@@ -88,6 +88,8 @@ The first spike (Typst 0.15.1, Rust 1.99.1, release profile with thin LTO and st
 
 The document date is fixed to 2026-01-01 UTC, so the output is deterministic: two runs and a clean rebuild produced the same SHA-256. The sample source is `assets/spike.typ`; the temporary entry point is `src/main.rs`.
 
+The AST-to-Typst layer must escape user text before emitting Typst: `$` opens math, `*` and `_` mark emphasis, `#` starts code, and brackets open content blocks. PDF/A also requires a document date, so the generator must set one explicitly or from a fixed build timestamp.
+
 krilla remains the fallback. It is a high-level PDF writer with PDF/A and PDF/UA support, but it explicitly leaves text layout, tables, page breaking and headers to the caller; choosing it would mean implementing those algorithms in the project.
 
 PDF/A output is validated with veraPDF, because producing a valid PDF/A file is not the same as conforming to the profile.

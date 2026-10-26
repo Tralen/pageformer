@@ -8,6 +8,7 @@
 - Chose Typst as the internal PDF engine and set `{NAME}` as the secret placeholder syntax.
 - Added the Typst PDF/A-2b spike with a sample contract and recorded its binary size, build time and validation result.
 - Added the example fixtures in `assets/examples/`: the contract Markdown and reference PDF, and the legal document extracted from an anonymized ODT.
+- Recorded the Typst escaping constraints and the explicit PDF/A date requirement in `docs/architecture.md`.
 
 ## Revision History
 *Patches, bug fixes, and minor updates.*

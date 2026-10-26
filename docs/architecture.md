@@ -47,13 +47,15 @@ Without secrets, the output is written next to the Markdown source, with the sam
 
 ## Secrets
 
-Placeholders use the form `{{NAME}}` in the document body. The angle-bracket form is avoided because CommonMark parses `<NAME>` as inline HTML, so both the parser and the editor preview would treat it as markup.
+Placeholders use the form `{NAME}` in the document body, with an uppercase name such as `{NOME_COMPLETO}`. Single braces are literal text in CommonMark, so both the parser and the Zed preview keep them intact. The angle-bracket form is rejected because `<NAME>` is parsed as inline HTML.
+
+Every token that matches `{[A-Z][A-Z0-9_]*}` is reserved for a secret. An unknown placeholder is a fatal error, never text left in the final document. The pattern does not apply inside code spans, code blocks or URLs, where the text is reproduced literally. A lowercase or spaced brace, such as `{nome}`, is ordinary text.
+
+Placeholders are resolved only in body content. One found in frontmatter metadata is an error, because secret values must never reach the PDF XMP package, the DOCX core properties or the ODT metadata.
 
 Secret values are loaded from a file outside the source tree, or from the environment, and are never accepted as command-line arguments. They are redacted from debug output and error messages and never printed to the console. A `--check` run reports placeholder names only.
 
-Secret values are never written to document metadata, including the PDF XMP package, the DOCX core properties or the ODT metadata. Metadata comes from the template and the frontmatter only.
-
-The document model replaces placeholders at render time, after parsing and before a backend sees the content.
+Metadata comes from the template and the frontmatter only. The document model replaces placeholders at render time, after parsing and before a backend sees the content.
 
 ## Formats
 
@@ -65,13 +67,15 @@ The document model replaces placeholders at render time, after parsing and befor
 
 ## PDF engine
 
-Constraint: a self-contained binary, with no Chromium, no webview and no external converter. Two candidates remain.
+The engine is Typst, used as a library. The constraint is a self-contained binary, with no Chromium, no webview and no external converter, and Typst satisfies it while providing the layout work the project would otherwise have to implement.
 
-Typst as a library is the leading candidate. It provides pagination, headers and footers, page numbering, explicit page breaks, automatic avoidance of single-line widows and orphans, system font discovery, font subsetting and embedding, PDF/A-2b, PDF/A-2u and PDF/UA-1. The Typst language stays internal: the YAML template and the document model generate Typst content, and users never write Typst.
+Typst provides pagination, headers and footers, page numbering, explicit page breaks, automatic avoidance of single-line widows and orphans, system font discovery, font subsetting and embedding, PDF/A-2b, PDF/A-2u and PDF/UA-1. The Typst language stays internal: the YAML template and the document model generate Typst content, and users never write Typst. A small `World` implementation for fonts and file access is preferred over a wrapper with an unstable API.
 
-krilla is a high-level PDF writer with PDF/A and PDF/UA support, but it explicitly leaves text layout, tables, page breaking and headers to the caller. Choosing it means implementing those algorithms in the project.
+Consequences: the binary grows by tens of megabytes and the first build takes minutes. Both must be measured in the first build. The crate is Apache-2.0, compatible with the project license.
 
-The decision is still open. The first build with Typst must measure the added binary size and compile time.
+krilla remains the fallback. It is a high-level PDF writer with PDF/A and PDF/UA support, but it explicitly leaves text layout, tables, page breaking and headers to the caller; choosing it would mean implementing those algorithms in the project.
+
+PDF/A output is validated with veraPDF, because producing a valid PDF/A file is not the same as conforming to the profile.
 
 ## Testing
 
@@ -79,7 +83,7 @@ Pure tests cover template resolution, validation, placeholder handling and the d
 
 ## Open decisions
 
-- PDF engine: Typst as a library, or krilla plus an in-house layout engine.
 - Exact YAML schema and its version field.
 - ODT implementation: a native ODF writer or another path.
-- Whether metadata may ever contain a secret, or whether metadata is always static.
+- DOCX library choice and the shared document model for reflowable formats.
+- Secret file format and permission checks.

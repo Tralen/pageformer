@@ -6,7 +6,7 @@ Generates documents from Markdown content and a single generic YAML template. On
 
 ## Stack
 
-Rust with egui for the graphical interface. The main workflow runs in the terminal; the interface is a minimal window launched by argument.
+Rust with egui for the graphical interface. The main workflow runs in the terminal; the interface is a minimal window launched by argument. PDF rendering uses Typst as an internal library, and users never write Typst.
 
 ## Versioning
 

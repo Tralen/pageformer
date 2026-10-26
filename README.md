@@ -20,7 +20,15 @@ SemVer; source: `Cargo.toml` (`[package].version`).
 
 Take a Markdown file or folder and render it through a template into PDF, ODT and DOCX, with the same document model behind every backend. PDF is the primary output and ODT is the second priority; additional formats, such as HTML, plain text and EPUB, fit behind the same rendering trait.
 
-Documentation is stored in [`docs/`](docs/). The rendering pipeline and the settled decisions are described in [`docs/architecture.md`](docs/architecture.md).
+Documentation is stored in [`docs/`](docs/). The rendering pipeline and the settled decisions are described in [`docs/architecture.md`](docs/architecture.md), and the YAML schema is described in [`docs/template.md`](docs/template.md).
+
+## Usage
+
+The command parses each Markdown file, resolves the template that applies to it and reports the result. Rendering arrives with the backends.
+
+```sh
+cargo run -- assets/examples/Contrato.md
+```
 
 ## Examples
 

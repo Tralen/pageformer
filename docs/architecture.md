@@ -21,11 +21,20 @@ flowchart TD
 
 ## Document model
 
-Markdown is parsed into a project-owned document model, not into backend-specific structures. The model holds semantic blocks and inlines, such as headings, paragraphs, lists, tables, quotes, code, images and explicit page breaks, and carries no layout decisions. Backends read the model and never parse Markdown themselves.
+Markdown is parsed into a project-owned document model, not into backend-specific structures. The model holds semantic blocks and inlines, such as headings, paragraphs, lists, tables, quotes, code, images and footnotes, and carries no layout decisions. Backends read the model and never parse Markdown themselves.
 
 The template is parsed and validated separately into a typed structure. An invalid template is fatal: the renderer never falls back to another template, because a document generated with the wrong template is worse than no document.
 
-The Markdown subset is CommonMark plus the extensions the Zed preview renders: tables, task lists, strikethrough, footnotes, alert block quotes and YAML frontmatter. Fenced code blocks are preserved. Raw HTML is not part of the contract.
+The Markdown subset is CommonMark plus the extensions the Zed preview renders: tables, task lists, strikethrough, footnotes, alert block quotes and YAML frontmatter. Fenced code blocks are preserved. Raw HTML is not part of the contract, so the parser rejects it instead of dropping it silently.
+
+## Crate layout
+
+- `src/document.rs` holds the backend-independent model, with newtypes and smart constructors for the values the pipeline validates.
+- `src/markdown.rs` parses CommonMark plus the extensions into the model. It is total: malformed event streams, raw HTML and nesting deeper than 128 levels become `MarkdownError` values.
+- `src/template/` holds the versioned YAML schema and the loader that resolves which template applies.
+- `src/main.rs` is the CLI. It parses each input, resolves the template and reports the result; rendering backends plug into the model later.
+
+The library is the pure core. File reading, the environment and the terminal live in the binary or in the loader's explicitly named functions.
 
 ## Consistency
 
@@ -86,7 +95,7 @@ The first spike (Typst 0.15.1, Rust 1.99.1, release profile with thin LTO and st
 | Fonts | Liberation Serif regular, bold and italic, embedded and subsetted |
 | PDF/A-2b | PASS with veraPDF 1.31.207 |
 
-The document date is fixed to 2026-01-01 UTC, so the output is deterministic: two runs and a clean rebuild produced the same SHA-256. The sample source is `assets/spike.typ`; the temporary entry point is `src/main.rs`.
+The document date is fixed to 2026-01-01 UTC, so the output was deterministic: two runs and a clean rebuild produced the same SHA-256. The spike was removed when the real crate layout replaced it; its measurements above remain the reference for the PDF backend.
 
 The AST-to-Typst layer must escape user text before emitting Typst: `$` opens math, `*` and `_` mark emphasis, `#` starts code, and brackets open content blocks. PDF/A also requires a document date, so the generator must set one explicitly or from a fixed build timestamp.
 
@@ -96,14 +105,16 @@ PDF/A output is validated with veraPDF, because producing a valid PDF/A file is 
 
 ## Testing
 
-Pure tests cover template resolution, validation, placeholder handling and the document model. HTML and plain text are compared as text. ZIP-based formats are checked structurally. PDF/A output is validated with veraPDF in integration tests. A corpus of real documents is kept as fixtures, because typography regressions do not appear in synthetic samples.
+Pure tests cover the document model, the Markdown parser, template validation and template resolution. The fixtures in `assets/examples/` drive the parser tests. HTML and plain text will be compared as text once those backends exist. ZIP-based formats will be checked structurally. PDF/A output is validated with veraPDF in integration tests. A corpus of real documents is kept as fixtures, because typography regressions do not appear in synthetic samples.
+
+The parser also has property tests that assert arbitrary text is either accepted or rejected without panicking. The template parser has the same property.
 
 The first fixtures are in `assets/examples/`: `Contrato.md` with the matching reference `Contrato.pdf`, and `Embargos.md`, extracted from an anonymized ODT. The reference PDF is for visual comparison, not byte equality.
 
 ## Open decisions
 
-- Exact YAML schema and its version field.
+- Explicit page breaks and the Markdown syntax that requests them.
 - ODT implementation: a native ODF writer or another path.
 - DOCX library choice and the shared document model for reflowable formats.
 - Secret file format and permission checks.
-- Crate layout for the pure core and the binary.
+- How much of the template typography, such as heading styles and header content, belongs in the schema before the PDF backend needs it.

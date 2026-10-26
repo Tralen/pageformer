@@ -22,7 +22,7 @@ fn assert_millimetres(actual: f64, expected: f64) {
 
 #[test]
 fn a_minimal_template_uses_the_documented_defaults() {
-    let template = parse("version: 1\n");
+    let template = parse("version: 2\n");
     assert_eq!(template.schema_version().get(), CURRENT_SCHEMA_VERSION);
     assert_eq!(template.page().size(), PageSize::A4);
     assert_eq!(template.page().orientation(), Orientation::Portrait);
@@ -31,19 +31,13 @@ fn a_minimal_template_uses_the_documented_defaults() {
     assert_eq!(template.text().leading().get(), 0.65);
     assert_eq!(template.text().alignment(), ParagraphAlignment::Justified);
     assert_eq!(template.text().font_families().len(), 3);
-    assert!(template.document_defaults().title().is_none());
 }
 
 #[test]
 fn a_complete_template_is_read_field_by_field() {
     let template = parse(
         r#"
-version: 1
-
-document:
-  title: Contrato
-  author: Pageformer
-  language: pt-BR
+version: 2
 
 page:
   size: letter
@@ -64,27 +58,6 @@ text:
   alignment: left
 "#,
     );
-    assert_eq!(
-        template
-            .document_defaults()
-            .title()
-            .map(|title| title.as_str()),
-        Some("Contrato")
-    );
-    assert_eq!(
-        template
-            .document_defaults()
-            .author()
-            .map(|author| author.as_str()),
-        Some("Pageformer")
-    );
-    assert_eq!(
-        template
-            .document_defaults()
-            .language()
-            .map(|language| language.as_str()),
-        Some("pt-BR")
-    );
     assert_eq!(template.page().size(), PageSize::Letter);
     assert_eq!(template.page().orientation(), Orientation::Landscape);
     assert_millimetres(millimetres(template.page().margins().right()), 25.0);
@@ -102,7 +75,7 @@ text:
 fn a_custom_page_keeps_its_dimensions() {
     let template = parse(
         r#"
-version: 1
+version: 2
 page:
   size:
     width: 216mm
@@ -117,7 +90,7 @@ page:
 
 #[test]
 fn landscape_swaps_the_page_dimensions() {
-    let template = parse("version: 1\npage:\n  size: a4\n  orientation: landscape\n");
+    let template = parse("version: 2\npage:\n  size: a4\n  orientation: landscape\n");
     let dimensions = template.page().dimensions();
     assert_millimetres(millimetres(dimensions.width()), 297.0);
     assert_millimetres(millimetres(dimensions.height()), 210.0);
@@ -125,17 +98,17 @@ fn landscape_swaps_the_page_dimensions() {
 
 #[test]
 fn an_unsupported_schema_version_is_rejected() {
-    let error = Template::from_yaml("version: 2\n").expect_err("version 2 is not supported");
+    let error = Template::from_yaml("version: 3\n").expect_err("version 3 is not supported");
     assert!(matches!(
         error,
         TemplateError::UnsupportedVersion {
-            found: 2,
+            found: 3,
             supported: CURRENT_SCHEMA_VERSION,
         }
     ));
     assert_eq!(
         error.to_string(),
-        "unsupported template schema version 2; this build supports version 1"
+        "unsupported template schema version 3; this build supports version 2"
     );
 }
 
@@ -146,12 +119,19 @@ fn a_missing_version_is_rejected() {
 }
 
 #[test]
+fn the_removed_document_section_is_rejected() {
+    let error = Template::from_yaml("version: 2\ndocument:\n  title: Contrato\n")
+        .expect_err("document metadata belongs to the frontmatter");
+    let message = error.to_string();
+    assert!(message.contains("unknown field `document`"), "{message}");
+}
+
+#[test]
 fn unknown_keys_are_rejected() {
     for yaml in [
-        "version: 1\ncolour: red\n",
-        "version: 1\npage:\n  size: a4\n  bleed: 3mm\n",
-        "version: 1\ntext:\n  font: Serif\n",
-        "version: 1\ndocument:\n  subject: Contrato\n",
+        "version: 2\ncolour: red\n",
+        "version: 2\npage:\n  size: a4\n  bleed: 3mm\n",
+        "version: 2\ntext:\n  font: Serif\n",
     ] {
         assert!(
             matches!(Template::from_yaml(yaml), Err(TemplateError::Yaml { .. })),
@@ -163,21 +143,21 @@ fn unknown_keys_are_rejected() {
 #[test]
 fn an_unknown_page_size_lists_the_accepted_names() {
     let error =
-        Template::from_yaml("version: 1\npage:\n  size: a3\n").expect_err("a3 is not supported");
+        Template::from_yaml("version: 2\npage:\n  size: a3\n").expect_err("a3 is not supported");
     let message = error.to_string();
     assert!(message.contains("a4"), "{message}");
 }
 
 #[test]
 fn an_unknown_orientation_is_rejected() {
-    let error = Template::from_yaml("version: 1\npage:\n  orientation: sideways\n")
+    let error = Template::from_yaml("version: 2\npage:\n  orientation: sideways\n")
         .expect_err("sideways is not supported");
     assert!(matches!(error, TemplateError::Yaml { .. }));
 }
 
 #[test]
 fn a_length_without_a_unit_is_rejected() {
-    let error = Template::from_yaml("version: 1\npage:\n  margins:\n    top: 30\n")
+    let error = Template::from_yaml("version: 2\npage:\n  margins:\n    top: 30\n")
         .expect_err("the unit is required");
     assert!(matches!(
         error,
@@ -191,7 +171,7 @@ fn a_length_without_a_unit_is_rejected() {
 #[test]
 fn an_unknown_length_unit_is_rejected() {
     let error =
-        Template::from_yaml("version: 1\ntext:\n  size: 12px\n").expect_err("px is not supported");
+        Template::from_yaml("version: 2\ntext:\n  size: 12px\n").expect_err("px is not supported");
     assert!(matches!(
         error,
         TemplateError::Value {
@@ -203,7 +183,7 @@ fn an_unknown_length_unit_is_rejected() {
 
 #[test]
 fn a_zero_font_size_is_rejected() {
-    let error = Template::from_yaml("version: 1\ntext:\n  size: 0pt\n")
+    let error = Template::from_yaml("version: 2\ntext:\n  size: 0pt\n")
         .expect_err("the font size must be positive");
     assert!(matches!(
         error,
@@ -216,7 +196,7 @@ fn a_zero_font_size_is_rejected() {
 
 #[test]
 fn a_negative_leading_is_rejected() {
-    let error = Template::from_yaml("version: 1\ntext:\n  leading: -0.2\n")
+    let error = Template::from_yaml("version: 2\ntext:\n  leading: -0.2\n")
         .expect_err("the leading must not be negative");
     assert!(matches!(
         error,
@@ -229,7 +209,7 @@ fn a_negative_leading_is_rejected() {
 
 #[test]
 fn an_empty_font_list_is_rejected() {
-    let error = Template::from_yaml("version: 1\ntext:\n  font_families: []\n")
+    let error = Template::from_yaml("version: 2\ntext:\n  font_families: []\n")
         .expect_err("the font list must not be empty");
     assert!(matches!(
         error,
@@ -241,30 +221,11 @@ fn an_empty_font_list_is_rejected() {
 }
 
 #[test]
-fn an_empty_document_title_is_rejected() {
-    let error =
-        Template::from_yaml("version: 1\ndocument:\n  title: \"  \"\n").expect_err("empty title");
-    assert!(matches!(error, TemplateError::DocumentMetadata(_)));
-}
-
-#[test]
-fn an_invalid_default_language_is_rejected() {
-    let error = Template::from_yaml("version: 1\ndocument:\n  language: pt_BR\n")
-        .expect_err("an invalid language");
-    assert!(matches!(error, TemplateError::DocumentMetadata(_)));
-}
-
-#[test]
 fn the_embedded_template_matches_the_project_defaults() {
     let template = Template::embedded().expect("the embedded template must be valid");
+    assert_eq!(template.schema_version().get(), CURRENT_SCHEMA_VERSION);
     assert_eq!(template.page().size(), PageSize::A4);
     assert_eq!(template.page().orientation(), Orientation::Portrait);
     assert_millimetres(millimetres(template.page().margins().left()), 25.0);
-    assert_eq!(
-        template
-            .document_defaults()
-            .language()
-            .map(|language| language.as_str()),
-        Some("pt-BR")
-    );
+    assert_eq!(template.text().font_families().len(), 3);
 }

@@ -4,6 +4,12 @@
 
 *Major updates and feature releases.*
 
+### 1.0.0
+
+- Breaking: removed the `document` section from the template. Titles, authors and languages now come only from the Markdown frontmatter, so one template serves many documents. Templates must use schema version 2.
+- Purged an identifying location from the example fixture history and regenerated `Embargos.pdf` from the corrected Markdown.
+- Revised the verification guide: every required tool installs without `sudo`, the Typst archive is extracted with Python when `tar -J` fails, and `qpdf`/`mupdf-tools` are optional.
+
 ### 0.3.1
 
 - Added `assets/examples/Embargos.pageformer.yaml`, a commented example of the template DSL.

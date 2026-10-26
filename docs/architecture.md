@@ -65,7 +65,7 @@ Placeholders are resolved only in body content. One found in frontmatter metadat
 
 Secret values are loaded from a file outside the source tree, or from the environment, and are never accepted as command-line arguments. They are redacted from debug output and error messages and never printed to the console. A `--check` run reports placeholder names only.
 
-Metadata comes from the template and the frontmatter only. The document model replaces placeholders at render time, after parsing and before a backend sees the content.
+Metadata comes from the frontmatter only. The template carries no document metadata, so one template serves many documents. The document model replaces placeholders at render time, after parsing and before a backend sees the content.
 
 ## Formats
 
@@ -85,7 +85,7 @@ The crate is Apache-2.0, compatible with the project license.
 
 ### The current backend
 
-`src/pdf` turns the model into Typst source and compiles it with the same Typst 0.15.1 library the spike used. The template sets the page dimensions, orientation, margins, letterhead, font families, size, leading and alignment; the frontmatter overrides the template's document defaults. The document date is fixed to 2026-01-01 UTC and the world reports the same date, so the same input produces the same bytes.
+`src/pdf` turns the model into Typst source and compiles it with the same Typst 0.15.1 library the spike used. The template sets the page dimensions, orientation, margins, letterhead, font families, size, leading and alignment; the frontmatter supplies the title, author and language. The document date is fixed to 2026-01-01 UTC and the world reports the same date, so the same input produces the same bytes.
 
 User text is escaped for Typst markup (`\`, `#`, `$`, `*`, `_`, `` ` ``, brackets, angle brackets, `@`, `~`, `-`, `+`, `/`, `=`, `:`, `&`, braces and periods; the period keeps `1.` from becoming an enum marker). Strings passed to Typst functions are escaped for Typst string literals. Local images are read at the edge, stored under a synthetic project path and served by the world; remote images are rejected. The letterhead resolves against the template file and the images resolve against the Markdown file.
 

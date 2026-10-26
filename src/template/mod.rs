@@ -12,12 +12,10 @@ use serde::Deserialize;
 use serde::de::value::MapAccessDeserializer;
 use serde::de::{self, Deserializer, MapAccess, Unexpected, Visitor};
 
-use crate::document::{Author, Language, MetadataError, Title};
-
 const MM_TO_POINTS: f64 = 72.0 / 25.4;
 
 /// The current schema version. A template for another version is rejected.
-pub const CURRENT_SCHEMA_VERSION: u16 = 1;
+pub const CURRENT_SCHEMA_VERSION: u16 = 2;
 
 const DEFAULT_MARGIN: Length = Length(20.0 * MM_TO_POINTS);
 const DEFAULT_FONT_SIZE: Length = Length(12.0);
@@ -48,7 +46,6 @@ const OFICIO_DIMENSIONS: PageDimensions = PageDimensions {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Template {
     version: SchemaVersion,
-    document: DocumentDefaults,
     page: Page,
     text: TextStyle,
 }
@@ -76,7 +73,6 @@ impl Template {
         }
         Ok(Self {
             version: SchemaVersion::CURRENT,
-            document: convert_document(raw.document)?,
             page: convert_page(raw.page)?,
             text: convert_text(raw.text)?,
         })
@@ -84,10 +80,6 @@ impl Template {
 
     pub fn schema_version(&self) -> SchemaVersion {
         self.version
-    }
-
-    pub fn document_defaults(&self) -> &DocumentDefaults {
-        &self.document
     }
 
     pub fn page(&self) -> &Page {
@@ -121,7 +113,6 @@ pub enum TemplateError {
         found: u16,
         supported: u16,
     },
-    DocumentMetadata(MetadataError),
     Value {
         field: &'static str,
         problem: ValueError,
@@ -136,9 +127,6 @@ impl fmt::Display for TemplateError {
                 formatter,
                 "unsupported template schema version {found}; this build supports version {supported}"
             ),
-            Self::DocumentMetadata(error) => {
-                write!(formatter, "invalid document defaults: {error}")
-            }
             Self::Value { field, problem } => {
                 write!(formatter, "invalid value for `{field}`: {problem}")
             }
@@ -149,7 +137,6 @@ impl fmt::Display for TemplateError {
 impl std::error::Error for TemplateError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
-            Self::DocumentMetadata(error) => Some(error),
             Self::Yaml { .. } | Self::UnsupportedVersion { .. } | Self::Value { .. } => None,
         }
     }
@@ -549,54 +536,14 @@ pub enum ParagraphAlignment {
     Left,
 }
 
-/// Metadata defaults provided by the template.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct DocumentDefaults {
-    title: Option<Title>,
-    author: Option<Author>,
-    language: Option<Language>,
-}
-
-impl DocumentDefaults {
-    pub fn new(title: Option<Title>, author: Option<Author>, language: Option<Language>) -> Self {
-        Self {
-            title,
-            author,
-            language,
-        }
-    }
-
-    pub fn title(&self) -> Option<&Title> {
-        self.title.as_ref()
-    }
-
-    pub fn author(&self) -> Option<&Author> {
-        self.author.as_ref()
-    }
-
-    pub fn language(&self) -> Option<&Language> {
-        self.language.as_ref()
-    }
-}
-
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct RawTemplate {
     version: u16,
     #[serde(default)]
-    document: RawDocument,
-    #[serde(default)]
     page: RawPage,
     #[serde(default)]
     text: RawText,
-}
-
-#[derive(Debug, Default, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct RawDocument {
-    title: Option<String>,
-    author: Option<String>,
-    language: Option<String>,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -631,25 +578,6 @@ struct RawText {
 struct DimensionsInput {
     width: String,
     height: String,
-}
-
-fn convert_document(raw: RawDocument) -> Result<DocumentDefaults, TemplateError> {
-    let title = raw
-        .title
-        .map(|text| Title::parse(&text))
-        .transpose()
-        .map_err(TemplateError::DocumentMetadata)?;
-    let author = raw
-        .author
-        .map(|text| Author::parse(&text))
-        .transpose()
-        .map_err(TemplateError::DocumentMetadata)?;
-    let language = raw
-        .language
-        .map(|text| Language::parse(&text))
-        .transpose()
-        .map_err(TemplateError::DocumentMetadata)?;
-    Ok(DocumentDefaults::new(title, author, language))
 }
 
 fn convert_page(raw: RawPage) -> Result<Page, TemplateError> {
@@ -829,12 +757,6 @@ mod tests {
         assert_eq!(template.schema_version(), SchemaVersion::CURRENT);
         assert_eq!(template.page().size(), PageSize::A4);
         assert_eq!(template.page().orientation(), Orientation::Portrait);
-        assert_eq!(
-            template
-                .document_defaults()
-                .language()
-                .map(Language::as_str),
-            Some("pt-BR")
-        );
+        assert_eq!(template.text().font_families().len(), 3);
     }
 }

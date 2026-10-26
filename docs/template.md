@@ -19,12 +19,7 @@ Paths written in the template, such as the letterhead image, resolve relative to
 ## Schema
 
 ```yaml
-version: 1
-
-document:
-  title: Contrato de Prestação de Serviços
-  author: Pageformer
-  language: pt-BR
+version: 2
 
 page:
   size: a4
@@ -40,6 +35,7 @@ text:
   font_families:
     - Liberation Serif
     - DejaVu Serif
+    - Libertinus Serif
   size: 12pt
   leading: 0.65
   alignment: justified
@@ -49,17 +45,21 @@ Every section and every key is optional except `version`. Missing keys take the 
 
 ### `version`
 
-The schema version, an integer. This build accepts `1` and rejects every other value.
+The schema version, an integer. This build accepts `2` and rejects every other value. Version 2 removed the `document` section: document metadata belongs to the Markdown.
 
-### `document`
+### Document metadata
 
-Defaults for the document metadata.
+The template carries no title, author or language, so one template serves many documents. Those values come only from the Markdown YAML frontmatter:
 
-- `title`: a non-empty title.
-- `author`: a non-empty author.
-- `language`: a BCP 47 style tag such as `pt-BR`.
+```yaml
+---
+title: Contrato de Prestação de Serviços
+author: Pageformer
+language: pt-BR
+---
+```
 
-Markdown frontmatter overrides these values. Empty strings are invalid.
+`title` and `author` must be non-empty, and `language` must be a BCP 47 style tag such as `pt-BR`. Without a language, the PDF sets no language and Typst uses its default.
 
 ### `page`
 
@@ -87,7 +87,7 @@ Images in the Markdown body resolve relative to the Markdown file, not to the te
 
 ## Current backend
 
-The PDF backend uses the page, text and document fields above. Header and footer content, heading page breaks, heading styles and configurable table styling are not in the schema yet, so the generated PDF uses Typst's default headings and lists, a neutral table grid and no header or footer.
+The PDF backend uses the page and text fields above and reads the document metadata from the frontmatter. Header and footer content, heading page breaks, heading styles and configurable table styling are not in the schema yet, so the generated PDF uses Typst's default headings and lists, a neutral table grid and no header or footer.
 
 ## Example
 

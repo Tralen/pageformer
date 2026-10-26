@@ -8,12 +8,7 @@
 # The nearest `.pageformer.yaml` replaces the global template and the embedded
 # fallback entirely; there is no merge.
 
-version: 1
-
-document:
-  title: EMBARGOS DE TERCEIRO
-  author: Escritório Exemplo
-  language: pt-BR
+version: 2
 
 page:
   size: a4

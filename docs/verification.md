@@ -1,6 +1,6 @@
 # Verification
 
-The project has four independent layers of verification: Rust checks, Markdown lint, PDF structure and PDF/A conformance. The tools below are installed at user level where possible, so only the optional system packages need `sudo`.
+The project has four independent layers of verification: Rust checks, Markdown lint, PDF structure and PDF/A conformance. Every required tool installs at user level; `sudo` is only for the optional system packages.
 
 ## Installed tools
 
@@ -11,31 +11,45 @@ The project has four independent layers of verification: Rust checks, Markdown l
 | `verapdf` | 1.30.3 | PDF/A conformance |
 | `pdfinfo`, `pdffonts`, `pdftotext` | poppler-utils | PDF structure, fonts and text |
 
-## Installation
+## Installation (no `sudo`)
 
-`markdownlint-cli2`, `typst` and `verapdf` do not need `sudo`.
+Put the user binaries on `PATH` first:
 
 ```sh
-npm install -g markdownlint-cli2
+export PATH="$HOME/.local/bin:$PATH"
+```
 
+Markdown lint. The `--prefix` keeps npm away from system directories:
+
+```sh
+npm install -g --prefix "$HOME/.local" markdownlint-cli2
+```
+
+Typst. The release is a `.tar.xz`; Python extracts it even when the local `xz` does not accept `tar -J`:
+
+```sh
 curl -L -o /tmp/typst.tar.xz https://github.com/typst/typst/releases/download/v0.15.1/typst-x86_64-unknown-linux-musl.tar.xz
-tar -xJf /tmp/typst.tar.xz -C /tmp
-install -m 755 /tmp/typst-x86_64-unknown-linux-musl/typst ~/.local/bin/typst
+mkdir -p /tmp/typst
+python3 -m tarfile -e /tmp/typst.tar.xz /tmp/typst
+install -m 755 /tmp/typst/typst-x86_64-unknown-linux-musl/typst "$HOME/.local/bin/typst"
+```
 
+veraPDF. It needs Java 11 or newer (`java -version`). The installer is interactive: choose `$HOME/.local/verapdf` and select the **veraPDF CLI** pack. The greenfield directory name carries the version, so use a glob:
+
+```sh
 curl -L -o /tmp/verapdf-installer.zip https://software.verapdf.org/releases/verapdf-installer.zip
 unzip -q /tmp/verapdf-installer.zip -d /tmp
 /tmp/verapdf-greenfield-*/verapdf-install -console
-# Choose ~/.local/verapdf and select the "veraPDF CLI" pack.
-ln -s ~/.local/verapdf/verapdf ~/.local/bin/verapdf
+ln -sf "$HOME/.local/verapdf/verapdf" "$HOME/.local/bin/verapdf"
 ```
 
-The optional PDF structure tools come from the distribution:
+The optional structure tools come from the distribution and are not needed for the checks below:
 
 ```sh
 sudo apt-get install qpdf poppler-utils mupdf-tools
 ```
 
-Poppler is already enough for the commands below; `qpdf --check` and `mutool info` add another structural opinion.
+Poppler provides the `pdfinfo`, `pdffonts` and `pdftotext` used here; `qpdf --check` and `mutool info` add another structural opinion.
 
 ## Commands
 

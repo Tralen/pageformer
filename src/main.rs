@@ -17,7 +17,7 @@ use typst_pdf::{PdfOptions, PdfStandard, PdfStandards};
 
 const MAIN_PATH: &str = "spike.typ";
 const SOURCE: &str = include_str!("../assets/spike.typ");
-const OUTPUT: &str = "spike.pdf";
+const OUTPUT: &str = ".examples/Contrato.pdf";
 const FIXED_YEAR: i32 = 2026;
 const FIXED_MONTH: u8 = 1;
 const FIXED_DAY: u8 = 1;
@@ -85,6 +85,12 @@ fn format_diagnostics(world: &SpikeWorld, diagnostics: &[SourceDiagnostic]) -> S
 }
 
 fn write_atomic(path: &Path, bytes: &[u8]) -> io::Result<()> {
+    if let Some(parent) = path
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+    {
+        std::fs::create_dir_all(parent)?;
+    }
     let temporary = path.with_extension("pdf.tmp");
     std::fs::write(&temporary, bytes)?;
     std::fs::rename(&temporary, path)

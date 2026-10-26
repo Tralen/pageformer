@@ -96,6 +96,8 @@ PDF/A output is validated with veraPDF, because producing a valid PDF/A file is 
 
 Pure tests cover template resolution, validation, placeholder handling and the document model. HTML and plain text are compared as text. ZIP-based formats are checked structurally. PDF/A output is validated with veraPDF in integration tests. A corpus of real documents is kept as fixtures, because typography regressions do not appear in synthetic samples.
 
+The first fixtures are in `assets/examples/`: `Contrato.md` with the matching reference `Contrato.pdf`, and `Embargos.md`, extracted from an anonymized ODT. The reference PDF is for visual comparison, not byte equality.
+
 ## Open decisions
 
 - Exact YAML schema and its version field.

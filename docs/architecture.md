@@ -32,13 +32,14 @@ The Markdown subset is CommonMark plus the extensions the Zed preview renders: t
 - `src/document.rs` holds the backend-independent model, with newtypes and smart constructors for the values the pipeline validates.
 - `src/markdown.rs` parses CommonMark plus the extensions into the model. It is total: malformed event streams, raw HTML and nesting deeper than 128 levels become `MarkdownError` values.
 - `src/template/` holds the versioned YAML schema and the loader that resolves which template applies.
-- `src/main.rs` is the CLI. It parses each input, resolves the template and reports the result; rendering backends plug into the model later.
+- `src/pdf/` is the PDF backend: `source.rs` generates Typst source, `assets.rs` reads local images and the letterhead, and `world.rs` is the Typst world that serves them.
+- `src/main.rs` is the CLI. It parses each input, resolves the template and either renders a PDF or reports the pipeline result.
 
 The library is the pure core. File reading, the environment and the terminal live in the binary or in the loader's explicitly named functions.
 
 ## Consistency
 
-Every format shares the semantic template: page size, orientation, margins, fonts, colors, line spacing, heading styles, header and footer content and the letterhead image.
+Every format shares the semantic template. The current schema defines page size, orientation, margins, font families, text size, leading, alignment and the letterhead image. Colors, heading styles and header and footer content are pending schema work.
 
 The promise is consistency of presentation, not identical content distribution. Pagination differs between paged formats, such as PDF, and reflowable formats, such as ODT, DOCX and EPUB. The project does not try to force the same distribution. Widows and orphans must be avoided where the engine allows it.
 
@@ -52,7 +53,7 @@ Paths inside the template, such as the letterhead image or a font file, resolve 
 
 ## Output
 
-Without secrets, the output is written next to the Markdown source, with the same name and the new extension. With secrets, the output must be written to a directory outside the source tree, given explicitly; the program refuses to write a secret-bearing document next to its sources. Writes are atomic.
+Without secrets, the output is written next to the Markdown source, with the same name and the new extension. `--output` selects another directory, and the program creates it when missing. Writes are atomic. With secrets, the output must be written to a directory outside the source tree, given explicitly; the program refuses to write a secret-bearing document next to its sources. Secrets are not implemented yet.
 
 ## Secrets
 
@@ -82,6 +83,16 @@ Typst provides pagination, headers and footers, page numbering, explicit page br
 
 The crate is Apache-2.0, compatible with the project license.
 
+### The current backend
+
+`src/pdf` turns the model into Typst source and compiles it with the same Typst 0.15.1 library the spike used. The template sets the page dimensions, orientation, margins, letterhead, font families, size, leading and alignment; the frontmatter overrides the template's document defaults. The document date is fixed to 2026-01-01 UTC and the world reports the same date, so the same input produces the same bytes.
+
+User text is escaped for Typst markup (`\`, `#`, `$`, `*`, `_`, `` ` ``, brackets, angle brackets, `@`, `~`, `-`, `+`, `/`, `=`, `:`, `&`, braces and periods; the period keeps `1.` from becoming an enum marker). Strings passed to Typst functions are escaped for Typst string literals. Local images are read at the edge, stored under a synthetic project path and served by the world; remote images are rejected. The letterhead resolves against the template file and the images resolve against the Markdown file.
+
+Embedded fonts are loaded before system fonts, so Libertinus Serif is always available as the last family in the default list. This keeps the binary self-contained, while a template can still prefer system fonts.
+
+Header and footer content, heading page breaks and configurable table styling are not part of the schema yet. The backend therefore uses Typst's default heading and list styles, a neutral table grid and no header or footer.
+
 ### Spike results
 
 The first spike (Typst 0.15.1, Rust 1.99.1, release profile with thin LTO and stripped symbols) rendered a nine-page A4 contract with system fonts, a header, a footer with page numbers, a table and signature lines.
@@ -95,17 +106,17 @@ The first spike (Typst 0.15.1, Rust 1.99.1, release profile with thin LTO and st
 | Fonts | Liberation Serif regular, bold and italic, embedded and subsetted |
 | PDF/A-2b | PASS with veraPDF 1.31.207 |
 
-The document date is fixed to 2026-01-01 UTC, so the output was deterministic: two runs and a clean rebuild produced the same SHA-256. The spike was removed when the real crate layout replaced it; its measurements above remain the reference for the PDF backend.
+The document date is fixed to 2026-01-01 UTC, so the output was deterministic: two runs and a clean rebuild produced the same SHA-256. The spike was removed when the real crate layout replaced it. The current backend reuses the same engine and fixes the date the same way; the measurements above remain the reference for build, binary size and runtime, but were not re-run for the backend.
 
-The AST-to-Typst layer must escape user text before emitting Typst: `$` opens math, `*` and `_` mark emphasis, `#` starts code, and brackets open content blocks. PDF/A also requires a document date, so the generator must set one explicitly or from a fixed build timestamp.
+The AST-to-Typst layer escapes user text before emitting Typst: `$` opens math, `*` and `_` mark emphasis, `#` starts code, and brackets open content blocks. PDF/A also requires a document date, so the generator sets one explicitly. See "The current backend" above for the implemented escaping and date policy.
 
 krilla remains the fallback. It is a high-level PDF writer with PDF/A and PDF/UA support, but it explicitly leaves text layout, tables, page breaking and headers to the caller; choosing it would mean implementing those algorithms in the project.
 
-PDF/A output is validated with veraPDF, because producing a valid PDF/A file is not the same as conforming to the profile.
+PDF/A output is validated with veraPDF, because producing a valid PDF/A file is not the same as conforming to the profile. The test suite checks the PDF/A markers and the PDF header; the veraPDF run remains a manual verification.
 
 ## Testing
 
-Pure tests cover the document model, the Markdown parser, template validation and template resolution. The fixtures in `assets/examples/` drive the parser tests. HTML and plain text will be compared as text once those backends exist. ZIP-based formats will be checked structurally. PDF/A output is validated with veraPDF in integration tests. A corpus of real documents is kept as fixtures, because typography regressions do not appear in synthetic samples.
+Pure tests cover the document model, the Markdown parser, template validation, template resolution and the Typst source generation. The fixtures in `assets/examples/` drive the parser and PDF tests. HTML and plain text will be compared as text once those backends exist. ZIP-based formats will be checked structurally. PDF output is checked for the PDF header and the PDF/A markers, and the same input must produce identical bytes in two runs. A corpus of real documents is kept as fixtures, because typography regressions do not appear in synthetic samples.
 
 The parser also has property tests that assert arbitrary text is either accepted or rejected without panicking. The template parser has the same property.
 
@@ -114,7 +125,8 @@ The first fixtures are in `assets/examples/`: `Contrato.md` with the matching re
 ## Open decisions
 
 - Explicit page breaks and the Markdown syntax that requests them.
+- Header and footer content, heading styles, heading page breaks and table styling in the template schema.
 - ODT implementation: a native ODF writer or another path.
 - DOCX library choice and the shared document model for reflowable formats.
 - Secret file format and permission checks.
-- How much of the template typography, such as heading styles and header content, belongs in the schema before the PDF backend needs it.
+- Folder input and generating every Markdown file found inside it.

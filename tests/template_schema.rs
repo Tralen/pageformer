@@ -30,7 +30,7 @@ fn a_minimal_template_uses_the_documented_defaults() {
     assert_eq!(template.text().size().points(), 12.0);
     assert_eq!(template.text().leading().get(), 0.65);
     assert_eq!(template.text().alignment(), ParagraphAlignment::Justified);
-    assert_eq!(template.text().font_families().len(), 2);
+    assert_eq!(template.text().font_families().len(), 3);
     assert!(template.document_defaults().title().is_none());
 }
 

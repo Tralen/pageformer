@@ -322,6 +322,9 @@ impl Table {
         header: Vec<TableCell>,
         rows: Vec<Vec<TableCell>>,
     ) -> Result<Self, TableError> {
+        if alignments.is_empty() {
+            return Err(TableError::NoColumns);
+        }
         let width = alignments.len();
         if header.len() != width {
             return Err(TableError::HeaderMismatch {
@@ -377,6 +380,7 @@ impl TableCell {
 /// Why a table was rejected.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TableError {
+    NoColumns,
     HeaderMismatch {
         expected: usize,
         found: usize,
@@ -391,6 +395,7 @@ pub enum TableError {
 impl fmt::Display for TableError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::NoColumns => formatter.write_str("the table has no columns"),
             Self::HeaderMismatch { expected, found } => {
                 write!(
                     formatter,
@@ -635,6 +640,12 @@ mod tests {
                 found: 1,
             })
         );
+    }
+
+    #[test]
+    fn table_rejects_a_table_without_columns() {
+        let error = Table::new(Vec::new(), Vec::new(), Vec::new());
+        assert_eq!(error, Err(TableError::NoColumns));
     }
 
     #[test]

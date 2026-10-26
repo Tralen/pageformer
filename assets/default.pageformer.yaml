@@ -20,6 +20,7 @@ text:
   font_families:
     - Liberation Serif
     - DejaVu Serif
+    - Libertinus Serif
   size: 12pt
   leading: 0.65
   alignment: justified

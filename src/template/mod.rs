@@ -736,6 +736,7 @@ fn default_font_families() -> Vec<FontFamily> {
     vec![
         FontFamily("Liberation Serif".to_owned()),
         FontFamily("DejaVu Serif".to_owned()),
+        FontFamily("Libertinus Serif".to_owned()),
     ]
 }
 

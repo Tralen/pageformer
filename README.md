@@ -24,11 +24,15 @@ Documentation is stored in [`docs/`](docs/). The rendering pipeline and the sett
 
 ## Usage
 
-The command parses each Markdown file, resolves the template that applies to it and reports the result. Rendering arrives with the backends.
+The command renders each Markdown file to PDF/A next to its source, using the template resolved for it.
 
 ```sh
 cargo run -- assets/examples/Contrato.md
+cargo run -- --check assets/examples/Contrato.md
+cargo run -- --output /tmp/pageformer assets/examples/Contrato.md
 ```
+
+The first command writes `Contrato.pdf` next to the Markdown and replaces the reference file in `assets/examples/`. Use `--output` to write somewhere else and `--check` to parse the Markdown and validate the template without rendering.
 
 ## Examples
 

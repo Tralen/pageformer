@@ -1,4 +1,4 @@
-//! Tests for the command-line pipeline check.
+//! Tests for the command-line pipeline.
 
 use std::ffi::OsStr;
 use std::fs;
@@ -35,7 +35,7 @@ fn stderr(output: &Output) -> String {
 
 #[test]
 fn the_contract_fixture_passes_the_pipeline_check() {
-    let output = run(&[fixture("Contrato.md").as_os_str()]);
+    let output = run(&[OsStr::new("--check"), fixture("Contrato.md").as_os_str()]);
     assert!(
         output.status.success(),
         "the check failed: {}",
@@ -49,6 +49,7 @@ fn the_contract_fixture_passes_the_pipeline_check() {
 #[test]
 fn every_input_is_reported() {
     let output = run(&[
+        OsStr::new("--check"),
         fixture("Contrato.md").as_os_str(),
         fixture("Embargos.md").as_os_str(),
     ]);
@@ -59,12 +60,37 @@ fn every_input_is_reported() {
 }
 
 #[test]
+fn the_contract_fixture_renders_a_pdf() {
+    let project = TempDir::new().expect("a temporary project");
+    let output = run(&[
+        OsStr::new("--output"),
+        project.path().as_os_str(),
+        fixture("Contrato.md").as_os_str(),
+    ]);
+    assert!(
+        output.status.success(),
+        "the render failed: {}",
+        stderr(&output)
+    );
+    let pdf = project.path().join("Contrato.pdf");
+    let bytes = fs::read(&pdf).expect("the PDF must exist");
+    assert!(bytes.starts_with(b"%PDF-"), "the output is not a PDF");
+    assert!(bytes.len() > 10_000, "the PDF is suspiciously small");
+    assert!(
+        stdout(&output).contains("Contrato.md -> "),
+        "{}",
+        stdout(&output)
+    );
+}
+
+#[test]
 fn an_invalid_explicit_template_fails_with_a_diagnostic() {
     let project = TempDir::new().expect("a temporary project");
     let template = project.path().join("broken.yaml");
     fs::write(&template, "version: 2\n").expect("the broken template must be written");
 
     let output = run(&[
+        OsStr::new("--check"),
         OsStr::new("--template"),
         template.as_os_str(),
         fixture("Contrato.md").as_os_str(),

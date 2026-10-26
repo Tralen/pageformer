@@ -3,6 +3,15 @@
 ## Version History
 *Major updates and feature releases.*
 
+### 0.3.0
+- Added the PDF backend: the document model and the resolved template become Typst source, which Typst compiles into PDF/A-2b.
+- Escaped user text for Typst markup and user strings for Typst string literals.
+- Loaded local images and the letterhead into the Typst project; remote images, missing files and unsupported formats are explicit errors.
+- Added embedded and system font discovery, so a fallback font is always available.
+- Made the PDF deterministic by fixing the document date.
+- Added `--output` to choose the destination directory and `--check` to validate without writing; PDFs are written atomically next to the source by default.
+- Rejected tables without columns in the document model.
+
 ### 0.2.0
 - Added the library core with the backend-independent document model, the Markdown parser and the template loader.
 - Defined schema version 1 of the YAML template: document defaults, page size, orientation, margins, letterhead, font families, text size, leading and alignment, all validated.

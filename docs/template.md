@@ -66,13 +66,13 @@ Markdown frontmatter overrides these values. Empty strings are invalid.
 - `size`: `a4`, `a5`, `letter`, `legal` or `oficio`, or a map with `width` and `height`. A custom size uses the same units as a length.
 - `orientation`: `portrait` or `landscape`. Landscape swaps the width and the height.
 - `margins`: `top`, `bottom`, `left` and `right`. A missing side defaults to `20mm`; a negative value is invalid.
-- `letterhead`: a path relative to the template file.
+- `letterhead`: a path relative to the template file. The file must be `png`, `jpg`, `gif`, `svg` or `webp`.
 
 The default size is A4 in portrait orientation.
 
 ### `text`
 
-- `font_families`: a non-empty list of font names, tried in order. The default is `Liberation Serif` and then `DejaVu Serif`.
+- `font_families`: a non-empty list of font names, tried in order. The default is `Liberation Serif`, `DejaVu Serif` and `Libertinus Serif`; the last one is embedded in the binary and is always available.
 - `size`: a positive length. The default is `12pt`.
 - `leading`: extra space between lines, in multiples of the font size. It must be finite and not negative; the default is `0.65`.
 - `alignment`: `justified` or `left`. The default is `justified`.
@@ -80,6 +80,14 @@ The default size is A4 in portrait orientation.
 ## Lengths
 
 A length is a number followed by one of `mm`, `cm`, `in` or `pt`. The unit is mandatory: `30` is an error and `30mm` is valid. Negative values are rejected, and the font size must be greater than zero.
+
+## Images
+
+Images in the Markdown body resolve relative to the Markdown file, not to the template. Absolute paths are accepted. The supported formats are `png`, `jpg`, `gif`, `svg` and `webp`; `pdf` images are rejected because PDF/A output does not accept them. Remote images are rejected because the program never performs network requests.
+
+## Current backend
+
+The PDF backend uses the page, text and document fields above. Header and footer content, heading page breaks, heading styles and configurable table styling are not in the schema yet, so the generated PDF uses Typst's default headings and lists, a neutral table grid and no header or footer.
 
 ## Errors
 

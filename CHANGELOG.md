@@ -1,9 +1,17 @@
 # Change Log
 
 ## Version History
+
 *Major updates and feature releases.*
 
+### 0.3.1
+
+- Added `assets/examples/Embargos.pageformer.yaml`, a commented example of the template DSL.
+- Regenerated both example PDFs with the current backend; both pass veraPDF 1.30.3 as PDF/A-2b.
+- Added the `markdownlint-cli2` configuration and documented the verification tools and commands in `docs/verification.md`.
+
 ### 0.3.0
+
 - Added the PDF backend: the document model and the resolved template become Typst source, which Typst compiles into PDF/A-2b.
 - Escaped user text for Typst markup and user strings for Typst string literals.
 - Loaded local images and the letterhead into the Typst project; remote images, missing files and unsupported formats are explicit errors.
@@ -13,6 +21,7 @@
 - Rejected tables without columns in the document model.
 
 ### 0.2.0
+
 - Added the library core with the backend-independent document model, the Markdown parser and the template loader.
 - Defined schema version 1 of the YAML template: document defaults, page size, orientation, margins, letterhead, font families, text size, leading and alignment, all validated.
 - Added the `pageformer` CLI that parses each Markdown file, resolves the applicable template and reports the result.
@@ -21,6 +30,7 @@
 - Added fixture tests for both examples, schema and resolution tests, CLI tests and property tests for parser totality.
 
 ### 0.1.0
+
 - Documented the rendering pipeline, the format priorities and the secret-handling policy in `docs/architecture.md`.
 - Chose Typst as the internal PDF engine and set `{NAME}` as the secret placeholder syntax.
 - Added the Typst PDF/A-2b spike with a sample contract and recorded its binary size, build time and validation result.
@@ -28,4 +38,5 @@
 - Recorded the Typst escaping constraints and the explicit PDF/A date requirement in `docs/architecture.md`.
 
 ## Revision History
+
 *Patches, bug fixes, and minor updates.*

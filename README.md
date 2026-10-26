@@ -20,7 +20,7 @@ SemVer; source: `Cargo.toml` (`[package].version`).
 
 Take a Markdown file or folder and render it through a template into PDF, ODT and DOCX, with the same document model behind every backend. PDF is the primary output and ODT is the second priority; additional formats, such as HTML, plain text and EPUB, fit behind the same rendering trait.
 
-Documentation is stored in [`docs/`](docs/). The rendering pipeline and the settled decisions are described in [`docs/architecture.md`](docs/architecture.md), and the YAML schema is described in [`docs/template.md`](docs/template.md).
+Documentation is stored in [`docs/`](docs/). The rendering pipeline and the settled decisions are described in [`docs/architecture.md`](docs/architecture.md), the YAML schema in [`docs/template.md`](docs/template.md), and the verification tools in [`docs/verification.md`](docs/verification.md).
 
 ## Usage
 
@@ -36,4 +36,4 @@ The first command writes `Contrato.pdf` next to the Markdown and replaces the re
 
 ## Examples
 
-The fixtures in [`assets/examples/`](assets/examples/) exercise the parser and the PDF backend. `Contrato.md` has a matching reference PDF, and `Embargos.md` was extracted from an anonymized ODT.
+The fixtures in [`assets/examples/`](assets/examples/) exercise the parser and the PDF backend. `Contrato.md` has a generated `Contrato.pdf`; `Embargos.md`, extracted from an anonymized ODT, has `Embargos.pdf` generated with the commented example template `Embargos.pageformer.yaml`. Both PDFs pass veraPDF as PDF/A-2b.

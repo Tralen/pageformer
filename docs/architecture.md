@@ -112,7 +112,7 @@ The AST-to-Typst layer escapes user text before emitting Typst: `$` opens math, 
 
 krilla remains the fallback. It is a high-level PDF writer with PDF/A and PDF/UA support, but it explicitly leaves text layout, tables, page breaking and headers to the caller; choosing it would mean implementing those algorithms in the project.
 
-PDF/A output is validated with veraPDF, because producing a valid PDF/A file is not the same as conforming to the profile. The test suite checks the PDF/A markers and the PDF header; the veraPDF run remains a manual verification.
+PDF/A output is validated with veraPDF, because producing a valid PDF/A file is not the same as conforming to the profile. Both example PDFs pass veraPDF 1.30.3 as PDF/A-2b; the test suite checks the PDF header, the PDF/A markers and deterministic bytes, and leaves the full veraPDF run to the verification commands in `docs/verification.md`.
 
 ## Testing
 
@@ -120,7 +120,7 @@ Pure tests cover the document model, the Markdown parser, template validation, t
 
 The parser also has property tests that assert arbitrary text is either accepted or rejected without panicking. The template parser has the same property.
 
-The first fixtures are in `assets/examples/`: `Contrato.md` with the matching reference `Contrato.pdf`, and `Embargos.md`, extracted from an anonymized ODT. The reference PDF is for visual comparison, not byte equality.
+The fixtures are in `assets/examples/`: `Contrato.md` with `Contrato.pdf`, and `Embargos.md` with `Embargos.pdf`, generated with `Embargos.pageformer.yaml`. The PDFs are outputs of the current backend, not byte targets; both pass veraPDF as PDF/A-2b.
 
 ## Open decisions
 

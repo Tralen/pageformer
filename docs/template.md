@@ -89,6 +89,14 @@ Images in the Markdown body resolve relative to the Markdown file, not to the te
 
 The PDF backend uses the page, text and document fields above. Header and footer content, heading page breaks, heading styles and configurable table styling are not in the schema yet, so the generated PDF uses Typst's default headings and lists, a neutral table grid and no header or footer.
 
+## Example
+
+`assets/examples/Embargos.pageformer.yaml` is a commented template for the legal fixture. Copy it to `.pageformer.yaml` next to the Markdown to have it discovered, or pass it explicitly:
+
+```sh
+pageformer --template assets/examples/Embargos.pageformer.yaml assets/examples/Embargos.md
+```
+
 ## Errors
 
 The template is validated before any document is rendered. A YAML syntax error, an unknown key, an unsupported version, a missing unit or a rejected value all stop the run with a diagnostic. The YAML parser reports the line and the column, and the loader adds the template path.

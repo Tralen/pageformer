@@ -71,7 +71,22 @@ The engine is Typst, used as a library. The constraint is a self-contained binar
 
 Typst provides pagination, headers and footers, page numbering, explicit page breaks, automatic avoidance of single-line widows and orphans, system font discovery, font subsetting and embedding, PDF/A-2b, PDF/A-2u and PDF/UA-1. The Typst language stays internal: the YAML template and the document model generate Typst content, and users never write Typst. A small `World` implementation for fonts and file access is preferred over a wrapper with an unstable API.
 
-Consequences: the binary grows by tens of megabytes and the first build takes minutes. Both must be measured in the first build. The crate is Apache-2.0, compatible with the project license.
+The crate is Apache-2.0, compatible with the project license.
+
+### Spike results
+
+The first spike (Typst 0.15.1, Rust 1.99.1, release profile with thin LTO and stripped symbols) rendered a nine-page A4 contract with system fonts, a header, a footer with page numbers, a table and signature lines.
+
+| Measurement | Result |
+|---|---|
+| Binary size | 40,387,192 bytes (about 38.5 MiB) |
+| Clean build | 62.6 s, peak RSS about 1.9 GiB |
+| Runtime | about 0.17 s, peak RSS about 33 MiB |
+| Output | 73,781 bytes, PDF 1.7, nine A4 pages, tagged |
+| Fonts | Liberation Serif regular, bold and italic, embedded and subsetted |
+| PDF/A-2b | PASS with veraPDF 1.31.207 |
+
+The document date is fixed to 2026-01-01 UTC, so the output is deterministic: two runs and a clean rebuild produced the same SHA-256. The sample source is `assets/spike.typ`; the temporary entry point is `src/main.rs`.
 
 krilla remains the fallback. It is a high-level PDF writer with PDF/A and PDF/UA support, but it explicitly leaves text layout, tables, page breaking and headers to the caller; choosing it would mean implementing those algorithms in the project.
 
@@ -87,3 +102,4 @@ Pure tests cover template resolution, validation, placeholder handling and the d
 - ODT implementation: a native ODF writer or another path.
 - DOCX library choice and the shared document model for reflowable formats.
 - Secret file format and permission checks.
+- Crate layout for the pure core and the binary.

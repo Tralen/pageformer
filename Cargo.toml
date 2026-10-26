@@ -1,0 +1,17 @@
+[package]
+name = "pageformer"
+version = "0.1.0"
+edition = "2024"
+license = "BSD-3-Clause"
+description = "Generates documents from Markdown and a YAML template."
+publish = false
+
+[dependencies]
+typst = "0.15.1"
+typst-kit = { version = "0.15.1", features = ["scan-fonts"] }
+typst-layout = "0.15.1"
+typst-pdf = "0.15.1"
+
+[profile.release]
+lto = "thin"
+strip = "symbols"

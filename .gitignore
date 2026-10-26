@@ -9,5 +9,4 @@ COMPLIANCE.md
 .handoff/
 target/
 SKETCH.md
-/spike.pdf
-/spike.pdf.tmp
+.examples/

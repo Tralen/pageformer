@@ -20,8 +20,4 @@ SemVer; source: `Cargo.toml` (`[package].version`).
 
 Take a Markdown file or folder and render it through a template into PDF, ODT and DOCX, with the same document model behind every backend. Additional formats, such as HTML, plain text and EPUB, fit behind the same rendering trait.
 
-## Assistant
-
-Role: Purist Functional Programming Assistant.
-
 Documentation is stored in [`docs/`](docs/).

@@ -1,11 +1,13 @@
 //! Integration tests for the PDF backend.
 
 use std::fs;
+use std::path::Path;
 
 use pageformer::document::{Block, Destination, Document, Inline, Metadata};
 use pageformer::markdown;
 use pageformer::pdf::{self, AssetMap, Assets};
 use pageformer::template::Template;
+use pageformer::template::loader;
 use tempfile::TempDir;
 
 const CONTRACT: &str = include_str!("../assets/examples/Contrato.md");
@@ -72,6 +74,32 @@ fn the_embargos_fixture_is_rendered() {
     assert!(
         output.warnings().is_empty(),
         "the embargos fixture produced warnings: {:?}",
+        output.warnings()
+    );
+}
+
+#[test]
+fn the_embargos_example_template_uses_its_letterhead() {
+    let examples = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("assets")
+        .join("examples");
+    let template = loader::load_file(&examples.join("Embargos.pageformer.yaml"))
+        .expect("the example template must load");
+    assert_eq!(
+        template.page().letterhead().map(|path| path.as_str()),
+        Some("Timbre.png")
+    );
+
+    let document = markdown::parse(EMBARGOS).expect("the embargos fixture must parse");
+    let assets = pdf::load_assets(&document, &template, &examples, Some(&examples))
+        .expect("the letterhead must load");
+    assert_eq!(assets.map().letterhead(), Some("assets/letterhead.png"));
+
+    let output = pdf::render(&document, &template, &assets).expect("the example must render");
+    assert!(output.bytes().starts_with(b"%PDF-"));
+    assert!(
+        output.warnings().is_empty(),
+        "the example produced warnings: {:?}",
         output.warnings()
     );
 }

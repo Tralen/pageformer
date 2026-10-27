@@ -91,7 +91,7 @@ The PDF backend uses the page and text fields above and reads the document metad
 
 ## Example
 
-`assets/examples/Embargos.pageformer.yaml` is a commented template for the legal fixture. Copy it to `.pageformer.yaml` next to the Markdown to have it discovered, or pass it explicitly:
+`assets/examples/Embargos.pageformer.yaml` is a commented template for the legal fixture. It uses the fictional `Timbre.png` letterhead from the same directory. Copy the template to `.pageformer.yaml` next to the Markdown to have it discovered, or pass it explicitly:
 
 ```sh
 pageformer --template assets/examples/Embargos.pageformer.yaml assets/examples/Embargos.md

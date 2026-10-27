@@ -4,19 +4,18 @@
 
 *Major updates and feature releases.*
 
-### 1.1.0
+### 0.4.0
 
+- Renumbered the unreleased 1.0.0 and 1.1.0 changes under 0.4.0; no release was made.
+- Breaking: removed the `document` section from the template. Titles, authors and languages now come only from the Markdown frontmatter, so one template serves many documents. Templates must use schema version 2.
 - Legal numbering no longer needs a backslash: a loose ordered list whose items are one paragraph each becomes a sequence of numbered paragraphs, so `1.` stays as written and keeps its number. Tight ordered lists remain lists.
 - Lists now carry their tightness, and the PDF passes it to Typst.
 - Moved trailing commas outside the bold and italic spans in `Embargos.md`.
-- Disabled markdownlint's ordered-list prefix rule, because legal numbering is explicit and may restart.
-- Documented why `tar -J` failed on machines where a user-level `xz` wrapper shadows `/usr/bin/xz`.
-
-### 1.0.0
-
-- Breaking: removed the `document` section from the template. Titles, authors and languages now come only from the Markdown frontmatter, so one template serves many documents. Templates must use schema version 2.
+- Added the fictional `Timbre.png` letterhead to the `Embargos` example and adjusted its margins and leading.
 - Purged an identifying location from the example fixture history and regenerated `Embargos.pdf` from the corrected Markdown.
+- Disabled markdownlint's ordered-list prefix rule, because legal numbering is explicit and may restart.
 - Revised the verification guide: every required tool installs without `sudo`, the Typst archive is extracted with Python when `tar -J` fails, and `qpdf`/`mupdf-tools` are optional.
+- Documented why `tar -J` failed on machines where a user-level `xz` wrapper shadows `/usr/bin/xz`.
 
 ### 0.3.1
 

@@ -18,8 +18,8 @@ page:
     bottom: 20mm
     left: 30mm
     right: 20mm
-    # A letterhead resolves relative to this file.
-    letterhead: Timbre.png
+  # A letterhead resolves relative to this file.
+  letterhead: Timbre.png
 
 text:
   font_families:

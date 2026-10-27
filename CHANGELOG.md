@@ -8,6 +8,7 @@
 
 - Added `text.paragraph_spacing`, a length that sets the space between paragraphs.
 - Moved the example template to `assets/examples/.pageformer.yaml`, so it applies to both `Contrato.md` and `Embargos.md`, and regenerated both example PDFs with the shared fictional letterhead.
+- Added `docs/roadmap.md`, the ordered implementation map from the CLI to 1.0.0.
 
 ### 0.4.0
 

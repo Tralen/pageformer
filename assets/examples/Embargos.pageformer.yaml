@@ -14,7 +14,7 @@ page:
   size: a4
   orientation: portrait
   margins:
-    top: 25mm
+    top: 30mm
     bottom: 20mm
     left: 30mm
     right: 20mm
@@ -27,5 +27,5 @@ text:
     - DejaVu Serif
     - Libertinus Serif
   size: 12pt
-  leading: 0.55
+  leading: 1.25
   alignment: justified

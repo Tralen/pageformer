@@ -27,5 +27,5 @@ text:
       - DejaVu Sans
       - Libertinus Serif
     size: 18
-  leading: 7.8pt
+  leading: 7.8
   alignment: justified

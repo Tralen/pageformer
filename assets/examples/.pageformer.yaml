@@ -30,7 +30,7 @@ text:
       - DejaVu Sans
       - Linux Biolinum O
     size: 18
-  leading: 7.8pt
+  leading: 7.8
   paragraph_spacing: 24
   header_spacing: 18
   alignment: justified

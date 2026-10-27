@@ -7,7 +7,7 @@ Pageformer reaches 1.0.0 through ten phases, in the order below. The order is a 
 | Phase | Scope | Status | Starts after |
 |---|---|---|---|
 | 1. CLI | Input discovery, format selection, output rules | Done in 0.6.0: files and directories, path-ordered batches, mirrored output, ANSI styling | 0.5.0 |
-| 2. PDF | Primary output and reference backend | In progress in 0.7.0: body and title styles, header spacing and point units; running header/footer, per-level heading styles and table styling remain | CLI output rules |
+| 2. PDF | Primary output and reference backend | In progress in 0.9.0: schema 0.5 with `formatting`, paragraph and heading styles, `h1` to `h6`, weight/style and inline overrides; running header/footer, page breaks and table styling remain | CLI output rules |
 | 3. Secrets | Placeholder resolution and leak prevention | Design only | PDF pipeline |
 | 4. TXT | Plain-text view and the renderer boundary | Not started | Secrets |
 | 5. ODT | Second-priority paged format | Not started | Renderer boundary |
@@ -85,7 +85,7 @@ A phase is closed only when all of the following hold:
 
 **Current state.** PDF/A-2b through Typst 0.15.1, page size, orientation, margins, letterhead, body and title styles, leading, paragraph spacing, header spacing, alignment, local images, headings, lists, tables, quotes, code, footnotes, embedded fonts and a fixed document date.
 
-**Status.** Started in 0.7.0: template schema 4, body and title styles for level-1 headings, header spacing, point defaults and a length-based leading. The rest of the list below remains.
+**Status.** Started in 0.7.0 and expanded in 0.9.0: template schema 0.5, `formatting.paragraph`, `formatting.heading` with `h1` to `h6`, weight, style, inline emphasis and strong overrides, point lengths and a length-based leading. The rest of the list below remains.
 
 **Work.**
 
@@ -226,12 +226,12 @@ A phase is closed only when all of the following hold:
 
 | Area | Keys | Phase | Notes |
 |---|---|---|---|
-| Version | `version` | 0.8.0 | Exact match; schema 4 is current. |
+| Version | `version` | 0.9.0 | Two-part string; schema `0.5` is current. |
 | Page | `page.size`, `page.orientation`, `page.margins`, `page.letterhead` | 0.5.0 | Shared by every paged format. |
-| Body and title | `text.body`, `text.title` | 0.7.0 | Font families and sizes; the title style applies to level-1 headings. |
-| Text spacing | `text.leading`, `text.paragraph_spacing`, `text.header_spacing`, `text.alignment` | 0.7.0 | `header_spacing` is above a level-1 heading; every spacing is a length, and `leading` is a length since 0.8.0. |
-| Header and footer | `page.header`, `page.footer` | 2 | Running header and footer; not `text.header_spacing`, which is heading spacing. |
-| Headings | `text.heading` | 2 | Per-level overrides; level 1 currently uses `text.title`. |
+| Paragraph | `formatting.paragraph` | 0.9.0 | Font families, size, weight, style, leading, spacing, alignment and inline overrides. |
+| Inline spans | `formatting.paragraph.emphasis`, `formatting.paragraph.strong` | 0.9.0 | Inherit the paragraph face; style italic and weight bold are the semantic defaults. |
+| Headings | `formatting.heading`, `formatting.heading.h1` to `h6` | 0.9.0 | Base plus per-level overrides for fonts, size, weight, style and spacing. |
+| Header and footer | `page.header`, `page.footer` | 2 | Running header and footer; not heading spacing. |
 | Tables | `table` | 2 | Borders, header fill, cell padding. |
 | EPUB | `epub.split_at` | After 1.0.0 | Defaults to first-level headings. |
 
@@ -241,7 +241,7 @@ Schema evolution follows one rule: an optional key that preserves the meaning an
 
 | Field | Phase | Purpose |
 |---|---|---|
-| `title`, `author`, `language` | 0.5.0 | Document metadata; the PDF uses the title as metadata, and level-1 headings use `text.title`. |
+| `title`, `author`, `language` | 0.5.0 | Document metadata; the PDF uses the title as metadata, and level-1 headings use `formatting.heading.h1`. |
 | `date` | 2 | Document date; replaces the fixed date when present. |
 | `subject`, `keywords` | 2 | PDF metadata and HTML meta tags. |
 | `identifier` | 9 | Stable EPUB identifier; overrides the derived UUID. |

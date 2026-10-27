@@ -1,8 +1,8 @@
 //! Tests for the YAML template schema.
 
 use pageformer::template::{
-    CURRENT_SCHEMA_VERSION, Length, Orientation, PageSize, ParagraphAlignment, Template,
-    TemplateError, ValueError,
+    CURRENT_SCHEMA_VERSION, FontSlant, FontWeight, Length, Orientation, PageSize,
+    ParagraphAlignment, SchemaVersion, Template, TemplateError, ValueError,
 };
 
 fn parse(yaml: &str) -> Template {
@@ -20,28 +20,49 @@ fn assert_millimetres(actual: f64, expected: f64) {
     );
 }
 
+fn value_error_is(error: &TemplateError, field: &str, problem: ValueError) -> bool {
+    matches!(
+        error,
+        TemplateError::Value {
+            field: actual,
+            problem: actual_problem,
+        } if actual.as_str() == field && *actual_problem == problem
+    )
+}
+
 #[test]
 fn a_minimal_template_uses_the_documented_defaults() {
-    let template = parse("version: 4\n");
-    assert_eq!(template.schema_version().get(), CURRENT_SCHEMA_VERSION);
+    let template = parse("version: \"0.5\"\n");
+    assert_eq!(template.schema_version(), CURRENT_SCHEMA_VERSION);
     assert_eq!(template.page().size(), PageSize::A4);
     assert_eq!(template.page().orientation(), Orientation::Portrait);
     assert_millimetres(millimetres(template.page().margins().top()), 20.0);
-    assert_eq!(template.text().body().size().points(), 12.0);
-    assert_eq!(template.text().title().size().points(), 18.0);
-    assert_eq!(template.text().leading().points(), 7.8);
-    assert_eq!(template.text().alignment(), ParagraphAlignment::Justified);
-    assert_eq!(template.text().body().font_families().len(), 3);
-    assert_eq!(template.text().title().font_families().len(), 3);
-    assert_eq!(template.text().paragraph_spacing(), None);
-    assert_eq!(template.text().header_spacing(), None);
+
+    let paragraph = template.formatting().paragraph();
+    assert_eq!(paragraph.face().size().points(), 12.0);
+    assert_eq!(paragraph.face().weight(), FontWeight::NORMAL);
+    assert_eq!(paragraph.face().slant(), FontSlant::Normal);
+    assert_eq!(paragraph.face().font_families().len(), 3);
+    assert_eq!(paragraph.leading().points(), 7.8);
+    assert_eq!(paragraph.spacing(), None);
+    assert_eq!(paragraph.alignment(), ParagraphAlignment::Justified);
+    assert_eq!(paragraph.emphasis().slant(), FontSlant::Italic);
+    assert_eq!(paragraph.strong().weight(), FontWeight::BOLD);
+
+    let heading = template.formatting().heading().levels();
+    assert_eq!(heading[0].face().size().points(), 18.0);
+    assert_eq!(heading[0].spacing_before().points(), 18.0);
+    assert_eq!(heading[0].spacing_after().points(), 6.0);
+    assert_eq!(heading[1].face().size().points(), 14.0);
+    assert_eq!(heading[2].face().size().points(), 12.0);
+    assert_eq!(heading[0].face().weight(), FontWeight::BOLD);
 }
 
 #[test]
 fn a_complete_template_is_read_field_by_field() {
     let template = parse(
         r#"
-version: 4
+version: "0.5"
 
 page:
   size: letter
@@ -53,20 +74,34 @@ page:
     right: 25mm
   letterhead: images/letterhead.png
 
-text:
-  body:
+formatting:
+  paragraph:
     font_families:
       - Liberation Serif
       - DejaVu Serif
     size: 11
-  title:
+    weight: semibold
+    style: italic
+    leading: 9
+    spacing: 6
+    alignment: left
+    emphasis:
+      weight: bold
+    strong:
+      style: italic
+  heading:
     font_families:
       - Liberation Sans
-    size: 16
-  leading: 7.5
-  paragraph_spacing: 6
-  header_spacing: 18
-  alignment: left
+    size: 20
+    weight: normal
+    style: italic
+    spacing_before: 14
+    spacing_after: 5
+    h1:
+      size: 22
+      weight: bold
+    h2:
+      spacing_before: 10
 "#,
     );
     assert_eq!(template.page().size(), PageSize::Letter);
@@ -76,27 +111,43 @@ text:
         template.page().letterhead().map(|path| path.as_str()),
         Some("images/letterhead.png")
     );
-    assert_eq!(template.text().body().size().points(), 11.0);
-    assert_eq!(template.text().title().size().points(), 16.0);
-    assert_eq!(template.text().leading().points(), 7.5);
-    assert_eq!(
-        template.text().paragraph_spacing().map(Length::points),
-        Some(6.0)
-    );
-    assert_eq!(
-        template.text().header_spacing().map(Length::points),
-        Some(18.0)
-    );
-    assert_eq!(template.text().alignment(), ParagraphAlignment::Left);
-    assert_eq!(template.text().body().font_families().len(), 2);
-    assert_eq!(template.text().title().font_families().len(), 1);
+
+    let paragraph = template.formatting().paragraph();
+    assert_eq!(paragraph.face().size().points(), 11.0);
+    assert_eq!(paragraph.face().weight().get(), 600);
+    assert_eq!(paragraph.face().slant(), FontSlant::Italic);
+    assert_eq!(paragraph.leading().points(), 9.0);
+    assert_eq!(paragraph.spacing().map(Length::points), Some(6.0));
+    assert_eq!(paragraph.alignment(), ParagraphAlignment::Left);
+    assert_eq!(paragraph.face().font_families().len(), 2);
+    assert_eq!(paragraph.emphasis().weight(), FontWeight::BOLD);
+    assert_eq!(paragraph.emphasis().slant(), FontSlant::Italic);
+    assert_eq!(paragraph.strong().weight(), FontWeight::BOLD);
+    assert_eq!(paragraph.strong().slant(), FontSlant::Italic);
+
+    let heading = template.formatting().heading().levels();
+    assert_eq!(heading[0].face().font_families().len(), 1);
+    assert_eq!(heading[0].face().size().points(), 22.0);
+    assert_eq!(heading[0].face().weight(), FontWeight::BOLD);
+    assert_eq!(heading[0].face().slant(), FontSlant::Italic);
+    assert_eq!(heading[0].spacing_before().points(), 14.0);
+    assert_eq!(heading[0].spacing_after().points(), 5.0);
+
+    assert_eq!(heading[1].face().size().points(), 20.0);
+    assert_eq!(heading[1].face().weight(), FontWeight::NORMAL);
+    assert_eq!(heading[1].spacing_before().points(), 10.0);
+    assert_eq!(heading[1].spacing_after().points(), 5.0);
+
+    assert_eq!(heading[2].face().size().points(), 20.0);
+    assert_eq!(heading[2].face().weight(), FontWeight::NORMAL);
+    assert_eq!(heading[2].spacing_before().points(), 14.0);
 }
 
 #[test]
 fn a_custom_page_keeps_its_dimensions() {
     let template = parse(
         r#"
-version: 4
+version: "0.5"
 page:
   size:
     width: 216mm
@@ -111,7 +162,7 @@ page:
 
 #[test]
 fn landscape_swaps_the_page_dimensions() {
-    let template = parse("version: 4\npage:\n  size: a4\n  orientation: landscape\n");
+    let template = parse("version: \"0.5\"\npage:\n  size: a4\n  orientation: landscape\n");
     let dimensions = template.page().dimensions();
     assert_millimetres(millimetres(dimensions.width()), 297.0);
     assert_millimetres(millimetres(dimensions.height()), 210.0);
@@ -119,17 +170,18 @@ fn landscape_swaps_the_page_dimensions() {
 
 #[test]
 fn an_unsupported_schema_version_is_rejected() {
-    let error = Template::from_yaml("version: 2\n").expect_err("version 2 is not supported");
+    let error =
+        Template::from_yaml("version: \"0.4\"\n").expect_err("version 0.4 is not supported");
     assert!(matches!(
         error,
         TemplateError::UnsupportedVersion {
-            found: 2,
-            supported: CURRENT_SCHEMA_VERSION,
-        }
+            found,
+            supported,
+        } if found == SchemaVersion::new(0, 4) && supported == CURRENT_SCHEMA_VERSION
     ));
     assert_eq!(
         error.to_string(),
-        "unsupported template schema version 2; this build supports version 4"
+        "unsupported template schema version 0.4; this build supports version 0.5"
     );
 }
 
@@ -140,20 +192,27 @@ fn a_missing_version_is_rejected() {
 }
 
 #[test]
-fn the_removed_document_section_is_rejected() {
-    let error = Template::from_yaml("version: 4\ndocument:\n  title: Contrato\n")
-        .expect_err("document metadata belongs to the frontmatter");
+fn an_unquoted_version_is_read_as_a_string() {
+    let template = parse("version: 0.5\n");
+    assert_eq!(template.schema_version(), CURRENT_SCHEMA_VERSION);
+}
+
+#[test]
+fn the_removed_text_section_is_rejected() {
+    let error = Template::from_yaml("version: \"0.5\"\ntext:\n  size: 12\n")
+        .expect_err("formatting replaced text");
     let message = error.to_string();
-    assert!(message.contains("unknown field `document`"), "{message}");
+    assert!(message.contains("unknown field `text`"), "{message}");
 }
 
 #[test]
 fn unknown_keys_are_rejected() {
     for yaml in [
-        "version: 4\ncolour: red\n",
-        "version: 4\npage:\n  size: a4\n  bleed: 3mm\n",
-        "version: 4\ntext:\n  font: Serif\n",
-        "version: 4\ntext:\n  body:\n    weight: bold\n",
+        "version: \"0.5\"\ncolour: red\n",
+        "version: \"0.5\"\npage:\n  size: a4\n  bleed: 3mm\n",
+        "version: \"0.5\"\nformatting:\n  paragraph:\n    font: Serif\n",
+        "version: \"0.5\"\nformatting:\n  heading:\n    h7:\n      size: 12\n",
+        "version: \"0.5\"\nformatting:\n  paragraph:\n    emphasis:\n      unknown: 1\n",
     ] {
         assert!(
             matches!(Template::from_yaml(yaml), Err(TemplateError::Yaml { .. })),
@@ -164,120 +223,181 @@ fn unknown_keys_are_rejected() {
 
 #[test]
 fn an_unknown_page_size_lists_the_accepted_names() {
-    let error =
-        Template::from_yaml("version: 4\npage:\n  size: a3\n").expect_err("a3 is not supported");
+    let error = Template::from_yaml("version: \"0.5\"\npage:\n  size: a3\n")
+        .expect_err("a3 is not supported");
     let message = error.to_string();
     assert!(message.contains("a4"), "{message}");
 }
 
 #[test]
 fn an_unknown_orientation_is_rejected() {
-    let error = Template::from_yaml("version: 4\npage:\n  orientation: sideways\n")
+    let error = Template::from_yaml("version: \"0.5\"\npage:\n  orientation: sideways\n")
         .expect_err("sideways is not supported");
     assert!(matches!(error, TemplateError::Yaml { .. }));
 }
 
 #[test]
 fn a_length_without_a_unit_is_points() {
-    let template = parse("version: 4\npage:\n  margins:\n    top: 30\n");
+    let template = parse("version: \"0.5\"\npage:\n  margins:\n    top: 30\n");
     assert_eq!(template.page().margins().top().points(), 30.0);
 }
 
 #[test]
 fn an_unknown_length_unit_is_rejected() {
-    let error = Template::from_yaml("version: 4\ntext:\n  body:\n    size: 12px\n")
-        .expect_err("px is not supported");
-    assert!(matches!(
-        error,
-        TemplateError::Value {
-            field: "text.body.size",
-            problem: ValueError::UnknownUnit,
-        }
+    let error =
+        Template::from_yaml("version: \"0.5\"\nformatting:\n  paragraph:\n    size: 12px\n")
+            .expect_err("px is not supported");
+    assert!(value_error_is(
+        &error,
+        "formatting.paragraph.size",
+        ValueError::UnknownUnit
     ));
 }
 
 #[test]
 fn a_zero_font_size_is_rejected() {
-    let error = Template::from_yaml("version: 4\ntext:\n  body:\n    size: 0pt\n")
+    let error = Template::from_yaml("version: \"0.5\"\nformatting:\n  paragraph:\n    size: 0\n")
         .expect_err("the font size must be positive");
-    assert!(matches!(
-        error,
-        TemplateError::Value {
-            field: "text.body.size",
-            problem: ValueError::Zero,
-        }
+    assert!(value_error_is(
+        &error,
+        "formatting.paragraph.size",
+        ValueError::Zero
+    ));
+}
+
+#[test]
+fn a_zero_heading_size_is_rejected() {
+    let error =
+        Template::from_yaml("version: \"0.5\"\nformatting:\n  heading:\n    h1:\n      size: 0\n")
+            .expect_err("the heading size must be positive");
+    assert!(value_error_is(
+        &error,
+        "formatting.heading.h1.size",
+        ValueError::Zero
+    ));
+}
+
+#[test]
+fn a_zero_inline_size_is_rejected() {
+    let error = Template::from_yaml(
+        "version: \"0.5\"\nformatting:\n  paragraph:\n    emphasis:\n      size: 0\n",
+    )
+    .expect_err("the inline size must be positive");
+    assert!(value_error_is(
+        &error,
+        "formatting.paragraph.emphasis.size",
+        ValueError::Zero
     ));
 }
 
 #[test]
 fn a_negative_leading_is_rejected() {
-    let error = Template::from_yaml("version: 4\ntext:\n  leading: -7\n")
-        .expect_err("the leading must not be negative");
-    assert!(matches!(
-        error,
-        TemplateError::Value {
-            field: "text.leading",
-            problem: ValueError::Negative,
-        }
+    let error =
+        Template::from_yaml("version: \"0.5\"\nformatting:\n  paragraph:\n    leading: -7\n")
+            .expect_err("the leading must not be negative");
+    assert!(value_error_is(
+        &error,
+        "formatting.paragraph.leading",
+        ValueError::Negative
     ));
 }
 
 #[test]
-fn an_unknown_leading_unit_is_rejected() {
-    let error = Template::from_yaml("version: 4\ntext:\n  leading: 7px\n")
-        .expect_err("px is not supported");
-    assert!(matches!(
-        error,
-        TemplateError::Value {
-            field: "text.leading",
-            problem: ValueError::UnknownUnit,
-        }
+fn a_negative_spacing_is_rejected() {
+    let error =
+        Template::from_yaml("version: \"0.5\"\nformatting:\n  paragraph:\n    spacing: -1\n")
+            .expect_err("the spacing must not be negative");
+    assert!(value_error_is(
+        &error,
+        "formatting.paragraph.spacing",
+        ValueError::Negative
     ));
 }
 
 #[test]
-fn a_negative_header_spacing_is_rejected() {
-    let error = Template::from_yaml("version: 4\ntext:\n  header_spacing: -1\n")
-        .expect_err("the header spacing must not be negative");
-    assert!(matches!(
-        error,
-        TemplateError::Value {
-            field: "text.header_spacing",
-            problem: ValueError::Negative,
-        }
+fn a_negative_heading_spacing_is_rejected() {
+    let error = Template::from_yaml(
+        "version: \"0.5\"\nformatting:\n  heading:\n    h1:\n      spacing_before: -1\n",
+    )
+    .expect_err("the heading spacing must not be negative");
+    assert!(value_error_is(
+        &error,
+        "formatting.heading.h1.spacing_before",
+        ValueError::Negative
     ));
 }
 
 #[test]
 fn an_empty_font_list_is_rejected() {
-    let error = Template::from_yaml("version: 4\ntext:\n  body:\n    font_families: []\n")
-        .expect_err("the font list must not be empty");
-    assert!(matches!(
-        error,
-        TemplateError::Value {
-            field: "text.body.font_families",
-            problem: ValueError::EmptyList,
-        }
+    let error =
+        Template::from_yaml("version: \"0.5\"\nformatting:\n  paragraph:\n    font_families: []\n")
+            .expect_err("the font list must not be empty");
+    assert!(value_error_is(
+        &error,
+        "formatting.paragraph.font_families",
+        ValueError::EmptyList
     ));
 }
 
 #[test]
-fn an_unknown_text_block_key_is_rejected() {
-    let error = Template::from_yaml("version: 4\ntext:\n  body:\n    family: Serif\n")
-        .expect_err("the key is unknown");
+fn a_font_weight_name_and_number_are_accepted() {
+    let named = parse("version: \"0.5\"\nformatting:\n  paragraph:\n    weight: semibold\n");
+    assert_eq!(named.formatting().paragraph().face().weight().get(), 600);
+
+    let numeric = parse("version: \"0.5\"\nformatting:\n  heading:\n    h2:\n      weight: 650\n");
+    assert_eq!(
+        numeric.formatting().heading().levels()[1]
+            .face()
+            .weight()
+            .get(),
+        650
+    );
+}
+
+#[test]
+fn an_invalid_font_weight_is_rejected() {
+    let error =
+        Template::from_yaml("version: \"0.5\"\nformatting:\n  paragraph:\n    weight: 950\n")
+            .expect_err("950 is outside the accepted range");
+    assert!(value_error_is(
+        &error,
+        "formatting.paragraph.weight",
+        ValueError::InvalidWeight
+    ));
+
+    let error =
+        Template::from_yaml("version: \"0.5\"\nformatting:\n  paragraph:\n    weight: heavyish\n")
+            .expect_err("the weight name is not supported");
+    assert!(value_error_is(
+        &error,
+        "formatting.paragraph.weight",
+        ValueError::InvalidWeight
+    ));
+}
+
+#[test]
+fn an_unknown_style_is_rejected() {
+    let error =
+        Template::from_yaml("version: \"0.5\"\nformatting:\n  paragraph:\n    style: oblique\n")
+            .expect_err("oblique is not supported");
     assert!(matches!(error, TemplateError::Yaml { .. }));
 }
 
 #[test]
 fn the_embedded_template_matches_the_project_defaults() {
     let template = Template::embedded().expect("the embedded template must be valid");
-    assert_eq!(template.schema_version().get(), CURRENT_SCHEMA_VERSION);
+    assert_eq!(template.schema_version(), CURRENT_SCHEMA_VERSION);
     assert_eq!(template.page().size(), PageSize::A4);
     assert_eq!(template.page().orientation(), Orientation::Portrait);
     assert_eq!(template.page().margins().left().points(), 71.0);
-    assert_eq!(template.text().body().font_families().len(), 3);
-    assert_eq!(template.text().body().size().points(), 12.0);
-    assert_eq!(template.text().title().size().points(), 18.0);
-    assert_eq!(template.text().leading().points(), 7.8);
-    assert_eq!(template.text().header_spacing(), None);
+
+    let paragraph = template.formatting().paragraph();
+    assert_eq!(paragraph.face().font_families().len(), 3);
+    assert_eq!(paragraph.face().size().points(), 12.0);
+    assert_eq!(paragraph.leading().points(), 7.8);
+
+    let heading = template.formatting().heading().levels();
+    assert_eq!(heading[0].face().size().points(), 18.0);
+    assert_eq!(heading[1].face().size().points(), 14.0);
+    assert_eq!(heading[0].face().weight(), FontWeight::BOLD);
 }

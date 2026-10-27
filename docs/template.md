@@ -19,42 +19,70 @@ Paths written in the template, such as the letterhead image, resolve relative to
 ## Schema
 
 ```yaml
-version: 4
+version: "0.5"
 
 page:
   size: a4
   orientation: portrait
   margins:
-    top: 85
-    bottom: 57
-    left: 85
-    right: 57
+    top: 30mm
+    bottom: 30mm
+    left: 30mm
+    right: 25mm
   letterhead: images/letterhead.png
 
-text:
-  body:
+formatting:
+  paragraph:
     font_families:
+      - Linux Libertine O
       - Liberation Serif
-      - DejaVu Serif
-      - Libertinus Serif
     size: 12
-  title:
+    weight: normal
+    style: normal
+    leading: 7.8
+    spacing: 24
+    alignment: justified
+    emphasis:
+      style: italic
+    strong:
+      weight: bold
+  heading:
     font_families:
+      - Linux Biolinum O
       - Liberation Sans
-      - DejaVu Sans
-      - Libertinus Serif
-    size: 18
-  leading: 7.8pt
-  paragraph_spacing: 24
-  header_spacing: 18
-  alignment: justified
+    weight: bold
+    style: normal
+    spacing_before: 18
+    spacing_after: 6
+    h1:
+      size: 18
+    h2:
+      size: 14
+      spacing_before: 12
+      spacing_after: 4
+    h3:
+      size: 12
+      spacing_before: 10
+      spacing_after: 4
+    h4:
+      size: 12
+      spacing_before: 8
+      spacing_after: 2
+    h5:
+      size: 12
+      spacing_before: 8
+      spacing_after: 2
+    h6:
+      size: 12
+      spacing_before: 8
+      spacing_after: 2
 ```
 
 Every section and every key is optional except `version`. Missing keys take the defaults described below, but an unknown key is an error, so a typo never changes the layout silently.
 
 ### `version`
 
-The schema version, an integer. This build accepts `4` and rejects every other value. Version 4 made `leading` a length. Version 3 replaced `text.font_families` and `text.size` with `text.body` and `text.title`, made a bare number mean points and added `text.header_spacing`. Version 2 had removed the `document` section: document metadata belongs to the Markdown.
+The schema version is a string in the form `major.minor`, quoted so YAML cannot turn it into a float. This build accepts `"0.5"` and rejects every other value. Version 0.5 replaced the `text` section with `formatting`, made `paragraph` and `heading` explicit, added `weight` and `style`, and added the `emphasis` and `strong` inline overrides.
 
 ### Document metadata
 
@@ -70,7 +98,7 @@ language: pt-BR
 
 `title` and `author` must be non-empty, and `language` must be a BCP 47 style tag such as `pt-BR`. Without a language, the PDF sets no language and Typst uses its default.
 
-The frontmatter `title` is document metadata. The `title` style applies to level-1 headings, not to a generated cover title.
+The frontmatter `title` is document metadata. The visible title is the first-level heading, styled by `formatting.heading.h1`.
 
 ### `page`
 
@@ -81,20 +109,45 @@ The frontmatter `title` is document metadata. The `title` style applies to level
 
 The default size is A4 in portrait orientation.
 
-### `text`
+### `formatting.paragraph`
 
-- `body`: a map with `font_families` and `size` for body text. The default families are `Liberation Serif`, `DejaVu Serif` and `Libertinus Serif`; the default size is `12pt`.
-- `title`: a map with `font_families` and `size` for level-1 headings. The default families are the same as the body, and the default size is `18pt`.
-- `leading`: extra space between lines, as a length. It must be finite and not negative; the default is `7.8pt`.
-- `paragraph_spacing`: space between paragraphs. When omitted, Typst's default spacing applies (`1.2em`).
-- `header_spacing`: space above a level-1 heading. When omitted, Typst's default heading spacing applies.
+- `font_families`: a non-empty list of font names, tried in order. The default is `Liberation Serif`, `DejaVu Serif` and `Libertinus Serif`.
+- `size`: a positive length. The default is `12pt`.
+- `weight`: `thin`, `extralight`, `light`, `normal`, `medium`, `semibold`, `bold`, `extrabold` or `black`, or a number from 100 to 900. The default is `normal`.
+- `style`: `normal` or `italic`. The default is `normal`.
+- `leading`: extra space between lines, as a length. The default is `7.8pt`.
+- `spacing`: space between paragraphs. When omitted, Typst's default spacing applies (`1.2em`).
 - `alignment`: `justified` or `left`. The default is `justified`.
+- `emphasis`: a map of overrides for `*...*` and `_..._`. It inherits from `paragraph`; its `style` defaults to `italic`.
+- `strong`: a map of overrides for `**...**` and `__...__`. It inherits from `paragraph`; its `weight` defaults to `bold`.
 
-Both `body` and `title` are optional maps. A present map may omit `font_families` or `size` independently, and the missing key takes its default.
+Inside `emphasis` and `strong`, the allowed keys are `font_families`, `size`, `weight` and `style`. Only the declared keys override the paragraph values, so an empty map is valid and changes nothing beyond the semantic default.
+
+### `formatting.heading`
+
+The `heading` map is the base for every heading level:
+
+- `font_families`: the heading fallback list. The default is `Liberation Sans`, `DejaVu Sans` and `Libertinus Serif`.
+- `size`: a positive length. It applies to every level that does not override it.
+- `weight`: the base weight. The default is `bold`.
+- `style`: `normal` or `italic`. The default is `normal`.
+- `spacing_before` and `spacing_after`: lengths around the heading. They apply to every level that does not override them.
+
+The `h1` to `h6` maps are optional overrides with the same keys. Only declared keys replace the base values. The default sizes are `18pt` for `h1`, `14pt` for `h2` and `12pt` for `h3` to `h6`; the default spacing is 18/6 for `h1`, 12/4 for `h2`, 10/4 for `h3` and 8/2 for `h4` to `h6`.
+
+The template sets explicit values for each level. There is no hidden multiplier per level: what the YAML declares is what the PDF uses.
+
+## Weights and styles
+
+`weight` and `style` are independent, as in CSS and Typst. Weight is the stroke thickness; style is the slant. A font can offer regular, italic, bold and bold italic faces, and the PDF picks the closest face for the requested weight and style.
+
+- Weight names map to 100 to 900; a bare number is also accepted in that range.
+- `semibold` is 600, not a separate style.
+- `style` accepts only `normal` and `italic`.
 
 ## Lengths
 
-A length is a number optionally followed by `mm`, `cm`, `in` or `pt`. A number without a unit is in points, so `30` and `30pt` are the same length. Negative values are rejected, and the font size must be greater than zero.
+A length is a number optionally followed by `mm`, `cm`, `in` or `pt`. A number without a unit is in points, so `30` and `30pt` are the same length. Negative values are rejected, and a font size must be greater than zero.
 
 ## Images
 
@@ -102,7 +155,7 @@ Images in the Markdown body resolve relative to the Markdown file, not to the te
 
 ## Current backend
 
-The PDF backend uses the page fields, the body and title styles, leading, paragraph spacing, header spacing and alignment. The title style applies to level-1 headings, and `header_spacing` controls the space above them. Running headers and footers, per-level heading styles beyond level 1, heading page breaks and configurable table styling are not in the schema yet.
+The PDF backend applies the paragraph face, leading, spacing and alignment. It emits one show rule per heading level with the resolved font, size, weight, style and spacing, and show rules for `emph` and `strong` from the inline overrides. Running headers and footers, explicit page breaks, configurable table styling and PDF metadata fields are not in the schema yet.
 
 ## Example
 
@@ -116,4 +169,4 @@ To use the same settings elsewhere, copy the file to the document directory as `
 
 ## Errors
 
-The template is validated before any document is rendered. A YAML syntax error, an unknown key, an unsupported version, a rejected value or a negative spacing all stop the run with a diagnostic. The YAML parser reports the line and the column, and the loader adds the template path.
+The template is validated before any document is rendered. A YAML syntax error, an unknown key, an unsupported version, a rejected weight, an unknown style, a negative spacing or a missing font family all stop the run with a diagnostic. The YAML parser reports the line and the column, and the loader adds the template path.

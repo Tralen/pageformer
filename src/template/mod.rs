@@ -15,11 +15,10 @@ use serde::de::{self, Deserializer, MapAccess, Unexpected, Visitor};
 const MM_TO_POINTS: f64 = 72.0 / 25.4;
 
 /// The current schema version. A template for another version is rejected.
-pub const CURRENT_SCHEMA_VERSION: u16 = 4;
+pub const CURRENT_SCHEMA_VERSION: SchemaVersion = SchemaVersion { major: 0, minor: 5 };
 
 const DEFAULT_MARGIN: Length = Length(20.0 * MM_TO_POINTS);
 const DEFAULT_FONT_SIZE: Length = Length(12.0);
-const DEFAULT_TITLE_SIZE: Length = Length(18.0);
 const DEFAULT_LEADING: Length = Length(7.8);
 
 const A4_DIMENSIONS: PageDimensions = PageDimensions {
@@ -48,7 +47,7 @@ const OFICIO_DIMENSIONS: PageDimensions = PageDimensions {
 pub struct Template {
     version: SchemaVersion,
     page: Page,
-    text: TextStyle,
+    formatting: Formatting,
 }
 
 impl Template {
@@ -85,7 +84,7 @@ impl Template {
         Ok(Self {
             version: SchemaVersion::CURRENT,
             page: convert_page(raw.page)?,
-            text: convert_text(raw.text)?,
+            formatting: convert_formatting(raw.formatting)?,
         })
     }
 
@@ -97,20 +96,70 @@ impl Template {
         &self.page
     }
 
-    pub fn text(&self) -> &TextStyle {
-        &self.text
+    pub fn formatting(&self) -> &Formatting {
+        &self.formatting
     }
 }
 
-/// The version of the template schema.
+/// The version of the template schema, written as `major.minor`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub struct SchemaVersion(u16);
+pub struct SchemaVersion {
+    major: u16,
+    minor: u16,
+}
 
 impl SchemaVersion {
-    pub const CURRENT: Self = Self(CURRENT_SCHEMA_VERSION);
+    pub const CURRENT: Self = CURRENT_SCHEMA_VERSION;
 
-    pub fn get(self) -> u16 {
-        self.0
+    pub fn new(major: u16, minor: u16) -> Self {
+        Self { major, minor }
+    }
+
+    pub fn major(self) -> u16 {
+        self.major
+    }
+
+    pub fn minor(self) -> u16 {
+        self.minor
+    }
+}
+
+impl fmt::Display for SchemaVersion {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(formatter, "{}.{}", self.major, self.minor)
+    }
+}
+
+impl std::str::FromStr for SchemaVersion {
+    type Err = String;
+
+    fn from_str(text: &str) -> Result<Self, Self::Err> {
+        let text = text.trim();
+        let (major, minor) = text.split_once('.').ok_or_else(|| {
+            format!("`{text}` is not a schema version; use `major.minor`, for example `0.5`")
+        })?;
+        if major.is_empty() || minor.is_empty() || minor.contains('.') {
+            return Err(format!(
+                "`{text}` is not a schema version; use `major.minor`, for example `0.5`"
+            ));
+        }
+        let major: u16 = major.parse().map_err(|_| {
+            format!("`{text}` is not a schema version; the major part must be a number")
+        })?;
+        let minor: u16 = minor.parse().map_err(|_| {
+            format!("`{text}` is not a schema version; the minor part must be a number")
+        })?;
+        Ok(Self { major, minor })
+    }
+}
+
+impl<'de> Deserialize<'de> for SchemaVersion {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let text = String::deserialize(deserializer)?;
+        text.parse().map_err(serde::de::Error::custom)
     }
 }
 
@@ -121,11 +170,11 @@ pub enum TemplateError {
         message: String,
     },
     UnsupportedVersion {
-        found: u16,
-        supported: u16,
+        found: SchemaVersion,
+        supported: SchemaVersion,
     },
     Value {
-        field: &'static str,
+        field: String,
         problem: ValueError,
     },
 }
@@ -164,6 +213,7 @@ pub enum ValueError {
     Negative,
     Zero,
     EmptyList,
+    InvalidWeight,
 }
 
 impl fmt::Display for ValueError {
@@ -176,12 +226,20 @@ impl fmt::Display for ValueError {
             Self::Negative => "the number must not be negative",
             Self::Zero => "the number must be greater than zero",
             Self::EmptyList => "the list must not be empty",
+            Self::InvalidWeight => "the weight must be a name or a number from 100 to 900",
         };
         formatter.write_str(message)
     }
 }
 
 impl std::error::Error for ValueError {}
+
+fn value_error(field: impl Into<String>, problem: ValueError) -> TemplateError {
+    TemplateError::Value {
+        field: field.into(),
+        problem,
+    }
+}
 
 /// A geometric length stored in typographic points.
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
@@ -452,15 +510,78 @@ impl TemplatePath {
     }
 }
 
-/// The font families and size for one kind of text.
-#[derive(Debug, Clone, PartialEq)]
-pub struct FontStyle {
-    font_families: Vec<FontFamily>,
-    size: Length,
+/// A font weight from 100 to 900.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub struct FontWeight(u16);
+
+impl FontWeight {
+    pub const NORMAL: Self = Self(400);
+    pub const BOLD: Self = Self(700);
+
+    pub fn new(value: u16) -> Result<Self, ValueError> {
+        if (100..=900).contains(&value) {
+            Ok(Self(value))
+        } else {
+            Err(ValueError::InvalidWeight)
+        }
+    }
+
+    pub fn parse(text: &str) -> Result<Self, ValueError> {
+        match text.trim().to_ascii_lowercase().as_str() {
+            "thin" => Ok(Self(100)),
+            "extralight" | "extra-light" => Ok(Self(200)),
+            "light" => Ok(Self(300)),
+            "normal" | "regular" => Ok(Self(400)),
+            "medium" => Ok(Self(500)),
+            "semibold" | "semi-bold" | "demibold" => Ok(Self(600)),
+            "bold" => Ok(Self(700)),
+            "extrabold" | "extra-bold" => Ok(Self(800)),
+            "black" | "heavy" => Ok(Self(900)),
+            other => other
+                .parse::<u16>()
+                .map_err(|_| ValueError::InvalidWeight)
+                .and_then(Self::new),
+        }
+    }
+
+    pub fn get(self) -> u16 {
+        self.0
+    }
 }
 
-impl FontStyle {
-    pub fn new(font_families: Vec<FontFamily>, size: Length) -> Result<Self, ValueError> {
+/// Whether the text is upright or italic.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum FontSlant {
+    Normal,
+    Italic,
+}
+
+impl FontSlant {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Normal => "normal",
+            Self::Italic => "italic",
+        }
+    }
+}
+
+/// The font families, size, weight and slant for one kind of text.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TextFace {
+    font_families: Vec<FontFamily>,
+    size: Length,
+    weight: FontWeight,
+    slant: FontSlant,
+}
+
+impl TextFace {
+    pub fn new(
+        font_families: Vec<FontFamily>,
+        size: Length,
+        weight: FontWeight,
+        slant: FontSlant,
+    ) -> Result<Self, ValueError> {
         if font_families.is_empty() {
             return Err(ValueError::EmptyList);
         }
@@ -470,6 +591,8 @@ impl FontStyle {
         Ok(Self {
             font_families,
             size,
+            weight,
+            slant,
         })
     }
 
@@ -480,61 +603,135 @@ impl FontStyle {
     pub fn size(&self) -> Length {
         self.size
     }
+
+    pub fn weight(&self) -> FontWeight {
+        self.weight
+    }
+
+    pub fn slant(&self) -> FontSlant {
+        self.slant
+    }
 }
 
-/// The text styling shared by every backend.
+/// Paragraph text and the inline styles that override it.
 #[derive(Debug, Clone, PartialEq)]
-pub struct TextStyle {
-    body: FontStyle,
-    title: FontStyle,
+pub struct ParagraphStyle {
+    face: TextFace,
     leading: Length,
-    paragraph_spacing: Option<Length>,
-    header_spacing: Option<Length>,
+    spacing: Option<Length>,
     alignment: ParagraphAlignment,
+    emphasis: TextFace,
+    strong: TextFace,
 }
 
-impl TextStyle {
+impl ParagraphStyle {
     pub fn new(
-        body: FontStyle,
-        title: FontStyle,
+        face: TextFace,
         leading: Length,
-        paragraph_spacing: Option<Length>,
-        header_spacing: Option<Length>,
+        spacing: Option<Length>,
         alignment: ParagraphAlignment,
+        emphasis: TextFace,
+        strong: TextFace,
     ) -> Self {
         Self {
-            body,
-            title,
+            face,
             leading,
-            paragraph_spacing,
-            header_spacing,
+            spacing,
             alignment,
+            emphasis,
+            strong,
         }
     }
 
-    pub fn body(&self) -> &FontStyle {
-        &self.body
-    }
-
-    pub fn title(&self) -> &FontStyle {
-        &self.title
+    pub fn face(&self) -> &TextFace {
+        &self.face
     }
 
     pub fn leading(&self) -> Length {
         self.leading
     }
 
-    pub fn paragraph_spacing(&self) -> Option<Length> {
-        self.paragraph_spacing
-    }
-
-    /// The space above a level-1 heading.
-    pub fn header_spacing(&self) -> Option<Length> {
-        self.header_spacing
+    pub fn spacing(&self) -> Option<Length> {
+        self.spacing
     }
 
     pub fn alignment(&self) -> ParagraphAlignment {
         self.alignment
+    }
+
+    pub fn emphasis(&self) -> &TextFace {
+        &self.emphasis
+    }
+
+    pub fn strong(&self) -> &TextFace {
+        &self.strong
+    }
+}
+
+/// The style of one heading level.
+#[derive(Debug, Clone, PartialEq)]
+pub struct HeadingStyle {
+    face: TextFace,
+    spacing_before: Length,
+    spacing_after: Length,
+}
+
+impl HeadingStyle {
+    pub fn new(face: TextFace, spacing_before: Length, spacing_after: Length) -> Self {
+        Self {
+            face,
+            spacing_before,
+            spacing_after,
+        }
+    }
+
+    pub fn face(&self) -> &TextFace {
+        &self.face
+    }
+
+    pub fn spacing_before(&self) -> Length {
+        self.spacing_before
+    }
+
+    pub fn spacing_after(&self) -> Length {
+        self.spacing_after
+    }
+}
+
+/// The six resolved heading levels.
+#[derive(Debug, Clone, PartialEq)]
+pub struct HeadingStyles {
+    levels: [HeadingStyle; 6],
+}
+
+impl HeadingStyles {
+    pub fn new(levels: [HeadingStyle; 6]) -> Self {
+        Self { levels }
+    }
+
+    pub fn levels(&self) -> &[HeadingStyle; 6] {
+        &self.levels
+    }
+}
+
+/// The formatting section of a template.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Formatting {
+    paragraph: ParagraphStyle,
+    heading: HeadingStyles,
+}
+
+impl Formatting {
+    pub fn new(paragraph: ParagraphStyle, heading: HeadingStyles) -> Self {
+        Self { paragraph, heading }
+    }
+
+    pub fn paragraph(&self) -> &ParagraphStyle {
+        &self.paragraph
+    }
+
+    pub fn heading(&self) -> &HeadingStyles {
+        &self.heading
     }
 }
 
@@ -567,17 +764,17 @@ pub enum ParagraphAlignment {
 
 #[derive(Debug, Deserialize)]
 struct VersionProbe {
-    version: u16,
+    version: SchemaVersion,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct RawTemplate {
-    version: u16,
+    version: SchemaVersion,
     #[serde(default)]
     page: RawPage,
     #[serde(default)]
-    text: RawText,
+    formatting: RawFormatting,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -600,20 +797,60 @@ struct RawMargins {
 
 #[derive(Debug, Default, Deserialize)]
 #[serde(deny_unknown_fields)]
-struct RawText {
-    body: Option<RawFontStyle>,
-    title: Option<RawFontStyle>,
-    leading: Option<String>,
-    paragraph_spacing: Option<String>,
-    header_spacing: Option<String>,
-    alignment: Option<ParagraphAlignment>,
+struct RawFormatting {
+    paragraph: Option<RawParagraph>,
+    heading: Option<RawHeading>,
 }
 
 #[derive(Debug, Default, Deserialize)]
 #[serde(deny_unknown_fields)]
-struct RawFontStyle {
+struct RawParagraph {
     font_families: Option<Vec<String>>,
     size: Option<String>,
+    weight: Option<String>,
+    style: Option<FontSlant>,
+    leading: Option<String>,
+    spacing: Option<String>,
+    alignment: Option<ParagraphAlignment>,
+    emphasis: Option<RawInlineStyle>,
+    strong: Option<RawInlineStyle>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawInlineStyle {
+    font_families: Option<Vec<String>>,
+    size: Option<String>,
+    weight: Option<String>,
+    style: Option<FontSlant>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawHeading {
+    font_families: Option<Vec<String>>,
+    size: Option<String>,
+    weight: Option<String>,
+    style: Option<FontSlant>,
+    spacing_before: Option<String>,
+    spacing_after: Option<String>,
+    h1: Option<RawHeadingLevel>,
+    h2: Option<RawHeadingLevel>,
+    h3: Option<RawHeadingLevel>,
+    h4: Option<RawHeadingLevel>,
+    h5: Option<RawHeadingLevel>,
+    h6: Option<RawHeadingLevel>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawHeadingLevel {
+    font_families: Option<Vec<String>>,
+    size: Option<String>,
+    weight: Option<String>,
+    style: Option<FontSlant>,
+    spacing_before: Option<String>,
+    spacing_after: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -637,10 +874,7 @@ fn convert_page(raw: RawPage) -> Result<Page, TemplateError> {
         .letterhead
         .map(|text| TemplatePath::parse(&text))
         .transpose()
-        .map_err(|problem| TemplateError::Value {
-            field: "page.letterhead",
-            problem,
-        })?;
+        .map_err(|problem| value_error("page.letterhead", problem))?;
     Ok(Page::new(
         raw.size.unwrap_or(PageSize::A4),
         raw.orientation.unwrap_or(Orientation::Portrait),
@@ -651,122 +885,299 @@ fn convert_page(raw: RawPage) -> Result<Page, TemplateError> {
 
 fn margin(value: Option<String>, field: &'static str) -> Result<Option<Length>, TemplateError> {
     value
-        .map(|text| Length::parse(&text).map_err(|problem| TemplateError::Value { field, problem }))
+        .map(|text| parse_length_field(&text, field))
         .transpose()
 }
 
-fn convert_text(raw: RawText) -> Result<TextStyle, TemplateError> {
-    let body = convert_font_style(
-        raw.body,
-        "text.body.font_families",
-        "text.body.size",
-        default_font_families(),
-        DEFAULT_FONT_SIZE,
-    )?;
-    let title = convert_font_style(
-        raw.title,
-        "text.title.font_families",
-        "text.title.size",
-        default_font_families(),
-        DEFAULT_TITLE_SIZE,
-    )?;
-    let leading = raw
-        .leading
-        .map(|text| {
-            Length::parse(&text).map_err(|problem| TemplateError::Value {
-                field: "text.leading",
-                problem,
-            })
-        })
-        .transpose()?
-        .unwrap_or(DEFAULT_LEADING);
-    let paragraph_spacing = raw
-        .paragraph_spacing
-        .map(|text| {
-            Length::parse(&text).map_err(|problem| TemplateError::Value {
-                field: "text.paragraph_spacing",
-                problem,
-            })
-        })
-        .transpose()?;
-    let header_spacing = raw
-        .header_spacing
-        .map(|text| {
-            Length::parse(&text).map_err(|problem| TemplateError::Value {
-                field: "text.header_spacing",
-                problem,
-            })
-        })
-        .transpose()?;
-    let alignment = raw.alignment.unwrap_or(ParagraphAlignment::Justified);
-    Ok(TextStyle::new(
-        body,
-        title,
-        leading,
-        paragraph_spacing,
-        header_spacing,
-        alignment,
+fn convert_formatting(raw: RawFormatting) -> Result<Formatting, TemplateError> {
+    Ok(Formatting::new(
+        convert_paragraph(raw.paragraph.unwrap_or_default())?,
+        convert_headings(raw.heading.unwrap_or_default())?,
     ))
 }
 
-fn convert_font_style(
-    raw: Option<RawFontStyle>,
-    families_field: &'static str,
-    size_field: &'static str,
-    default_families: Vec<FontFamily>,
-    default_size: Length,
-) -> Result<FontStyle, TemplateError> {
-    let Some(raw) = raw else {
-        return FontStyle::new(default_families, default_size).map_err(|problem| {
-            let field = match problem {
-                ValueError::Zero => size_field,
-                _ => families_field,
-            };
-            TemplateError::Value { field, problem }
-        });
-    };
-    let families = match raw.font_families {
-        Some(values) if values.is_empty() => {
-            return Err(TemplateError::Value {
-                field: families_field,
-                problem: ValueError::EmptyList,
-            });
-        }
-        Some(values) => values
-            .into_iter()
-            .map(|value| FontFamily::parse(&value))
-            .collect::<Result<Vec<_>, _>>()
-            .map_err(|problem| TemplateError::Value {
-                field: families_field,
-                problem,
-            })?,
-        None => default_families,
-    };
-    let size = raw
-        .size
-        .map(|text| {
-            Length::parse(&text).map_err(|problem| TemplateError::Value {
-                field: size_field,
-                problem,
-            })
-        })
-        .transpose()?
-        .unwrap_or(default_size);
-    FontStyle::new(families, size).map_err(|problem| {
-        let field = match problem {
-            ValueError::Zero => size_field,
-            _ => families_field,
-        };
-        TemplateError::Value { field, problem }
-    })
+fn convert_paragraph(raw: RawParagraph) -> Result<ParagraphStyle, TemplateError> {
+    let families = parse_families_field(
+        raw.font_families,
+        "formatting.paragraph.font_families",
+        default_paragraph_font_families(),
+    )?;
+    let size = parse_size_field(raw.size, "formatting.paragraph.size", DEFAULT_FONT_SIZE)?;
+    if size.points() <= 0.0 {
+        return Err(value_error("formatting.paragraph.size", ValueError::Zero));
+    }
+    let weight = parse_weight_field(
+        raw.weight,
+        "formatting.paragraph.weight",
+        FontWeight::NORMAL,
+    )?;
+    let slant = raw.style.unwrap_or(FontSlant::Normal);
+    let face = TextFace::new(families, size, weight, slant)
+        .map_err(|problem| value_error("formatting.paragraph", problem))?;
+    let leading = parse_size_field(raw.leading, "formatting.paragraph.leading", DEFAULT_LEADING)?;
+    let spacing = parse_optional_length(raw.spacing, "formatting.paragraph.spacing")?;
+    let alignment = raw.alignment.unwrap_or(ParagraphAlignment::Justified);
+    let emphasis = convert_inline(
+        &face,
+        raw.emphasis,
+        "formatting.paragraph.emphasis",
+        Some(FontSlant::Italic),
+        None,
+    )?;
+    let strong = convert_inline(
+        &face,
+        raw.strong,
+        "formatting.paragraph.strong",
+        None,
+        Some(FontWeight::BOLD),
+    )?;
+    Ok(ParagraphStyle::new(
+        face, leading, spacing, alignment, emphasis, strong,
+    ))
 }
 
-fn default_font_families() -> Vec<FontFamily> {
+fn convert_inline(
+    base: &TextFace,
+    raw: Option<RawInlineStyle>,
+    prefix: &str,
+    semantic_slant: Option<FontSlant>,
+    semantic_weight: Option<FontWeight>,
+) -> Result<TextFace, TemplateError> {
+    let mut families = base.font_families().to_vec();
+    let mut size = base.size();
+    let mut weight = semantic_weight.unwrap_or(base.weight());
+    let mut slant = semantic_slant.unwrap_or(base.slant());
+    if let Some(raw) = raw {
+        if let Some(values) = raw.font_families {
+            families = parse_families(values, &format!("{prefix}.font_families"))?;
+        }
+        if let Some(text) = raw.size {
+            size = parse_length_field(&text, &format!("{prefix}.size"))?;
+        }
+        if let Some(text) = raw.weight {
+            weight = parse_weight(&text, &format!("{prefix}.weight"))?;
+        }
+        if let Some(value) = raw.style {
+            slant = value;
+        }
+    }
+    if size.points() <= 0.0 {
+        return Err(value_error(format!("{prefix}.size"), ValueError::Zero));
+    }
+    TextFace::new(families, size, weight, slant).map_err(|problem| value_error(prefix, problem))
+}
+
+fn convert_headings(raw: RawHeading) -> Result<HeadingStyles, TemplateError> {
+    let RawHeading {
+        font_families,
+        size,
+        weight,
+        style,
+        spacing_before,
+        spacing_after,
+        h1,
+        h2,
+        h3,
+        h4,
+        h5,
+        h6,
+    } = raw;
+    let base = HeadingOverrides::parse(
+        font_families,
+        size,
+        weight,
+        style,
+        spacing_before,
+        spacing_after,
+        "formatting.heading",
+    )?;
+    let raw_levels = [h1, h2, h3, h4, h5, h6];
+    let mut overrides: [Option<HeadingOverrides>; 6] = Default::default();
+    for (index, raw_level) in raw_levels.into_iter().enumerate() {
+        if let Some(raw_level) = raw_level {
+            let prefix = format!("formatting.heading.h{}", index + 1);
+            overrides[index] = Some(HeadingOverrides::parse(
+                raw_level.font_families,
+                raw_level.size,
+                raw_level.weight,
+                raw_level.style,
+                raw_level.spacing_before,
+                raw_level.spacing_after,
+                &prefix,
+            )?);
+        }
+    }
+    let levels = std::array::from_fn(|index| {
+        let mut style = default_heading_style(index + 1);
+        base.apply(&mut style);
+        if let Some(overrides) = &overrides[index] {
+            overrides.apply(&mut style);
+        }
+        style
+    });
+    Ok(HeadingStyles::new(levels))
+}
+
+#[derive(Debug, Default)]
+struct HeadingOverrides {
+    font_families: Option<Vec<FontFamily>>,
+    size: Option<Length>,
+    weight: Option<FontWeight>,
+    slant: Option<FontSlant>,
+    spacing_before: Option<Length>,
+    spacing_after: Option<Length>,
+}
+
+impl HeadingOverrides {
+    fn parse(
+        font_families: Option<Vec<String>>,
+        size: Option<String>,
+        weight: Option<String>,
+        slant: Option<FontSlant>,
+        spacing_before: Option<String>,
+        spacing_after: Option<String>,
+        prefix: &str,
+    ) -> Result<Self, TemplateError> {
+        let size = size
+            .map(|text| parse_length_field(&text, &format!("{prefix}.size")))
+            .transpose()?;
+        if let Some(size) = size
+            && size.points() <= 0.0
+        {
+            return Err(value_error(format!("{prefix}.size"), ValueError::Zero));
+        }
+        Ok(Self {
+            font_families: font_families
+                .map(|values| parse_families(values, &format!("{prefix}.font_families")))
+                .transpose()?,
+            size,
+            weight: weight
+                .map(|text| parse_weight(&text, &format!("{prefix}.weight")))
+                .transpose()?,
+            slant,
+            spacing_before: spacing_before
+                .map(|text| parse_length_field(&text, &format!("{prefix}.spacing_before")))
+                .transpose()?,
+            spacing_after: spacing_after
+                .map(|text| parse_length_field(&text, &format!("{prefix}.spacing_after")))
+                .transpose()?,
+        })
+    }
+
+    fn apply(&self, style: &mut HeadingStyle) {
+        if let Some(families) = &self.font_families {
+            style.face.font_families = families.clone();
+        }
+        if let Some(size) = self.size {
+            style.face.size = size;
+        }
+        if let Some(weight) = self.weight {
+            style.face.weight = weight;
+        }
+        if let Some(slant) = self.slant {
+            style.face.slant = slant;
+        }
+        if let Some(before) = self.spacing_before {
+            style.spacing_before = before;
+        }
+        if let Some(after) = self.spacing_after {
+            style.spacing_after = after;
+        }
+    }
+}
+
+fn parse_families(values: Vec<String>, field: &str) -> Result<Vec<FontFamily>, TemplateError> {
+    if values.is_empty() {
+        return Err(value_error(field, ValueError::EmptyList));
+    }
+    values
+        .into_iter()
+        .map(|value| FontFamily::parse(&value).map_err(|problem| value_error(field, problem)))
+        .collect()
+}
+
+fn parse_families_field(
+    value: Option<Vec<String>>,
+    field: &str,
+    default: Vec<FontFamily>,
+) -> Result<Vec<FontFamily>, TemplateError> {
+    match value {
+        Some(values) => parse_families(values, field),
+        None => Ok(default),
+    }
+}
+
+fn parse_length_field(text: &str, field: &str) -> Result<Length, TemplateError> {
+    Length::parse(text).map_err(|problem| value_error(field, problem))
+}
+
+fn parse_size_field(
+    value: Option<String>,
+    field: &str,
+    default: Length,
+) -> Result<Length, TemplateError> {
+    match value {
+        Some(text) => parse_length_field(&text, field),
+        None => Ok(default),
+    }
+}
+
+fn parse_weight(text: &str, field: &str) -> Result<FontWeight, TemplateError> {
+    FontWeight::parse(text).map_err(|problem| value_error(field, problem))
+}
+
+fn parse_weight_field(
+    value: Option<String>,
+    field: &str,
+    default: FontWeight,
+) -> Result<FontWeight, TemplateError> {
+    match value {
+        Some(text) => parse_weight(&text, field),
+        None => Ok(default),
+    }
+}
+
+fn parse_optional_length(
+    value: Option<String>,
+    field: &str,
+) -> Result<Option<Length>, TemplateError> {
+    value
+        .map(|text| parse_length_field(&text, field))
+        .transpose()
+}
+
+fn default_paragraph_font_families() -> Vec<FontFamily> {
     vec![
         FontFamily("Liberation Serif".to_owned()),
         FontFamily("DejaVu Serif".to_owned()),
         FontFamily("Libertinus Serif".to_owned()),
     ]
+}
+
+fn default_heading_font_families() -> Vec<FontFamily> {
+    vec![
+        FontFamily("Liberation Sans".to_owned()),
+        FontFamily("DejaVu Sans".to_owned()),
+        FontFamily("Libertinus Serif".to_owned()),
+    ]
+}
+
+const HEADING_SIZES: [f64; 6] = [18.0, 14.0, 12.0, 12.0, 12.0, 12.0];
+const HEADING_SPACING_BEFORE: [f64; 6] = [18.0, 12.0, 10.0, 8.0, 8.0, 8.0];
+const HEADING_SPACING_AFTER: [f64; 6] = [6.0, 4.0, 4.0, 2.0, 2.0, 2.0];
+
+fn default_heading_style(level: usize) -> HeadingStyle {
+    let index = level.saturating_sub(1).min(5);
+    HeadingStyle::new(
+        TextFace {
+            font_families: default_heading_font_families(),
+            size: Length(HEADING_SIZES[index]),
+            weight: FontWeight::BOLD,
+            slant: FontSlant::Normal,
+        },
+        Length(HEADING_SPACING_BEFORE[index]),
+        Length(HEADING_SPACING_AFTER[index]),
+    )
 }
 
 #[cfg(test)]
@@ -831,27 +1242,67 @@ mod tests {
     }
 
     #[test]
-    fn font_style_rejects_a_zero_size() {
-        let error = FontStyle::new(
-            default_font_families(),
+    fn text_face_rejects_a_zero_size() {
+        let error = TextFace::new(
+            default_paragraph_font_families(),
             Length::new(0.0).expect("zero is a valid length"),
+            FontWeight::NORMAL,
+            FontSlant::Normal,
         );
         assert_eq!(error, Err(ValueError::Zero));
     }
 
     #[test]
-    fn font_style_rejects_an_empty_font_list() {
-        let error = FontStyle::new(Vec::new(), DEFAULT_FONT_SIZE);
+    fn text_face_rejects_an_empty_font_list() {
+        let error = TextFace::new(
+            Vec::new(),
+            DEFAULT_FONT_SIZE,
+            FontWeight::NORMAL,
+            FontSlant::Normal,
+        );
         assert_eq!(error, Err(ValueError::EmptyList));
     }
 
     #[test]
-    fn title_and_header_defaults_are_distinct_from_the_body() {
-        let template = Template::from_yaml("version: 4\n").expect("the default template");
-        assert_eq!(template.text().body().size().points(), 12.0);
-        assert_eq!(template.text().title().size().points(), 18.0);
-        assert_eq!(template.text().leading().points(), 7.8);
-        assert_eq!(template.text().header_spacing(), None);
+    fn font_weight_parses_names_and_numbers() {
+        assert_eq!(FontWeight::parse("normal"), Ok(FontWeight::NORMAL));
+        assert_eq!(FontWeight::parse("semibold").map(FontWeight::get), Ok(600));
+        assert_eq!(FontWeight::parse("700").map(FontWeight::get), Ok(700));
+        assert_eq!(FontWeight::parse("50"), Err(ValueError::InvalidWeight));
+        assert_eq!(
+            FontWeight::parse("heavyweight"),
+            Err(ValueError::InvalidWeight)
+        );
+    }
+
+    #[test]
+    fn paragraph_and_heading_defaults_are_distinct() {
+        let template = Template::from_yaml("version: \"0.5\"\n").expect("the default template");
+        let paragraph = template.formatting().paragraph();
+        assert_eq!(paragraph.face().size().points(), 12.0);
+        assert_eq!(paragraph.face().weight(), FontWeight::NORMAL);
+        assert_eq!(paragraph.face().slant(), FontSlant::Normal);
+        assert_eq!(paragraph.leading().points(), 7.8);
+        assert_eq!(paragraph.emphasis().slant(), FontSlant::Italic);
+        assert_eq!(paragraph.strong().weight(), FontWeight::BOLD);
+
+        let heading = template.formatting().heading().levels();
+        assert_eq!(heading[0].face().size().points(), 18.0);
+        assert_eq!(heading[1].face().size().points(), 14.0);
+        assert_eq!(heading[2].face().size().points(), 12.0);
+        assert_eq!(heading[0].face().weight(), FontWeight::BOLD);
+    }
+
+    #[test]
+    fn schema_versions_parse_major_minor() {
+        assert_eq!(
+            "0.5"
+                .parse::<SchemaVersion>()
+                .map(|version| version.to_string()),
+            Ok("0.5".to_owned())
+        );
+        assert!("0.5.0".parse::<SchemaVersion>().is_err());
+        assert!("4".parse::<SchemaVersion>().is_err());
     }
 
     #[test]
@@ -860,7 +1311,21 @@ mod tests {
         assert_eq!(template.schema_version(), SchemaVersion::CURRENT);
         assert_eq!(template.page().size(), PageSize::A4);
         assert_eq!(template.page().orientation(), Orientation::Portrait);
-        assert_eq!(template.text().body().font_families().len(), 3);
-        assert_eq!(template.text().title().size().points(), 18.0);
+        assert_eq!(
+            template
+                .formatting()
+                .paragraph()
+                .face()
+                .font_families()
+                .len(),
+            3
+        );
+        assert_eq!(
+            template.formatting().heading().levels()[0]
+                .face()
+                .size()
+                .points(),
+            18.0
+        );
     }
 }

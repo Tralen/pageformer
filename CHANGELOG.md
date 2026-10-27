@@ -4,6 +4,15 @@
 
 *Major updates and feature releases.*
 
+### 0.9.0
+
+- Breaking: template schema 0.5 uses a two-part string version such as `"0.5"` and replaces the `text` section with `formatting`.
+- `formatting.paragraph` holds font families, size, weight, style, leading, spacing, alignment and the `emphasis` and `strong` inline overrides.
+- `formatting.heading` is the base for `h1` to `h6`, each of which overrides font families, size, weight, style and spacing before and after.
+- Added `weight` (normal, semibold, bold or 100 to 900) and `style` (normal or italic).
+- Removed `text.body`, `text.title` and `text.header_spacing`.
+- Regenerated both example PDFs.
+
 ### 0.8.0
 
 - Breaking: template schema 4 makes `leading` a length in points, like the other spacing fields. A multiplier such as `0.65` is no longer accepted; use `7.8pt` for the same line spacing at 12pt.

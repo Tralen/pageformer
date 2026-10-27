@@ -11,7 +11,7 @@ use crate::document::{
     Block, CodeBlock, ColumnAlignment, Document, Inline, Language, List, ListStart, Table,
     TaskState,
 };
-use crate::template::{Length, ParagraphAlignment, Template};
+use crate::template::{Length, ParagraphAlignment, Template, TextFace};
 
 use super::assets::AssetMap;
 use super::{FIXED_DAY, FIXED_MONTH, FIXED_YEAR, PdfError};
@@ -95,31 +95,39 @@ impl<'a> SourceBuilder<'a> {
         self.output.push_str(")\n\n");
 
         let language = document.metadata().language();
+        let paragraph = template.formatting().paragraph();
+        let face = paragraph.face();
         self.output.push_str("#set text(\n  font: (");
-        for family in template.text().body().font_families() {
+        for family in face.font_families() {
             let _ = write!(self.output, "{}, ", typst_string(family.as_str()));
         }
         self.output.push_str("),\n");
+        let _ = writeln!(self.output, "  size: {},", typst_length(face.size()));
+        let _ = writeln!(self.output, "  weight: {},", face.weight().get());
         let _ = writeln!(
             self.output,
-            "  size: {},",
-            typst_length(template.text().body().size())
+            "  style: {},",
+            typst_string(face.slant().as_str())
         );
         if let Some(language) = language {
             self.language_rules(language);
         }
         self.output.push_str(")\n\n");
 
-        let justify = matches!(template.text().alignment(), ParagraphAlignment::Justified);
+        let justify = matches!(paragraph.alignment(), ParagraphAlignment::Justified);
         let _ = write!(
             self.output,
             "#set par(justify: {justify}, leading: {}",
-            typst_length(template.text().leading())
+            typst_length(paragraph.leading())
         );
-        if let Some(spacing) = template.text().paragraph_spacing() {
+        if let Some(spacing) = paragraph.spacing() {
             let _ = write!(self.output, ", spacing: {}", typst_length(spacing));
         }
         self.output.push_str(")\n\n");
+
+        self.inline_style("emph", paragraph.emphasis());
+        self.inline_style("strong", paragraph.strong());
+        self.output.push('\n');
     }
 
     fn language_rules(&mut self, language: &Language) {
@@ -130,23 +138,43 @@ impl<'a> SourceBuilder<'a> {
         }
     }
 
-    fn heading_style(&mut self, template: &Template) {
-        let text = template.text();
-        self.output
-            .push_str("#show heading.where(level: 1): set text(font: (");
-        for family in text.title().font_families() {
+    fn inline_style(&mut self, element: &str, face: &TextFace) {
+        let _ = write!(self.output, "#show {element}: set text(font: (");
+        for family in face.font_families() {
             let _ = write!(self.output, "{}, ", typst_string(family.as_str()));
         }
         let _ = writeln!(
             self.output,
-            "), size: {})",
-            typst_length(text.title().size())
+            "), size: {}, weight: {}, style: {})",
+            typst_length(face.size()),
+            face.weight().get(),
+            typst_string(face.slant().as_str())
         );
-        if let Some(spacing) = text.header_spacing() {
+    }
+
+    fn heading_style(&mut self, template: &Template) {
+        for (index, style) in template.formatting().heading().levels().iter().enumerate() {
+            let level = index + 1;
+            let face = style.face();
+            let _ = write!(
+                self.output,
+                "#show heading.where(level: {level}): set text(font: ("
+            );
+            for family in face.font_families() {
+                let _ = write!(self.output, "{}, ", typst_string(family.as_str()));
+            }
             let _ = writeln!(
                 self.output,
-                "#show heading.where(level: 1): set block(above: {})",
-                typst_length(spacing)
+                "), size: {}, weight: {}, style: {})",
+                typst_length(face.size()),
+                face.weight().get(),
+                typst_string(face.slant().as_str())
+            );
+            let _ = writeln!(
+                self.output,
+                "#show heading.where(level: {level}): set block(above: {}, below: {})",
+                typst_length(style.spacing_before()),
+                typst_length(style.spacing_after())
             );
         }
         self.output.push('\n');
@@ -491,7 +519,7 @@ mod tests {
     use crate::template::Template;
 
     fn template() -> Template {
-        Template::from_yaml("version: 4\n").expect("the default template")
+        Template::from_yaml("version: \"0.5\"\n").expect("the default template")
     }
 
     fn paragraph(text: &str) -> Document {
@@ -561,7 +589,7 @@ mod tests {
     #[test]
     fn the_page_uses_the_template_dimensions_and_margins() {
         let template = Template::from_yaml(
-            "version: 4\npage:\n  size: a5\n  orientation: landscape\n  margins:\n    top: 10mm\n    bottom: 20mm\n    left: 30mm\n    right: 40mm\n",
+            "version: \"0.5\"\npage:\n  size: a5\n  orientation: landscape\n  margins:\n    top: 10mm\n    bottom: 20mm\n    left: 30mm\n    right: 40mm\n",
         )
         .expect("the template");
         let document = Document::new(Metadata::default(), Vec::new());
@@ -763,8 +791,9 @@ mod tests {
 
     #[test]
     fn paragraph_spacing_is_emitted_when_configured() {
-        let template = Template::from_yaml("version: 4\ntext:\n  paragraph_spacing: 6pt\n")
-            .expect("the template");
+        let template =
+            Template::from_yaml("version: \"0.5\"\nformatting:\n  paragraph:\n    spacing: 6pt\n")
+                .expect("the template");
         let document = Document::new(
             Metadata::default(),
             vec![
@@ -785,16 +814,17 @@ mod tests {
     #[test]
     fn leading_is_emitted_in_points() {
         let template =
-            Template::from_yaml("version: 4\ntext:\n  leading: 9pt\n").expect("the template");
+            Template::from_yaml("version: \"0.5\"\nformatting:\n  paragraph:\n    leading: 9pt\n")
+                .expect("the template");
         let document = Document::new(Metadata::default(), Vec::new());
         let source = typst_source(&document, &template, &AssetMap::new()).expect("the source");
         assert!(source.contains("leading: 9.000pt"), "{source}");
     }
 
     #[test]
-    fn level_one_headings_use_the_title_style_and_header_spacing() {
+    fn headings_use_the_configured_styles_and_spacing() {
         let template = Template::from_yaml(
-            "version: 4\ntext:\n  header_spacing: 18pt\n  title:\n    font_families:\n      - Liberation Sans\n    size: 20pt\n",
+            "version: \"0.5\"\nformatting:\n  heading:\n    font_families:\n      - Liberation Sans\n    weight: bold\n    style: normal\n    spacing_before: 18\n    spacing_after: 6\n    h1:\n      size: 20\n    h2:\n      size: 14\n      weight: normal\n      style: italic\n",
         )
         .expect("the template");
         let document = Document::new(
@@ -807,15 +837,51 @@ mod tests {
         let source = typst_source(&document, &template, &AssetMap::new()).expect("the source");
         assert!(
             source.contains(
-                "#show heading.where(level: 1): set text(font: (\"Liberation Sans\", ), size: 20.000pt)"
+                "#show heading.where(level: 1): set text(font: (\"Liberation Sans\", ), size: 20.000pt, weight: 700, style: \"normal\")"
             ),
             "{source}"
         );
         assert!(
-            source.contains("#show heading.where(level: 1): set block(above: 18.000pt)"),
+            source.contains(
+                "#show heading.where(level: 1): set block(above: 18.000pt, below: 6.000pt)"
+            ),
+            "{source}"
+        );
+        assert!(
+            source.contains(
+                "#show heading.where(level: 2): set text(font: (\"Liberation Sans\", ), size: 14.000pt, weight: 400, style: \"italic\")"
+            ),
+            "{source}"
+        );
+        assert!(
+            source.contains(
+                "#show heading.where(level: 3): set text(font: (\"Liberation Sans\", ), size: 12.000pt, weight: 700, style: \"normal\")"
+            ),
             "{source}"
         );
         assert!(source.contains("#heading(level: 1)[Contrato]"), "{source}");
+    }
+
+    #[test]
+    fn inline_styles_use_the_configured_faces() {
+        let template = Template::from_yaml(
+            "version: \"0.5\"\nformatting:\n  paragraph:\n    font_families:\n      - Liberation Serif\n    size: 12\n    emphasis:\n      font_families:\n        - DejaVu Serif\n      weight: semibold\n    strong:\n      size: 13\n      style: italic\n",
+        )
+        .expect("the template");
+        let document = Document::new(Metadata::default(), Vec::new());
+        let source = typst_source(&document, &template, &AssetMap::new()).expect("the source");
+        assert!(
+            source.contains(
+                "#show emph: set text(font: (\"DejaVu Serif\", ), size: 12.000pt, weight: 600, style: \"italic\")"
+            ),
+            "{source}"
+        );
+        assert!(
+            source.contains(
+                "#show strong: set text(font: (\"Liberation Serif\", ), size: 13.000pt, weight: 700, style: \"italic\")"
+            ),
+            "{source}"
+        );
     }
 
     #[test]

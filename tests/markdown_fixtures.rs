@@ -7,6 +7,7 @@ use pageformer::markdown;
 
 const CONTRACT: &str = include_str!("../assets/examples/Contrato.md");
 const EMBARGOS: &str = include_str!("../assets/examples/Embargos.md");
+const REPORT: &str = include_str!("../assets/examples/tecnico/Relatorio.md");
 
 fn plain_text(inlines: &[Inline]) -> String {
     inlines
@@ -56,6 +57,53 @@ fn first_quote(document: &Document) -> &Quote {
             _ => None,
         })
         .expect("a block quote")
+}
+
+#[test]
+fn contract_forces_the_signature_block_to_a_new_page() {
+    let document = markdown::parse(CONTRACT).expect("the contract fixture must parse");
+    let index = document
+        .blocks()
+        .iter()
+        .position(|block| matches!(block, Block::PageBreak))
+        .expect("the contract has a page break");
+    let next = document
+        .blocks()
+        .get(index + 1)
+        .expect("a block after the break");
+    match next {
+        Block::Paragraph(inlines) => assert_eq!(plain_text(inlines), "Local e data:"),
+        other => panic!("expected the signature block, found {other:?}"),
+    }
+}
+
+#[test]
+fn the_report_uses_the_new_template_features() {
+    let document = markdown::parse(REPORT).expect("the report fixture must parse");
+    let metadata = document.metadata();
+    assert_eq!(
+        metadata.date().map(|date| date.to_string()),
+        Some("2026-03-10".to_owned())
+    );
+    assert_eq!(
+        metadata.subject().map(|subject| subject.as_str()),
+        Some("Demonstração das funcionalidades do template")
+    );
+    assert_eq!(metadata.keywords().len(), 2);
+    assert!(
+        document
+            .blocks()
+            .iter()
+            .any(|block| matches!(block, Block::PageBreak)),
+        "the report forces a page break"
+    );
+    assert!(
+        document
+            .blocks()
+            .iter()
+            .any(|block| matches!(block, Block::Table(_))),
+        "the report has a table"
+    );
 }
 
 #[test]

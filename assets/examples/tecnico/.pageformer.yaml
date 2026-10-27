@@ -1,0 +1,57 @@
+# Template for the technical report example.
+#
+# It lives in its own directory, so it replaces the shared template of the
+# parent folder. Without a letterhead, both margins are free for the running
+# header and footer.
+
+version: "0.5"
+
+page:
+  size: a4
+  orientation: portrait
+  margins:
+    top: 25mm
+    bottom: 25mm
+    left: 25mm
+    right: 25mm
+  header:
+    left: "{author}"
+    center: "{title}"
+    right: "Página {page} de {pages}"
+  footer:
+    left: "Documento de demonstração"
+    right: "Pageformer"
+
+formatting:
+  paragraph:
+    font_families:
+      - Liberation Serif
+      - DejaVu Serif
+    size: 11
+    leading: 7
+    spacing: 10
+  heading:
+    font_families:
+      - Liberation Sans
+      - DejaVu Sans
+    weight: bold
+    spacing_before: 18
+    spacing_after: 6
+    h1:
+      size: 18
+      spacing_before: 0
+      spacing_after: 12
+    h2:
+      size: 14
+      spacing_before: 16
+      spacing_after: 6
+    h3:
+      size: 12
+      spacing_before: 12
+      spacing_after: 4
+
+table:
+  border: 0.5pt
+  border_color: "#336699"
+  header_fill: "#e8eef5"
+  cell_padding: 6pt

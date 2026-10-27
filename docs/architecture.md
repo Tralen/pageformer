@@ -132,7 +132,7 @@ Pure tests cover the document model, the Markdown parser, template validation, t
 
 The parser also has property tests that assert arbitrary text is either accepted or rejected without panicking. The template parser has the same property.
 
-The fixtures are in `assets/examples/`: `Contrato.md` with `Contrato.pdf`, and `Embargos.md` with `Embargos.pdf`, both generated with the shared `.pageformer.yaml` and its `Timbre.png` letterhead. The PDFs are outputs of the current backend, not byte targets; both pass veraPDF as PDF/A-2b.
+The fixtures are in `assets/examples/`: `Contrato.md` with `Contrato.pdf` and `Embargos.md` with `Embargos.pdf`, both generated with the shared `.pageformer.yaml` and its `Timbre.png` letterhead, plus `tecnico/Relatorio.md` with its own template and `Relatorio.pdf`. The PDFs are outputs of the current backend, not byte targets; all three pass veraPDF as PDF/A-2b.
 
 ## Open decisions
 

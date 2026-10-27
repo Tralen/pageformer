@@ -16,12 +16,9 @@ page:
     right: 25mm
   # A letterhead resolves relative to this file.
   letterhead: Timbre.png
-  # A running header or footer may use {page}, {pages}, {title} and {author}.
-  # This letterhead already fills both margins, so no running content is set.
-  # header:
-  #   right: "{title}"
-  # footer:
-  #   center: "Página {page} de {pages}"
+  # The page number stays at the right, clear of the centered letterhead.
+  header:
+    right: "{page} de {pages}"
 
 formatting:
   paragraph:

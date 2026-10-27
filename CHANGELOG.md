@@ -4,6 +4,13 @@
 
 *Major updates and feature releases.*
 
+### 0.10.1
+
+- The shared example template now sets a running header with `{page} de {pages}` in the right slot, clear of the letterhead.
+- Added the `tecnico/` example, with its own template: running header and footer with every token, a styled table, a forced page break and document metadata.
+- The contract fixture forces the signature block onto a new page with `\pagebreak`.
+- Regenerated the example PDFs.
+
 ### 0.10.0
 
 - Added `page.header` and `page.footer` with left, center and right slots. Slots expand the lowercase tokens `{page}`, `{pages}`, `{title}` and `{author}`; an unknown lowercase token is a template error, while an uppercase token stays literal for the secret phase.

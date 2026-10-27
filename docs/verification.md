@@ -78,6 +78,7 @@ PDF/A conformance and structure:
 ```sh
 verapdf --format text -f 2b assets/examples/Contrato.pdf
 verapdf --format text -f 2b assets/examples/Embargos.pdf
+verapdf --format text -f 2b assets/examples/tecnico/Relatorio.pdf
 
 pdfinfo assets/examples/Contrato.pdf
 pdffonts assets/examples/Embargos.pdf

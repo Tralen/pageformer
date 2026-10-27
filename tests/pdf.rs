@@ -142,6 +142,39 @@ table:
 }
 
 #[test]
+fn the_technical_report_uses_its_own_template() {
+    let examples = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("assets")
+        .join("examples")
+        .join("tecnico");
+    let resolved = loader::resolve(&examples, None).expect("the report template must resolve");
+    let template = resolved.template();
+    assert_eq!(template.page().letterhead(), None);
+    assert!(
+        template.page().header().is_some(),
+        "the report has a header"
+    );
+    assert!(
+        template.page().footer().is_some(),
+        "the report has a footer"
+    );
+
+    let document = markdown::parse(include_str!("../assets/examples/tecnico/Relatorio.md"))
+        .expect("the report fixture must parse");
+    let assets = pdf::load_assets(&document, template, &examples, resolved.base_directory())
+        .expect("the report assets must load");
+    let first = pdf::render(&document, template, &assets).expect("the report must render");
+    assert!(
+        first.warnings().is_empty(),
+        "the report produced warnings: {:?}",
+        first.warnings()
+    );
+    assert!(contains(first.bytes(), b"pdfaid:part"), "no PDF/A marker");
+    let second = pdf::render(&document, template, &assets).expect("the rerender must work");
+    assert_eq!(first.bytes(), second.bytes());
+}
+
+#[test]
 fn local_images_are_loaded_and_named() {
     let project = TempDir::new().expect("a temporary project");
     fs::write(project.path().join("logo.png"), b"not a real png")

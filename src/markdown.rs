@@ -14,8 +14,8 @@ use serde::Deserialize;
 use crate::document::{
     Alert, Author, Block, CodeBlock, CodeLanguage, ColumnAlignment, Destination, Document,
     FootnoteDefinition, FootnoteId, Heading, HeadingLevel, Inline, Language, List, ListItem,
-    ListStart, Metadata, MetadataError, Quote, QuoteKind, Table, TableCell, TableError, TaskState,
-    Title,
+    ListStart, Metadata, MetadataError, NumberedParagraph, Quote, QuoteKind, Table, TableCell,
+    TableError, TaskState, Title,
 };
 
 /// The deepest tag nesting accepted. A deeper document is rejected instead of
@@ -82,6 +82,16 @@ struct DocumentParser<'source> {
     metadata: Option<Metadata>,
 }
 
+struct ParsedList {
+    items: Vec<ListItem>,
+    tight: bool,
+}
+
+struct ParsedItem {
+    item: ListItem,
+    tight: bool,
+}
+
 impl<'source> DocumentParser<'source> {
     fn new(events: Vec<Event<'source>>) -> Self {
         Self {
@@ -94,9 +104,7 @@ impl<'source> DocumentParser<'source> {
     fn parse_document(mut self) -> Result<Document, MarkdownError> {
         let mut blocks = Vec::new();
         while let Some(event) = self.next() {
-            if let Some(block) = self.parse_block_event(event, 0)? {
-                blocks.push(block);
-            }
+            blocks.extend(self.parse_block_event(event, 0)?);
         }
         Ok(Document::new(self.metadata.unwrap_or_default(), blocks))
     }
@@ -117,14 +125,14 @@ impl<'source> DocumentParser<'source> {
         &mut self,
         event: Event<'source>,
         depth: usize,
-    ) -> Result<Option<Block>, MarkdownError> {
+    ) -> Result<Vec<Block>, MarkdownError> {
         match event {
             Event::Start(Tag::MetadataBlock(kind)) => {
                 self.parse_frontmatter(kind)?;
-                Ok(None)
+                Ok(Vec::new())
             }
             Event::Start(tag) => self.parse_start_tag(tag, depth),
-            Event::Rule => Ok(Some(Block::ThematicBreak)),
+            Event::Rule => Ok(vec![Block::ThematicBreak]),
             Event::Html(_) | Event::InlineHtml(_) => Err(MarkdownError::HtmlNotSupported),
             other => Err(MarkdownError::Malformed {
                 message: format!("unexpected event at block level: {other:?}"),
@@ -136,34 +144,43 @@ impl<'source> DocumentParser<'source> {
         &mut self,
         tag: Tag<'source>,
         depth: usize,
-    ) -> Result<Option<Block>, MarkdownError> {
+    ) -> Result<Vec<Block>, MarkdownError> {
         if depth >= MAX_NESTING {
             return Err(MarkdownError::NestingTooDeep { limit: MAX_NESTING });
         }
         match tag {
             Tag::Paragraph => {
                 let content = self.parse_inlines(TagEnd::Paragraph, depth)?;
-                Ok(Some(Block::Paragraph(content)))
+                Ok(vec![Block::Paragraph(content)])
             }
             Tag::Heading { level: source, .. } => {
                 let end = TagEnd::Heading(source);
                 let level = heading_level(source)?;
                 let content = self.parse_inlines(end, depth)?;
-                Ok(Some(Block::Heading(Heading::new(level, content))))
+                Ok(vec![Block::Heading(Heading::new(level, content))])
             }
             Tag::BlockQuote(kind) => {
                 let end = TagEnd::BlockQuote(kind);
                 let quote_kind = quote_kind(kind);
                 let blocks = self.parse_blocks(end, depth + 1)?;
-                Ok(Some(Block::Quote(Quote::new(quote_kind, blocks))))
+                Ok(vec![Block::Quote(Quote::new(quote_kind, blocks))])
             }
             Tag::List(start) => {
-                let items = self.parse_items(start, depth + 1)?;
+                let parsed = self.parse_items(start, depth + 1)?;
+                if let Some(number) = start
+                    && let Some(paragraphs) = numbered_paragraphs(number, &parsed)
+                {
+                    return Ok(paragraphs);
+                }
                 let start = match start {
                     Some(number) => ListStart::Ordered(number),
                     None => ListStart::Unordered,
                 };
-                Ok(Some(Block::List(List::new(start, items))))
+                Ok(vec![Block::List(List::new(
+                    start,
+                    parsed.items,
+                    parsed.tight,
+                ))])
             }
             Tag::CodeBlock(kind) => {
                 let language = match kind {
@@ -171,19 +188,19 @@ impl<'source> DocumentParser<'source> {
                     CodeBlockKind::Fenced(info) => CodeLanguage::parse(&info),
                 };
                 let text = self.collect_text(TagEnd::CodeBlock, "code block")?;
-                Ok(Some(Block::CodeBlock(CodeBlock::new(language, text))))
+                Ok(vec![Block::CodeBlock(CodeBlock::new(language, text))])
             }
             Tag::Table(alignments) => {
                 let table = self.parse_table(alignments, depth + 1)?;
-                Ok(Some(Block::Table(table)))
+                Ok(vec![Block::Table(table)])
             }
             Tag::FootnoteDefinition(name) => {
                 let id = FootnoteId::parse(&name)
                     .ok_or_else(|| malformed("a footnote definition has an empty label"))?;
                 let blocks = self.parse_blocks(TagEnd::FootnoteDefinition, depth + 1)?;
-                Ok(Some(Block::FootnoteDefinition(FootnoteDefinition::new(
+                Ok(vec![Block::FootnoteDefinition(FootnoteDefinition::new(
                     id, blocks,
-                ))))
+                ))])
             }
             Tag::HtmlBlock => Err(MarkdownError::HtmlNotSupported),
             Tag::Item => Err(malformed("a list item appeared outside a list")),
@@ -206,9 +223,7 @@ impl<'source> DocumentParser<'source> {
                     let event = self
                         .next()
                         .ok_or_else(|| malformed("unexpected end of the document"))?;
-                    if let Some(block) = self.parse_block_event(event, depth)? {
-                        blocks.push(block);
-                    }
+                    blocks.extend(self.parse_block_event(event, depth)?);
                 }
                 None => {
                     return Err(malformed(format!(
@@ -223,18 +238,23 @@ impl<'source> DocumentParser<'source> {
         &mut self,
         start: Option<u64>,
         depth: usize,
-    ) -> Result<Vec<ListItem>, MarkdownError> {
+    ) -> Result<ParsedList, MarkdownError> {
         let end = TagEnd::List(start.is_some());
         let mut items = Vec::new();
+        let mut tight = true;
         loop {
             match self.peek().cloned() {
                 Some(Event::Start(Tag::Item)) => {
                     self.index += 1;
-                    items.push(self.parse_item(depth)?);
+                    let parsed = self.parse_item(depth)?;
+                    if !parsed.tight {
+                        tight = false;
+                    }
+                    items.push(parsed.item);
                 }
                 Some(Event::End(actual)) if actual == end => {
                     self.index += 1;
-                    return Ok(items);
+                    return Ok(ParsedList { items, tight });
                 }
                 Some(other) => {
                     return Err(malformed(format!("unexpected event in a list: {other:?}")));
@@ -244,14 +264,18 @@ impl<'source> DocumentParser<'source> {
         }
     }
 
-    fn parse_item(&mut self, depth: usize) -> Result<ListItem, MarkdownError> {
+    fn parse_item(&mut self, depth: usize) -> Result<ParsedItem, MarkdownError> {
         let mut blocks = Vec::new();
         let mut task = None;
+        let mut tight = true;
         loop {
             match self.peek().cloned() {
                 Some(Event::End(TagEnd::Item)) => {
                     self.index += 1;
-                    return Ok(ListItem::new(task, blocks));
+                    return Ok(ParsedItem {
+                        item: ListItem::new(task, blocks),
+                        tight,
+                    });
                 }
                 Some(Event::TaskListMarker(checked)) if blocks.is_empty() && task.is_none() => {
                     self.index += 1;
@@ -259,6 +283,7 @@ impl<'source> DocumentParser<'source> {
                 }
                 Some(Event::Start(Tag::Paragraph)) => {
                     self.index += 1;
+                    tight = false;
                     if blocks.is_empty() && task.is_none() {
                         task = self.take_task_marker();
                     }
@@ -271,9 +296,7 @@ impl<'source> DocumentParser<'source> {
                 }
                 Some(Event::Start(tag)) => {
                     self.index += 1;
-                    if let Some(block) = self.parse_start_tag(tag, depth)? {
-                        blocks.push(block);
-                    }
+                    blocks.extend(self.parse_start_tag(tag, depth)?);
                 }
                 Some(Event::Rule) => {
                     self.index += 1;
@@ -503,6 +526,31 @@ impl<'source> DocumentParser<'source> {
         self.metadata = Some(frontmatter_metadata(&yaml)?);
         Ok(())
     }
+}
+
+/// A loose ordered list whose items are one paragraph each is a sequence of
+/// numbered paragraphs. This keeps legal numbering such as `1.` as text,
+/// without an escape and without renumbering it as a list.
+fn numbered_paragraphs(number: u64, list: &ParsedList) -> Option<Vec<Block>> {
+    if list.items.is_empty() || (list.items.len() > 1 && list.tight) {
+        return None;
+    }
+    let mut paragraphs = Vec::with_capacity(list.items.len());
+    for (index, item) in list.items.iter().enumerate() {
+        if item.task().is_some() {
+            return None;
+        }
+        let [Block::Paragraph(inlines)] = item.blocks() else {
+            return None;
+        };
+        let offset = u64::try_from(index).ok()?;
+        let paragraph_number = number.checked_add(offset)?;
+        paragraphs.push(Block::NumberedParagraph(NumberedParagraph::new(
+            paragraph_number,
+            inlines.clone(),
+        )));
+    }
+    Some(paragraphs)
 }
 
 fn heading_level(level: SourceHeadingLevel) -> Result<HeadingLevel, MarkdownError> {
@@ -793,6 +841,64 @@ mod tests {
         };
         assert_eq!(list.start(), ListStart::Ordered(3));
         assert_eq!(list.items().len(), 2);
+    }
+
+    #[test]
+    fn single_item_ordered_lists_become_numbered_paragraphs() {
+        let document =
+            parse("1. Requer a nulidade.\n\n2. Segue o pedido.\n").expect("numbered paragraphs");
+        let numbered = document
+            .blocks()
+            .iter()
+            .filter_map(|block| match block {
+                Block::NumberedParagraph(paragraph) => {
+                    Some((paragraph.number(), plain_text(paragraph.content())))
+                }
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(
+            numbered,
+            vec![
+                (1, "Requer a nulidade.".to_owned()),
+                (2, "Segue o pedido.".to_owned()),
+            ]
+        );
+    }
+
+    #[test]
+    fn multi_item_ordered_lists_stay_lists() {
+        let document = parse("1. Um\n2. Dois\n").expect("a list");
+        assert!(matches!(first_block(&document), Block::List(_)));
+    }
+
+    #[test]
+    fn a_tight_single_item_list_is_a_numbered_paragraph() {
+        let document = parse("1. Apenas um passo.\n").expect("one item");
+        assert!(matches!(
+            first_block(&document),
+            Block::NumberedParagraph(_)
+        ));
+    }
+
+    #[test]
+    fn loose_numbered_paragraphs_increment_from_the_start() {
+        let document = parse("7. Sete.\n\n8. Oito.\n").expect("numbered paragraphs");
+        let numbers = document
+            .blocks()
+            .iter()
+            .filter_map(|block| match block {
+                Block::NumberedParagraph(paragraph) => Some(paragraph.number()),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(numbers, vec![7, 8]);
+    }
+
+    #[test]
+    fn a_loose_list_with_multi_paragraph_items_stays_a_list() {
+        let document = parse("1. Um\n\n   Continuação.\n\n2. Dois\n").expect("a loose list");
+        assert!(matches!(first_block(&document), Block::List(list) if !list.is_tight()));
     }
 
     #[test]

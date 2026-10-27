@@ -145,6 +145,13 @@ impl<'a> SourceBuilder<'a> {
                 self.inlines(inlines)?;
                 self.output.push(']');
             }
+            Block::NumberedParagraph(paragraph) => {
+                self.output.push_str("#par[");
+                self.output
+                    .push_str(&escape_markup(&format!("{}. ", paragraph.number())));
+                self.inlines(paragraph.content())?;
+                self.output.push(']');
+            }
             Block::List(list) => self.list(list)?,
             Block::Table(table) => self.table(table)?,
             Block::Quote(quote) => {
@@ -251,9 +258,15 @@ impl<'a> SourceBuilder<'a> {
             return Ok(());
         }
         match list.start() {
-            ListStart::Unordered => self.output.push_str("#list(\n"),
+            ListStart::Unordered => {
+                let _ = writeln!(self.output, "#list(tight: {},", list.is_tight());
+            }
             ListStart::Ordered(start) => {
-                let _ = writeln!(self.output, "#enum(start: {start},");
+                let _ = writeln!(
+                    self.output,
+                    "#enum(tight: {}, start: {start},",
+                    list.is_tight()
+                );
             }
         }
         for item in list.items() {
@@ -336,6 +349,7 @@ fn collect_footnotes(blocks: &[Block], footnotes: &mut BTreeMap<String, Vec<Bloc
             Block::Quote(quote) => collect_footnotes(quote.blocks(), footnotes),
             Block::Heading(_)
             | Block::Paragraph(_)
+            | Block::NumberedParagraph(_)
             | Block::Table(_)
             | Block::CodeBlock(_)
             | Block::ThematicBreak => {}
@@ -445,7 +459,7 @@ mod tests {
     use super::*;
     use crate::document::{
         Alert, CodeBlock, CodeLanguage, Destination, FootnoteDefinition, FootnoteId, Heading,
-        HeadingLevel, ListItem, Metadata, Quote, QuoteKind, TableCell,
+        HeadingLevel, ListItem, Metadata, NumberedParagraph, Quote, QuoteKind, TableCell,
     };
     use crate::template::Template;
 
@@ -545,10 +559,11 @@ mod tests {
                     vec![Block::Paragraph(vec![Inline::Text("Pendente".to_owned())])],
                 ),
             ],
+            true,
         );
         let document = Document::new(Metadata::default(), vec![Block::List(list)]);
         let source = source(&document, &AssetMap::new());
-        assert!(source.contains("#enum(start: 3,"), "{source}");
+        assert!(source.contains("#enum(tight: true, start: 3,"), "{source}");
         assert!(source.contains("\\[x\\] Feito"), "{source}");
         assert!(source.contains("\\[ \\] Pendente"), "{source}");
     }
@@ -685,7 +700,11 @@ mod tests {
     fn an_empty_list_renders_nothing() {
         let document = Document::new(
             Metadata::default(),
-            vec![Block::List(List::new(ListStart::Unordered, Vec::new()))],
+            vec![Block::List(List::new(
+                ListStart::Unordered,
+                Vec::new(),
+                true,
+            ))],
         );
         let source = source(&document, &AssetMap::new());
         assert!(!source.contains("#list("), "{source}");
@@ -700,6 +719,19 @@ mod tests {
             "{source}"
         );
         assert!(!source.contains("#par[1. "), "{source}");
+    }
+
+    #[test]
+    fn numbered_paragraphs_keep_their_number() {
+        let document = Document::new(
+            Metadata::default(),
+            vec![Block::NumberedParagraph(NumberedParagraph::new(
+                2,
+                vec![Inline::Text("Segue.".to_owned())],
+            ))],
+        );
+        let source = source(&document, &AssetMap::new());
+        assert!(source.contains("#par[2\\. Segue\\.]"), "{source}");
     }
 
     #[test]

@@ -34,6 +34,8 @@ python3 -m tarfile -e /tmp/typst.tar.xz /tmp/typst
 install -m 755 /tmp/typst/typst-x86_64-unknown-linux-musl/typst "$HOME/.local/bin/typst"
 ```
 
+Why not `tar -xJf`: on this machine `~/.local/bin/xz` is a custom wrapper that compresses a path into `<name>.tar.xz` and does not implement `-d`. Because `~/.local/bin` precedes `/usr/bin`, GNU tar's `-J` invokes the wrapper and fails with `Opção desconhecida: -d`. Python extraction bypasses the wrapper; alternatively, run `/usr/bin/xz -d` explicitly or put `/usr/bin` first for the command.
+
 veraPDF. It needs Java 11 or newer (`java -version`). The installer is interactive: choose `$HOME/.local/verapdf` and select the **veraPDF CLI** pack. The greenfield directory name carries the version, so use a glob:
 
 ```sh
@@ -69,7 +71,7 @@ Markdown, using the repository `.markdownlint-cli2.jsonc`:
 markdownlint-cli2
 ```
 
-The configuration disables only rules that conflict with legal documents: line length, compact tables, multiple H1 section headings after a frontmatter title, and bold or italic lines used as headings. It ignores the session files and `target/`.
+The configuration disables only rules that conflict with legal documents: line length, compact tables, explicit legal-numbering prefixes, multiple H1 section headings after a frontmatter title, and bold or italic lines used as headings. It ignores the session files and `target/`.
 
 PDF/A conformance and structure:
 

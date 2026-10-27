@@ -203,12 +203,37 @@ impl std::error::Error for MetadataError {}
 pub enum Block {
     Heading(Heading),
     Paragraph(Vec<Inline>),
+    NumberedParagraph(NumberedParagraph),
     List(List),
     Table(Table),
     Quote(Quote),
     CodeBlock(CodeBlock),
     ThematicBreak,
     FootnoteDefinition(FootnoteDefinition),
+}
+
+/// A numbered paragraph, such as the manual numbering in legal documents.
+///
+/// A single-item ordered list becomes this block, so the source can write
+/// `1.` without escaping the period and without being treated as a list.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NumberedParagraph {
+    number: u64,
+    content: Vec<Inline>,
+}
+
+impl NumberedParagraph {
+    pub fn new(number: u64, content: Vec<Inline>) -> Self {
+        Self { number, content }
+    }
+
+    pub fn number(&self) -> u64 {
+        self.number
+    }
+
+    pub fn content(&self) -> &[Inline] {
+        &self.content
+    }
 }
 
 /// A heading from level 1 to 6.
@@ -256,11 +281,16 @@ impl HeadingLevel {
 pub struct List {
     start: ListStart,
     items: Vec<ListItem>,
+    tight: bool,
 }
 
 impl List {
-    pub fn new(start: ListStart, items: Vec<ListItem>) -> Self {
-        Self { start, items }
+    pub fn new(start: ListStart, items: Vec<ListItem>, tight: bool) -> Self {
+        Self {
+            start,
+            items,
+            tight,
+        }
     }
 
     pub fn start(&self) -> ListStart {
@@ -269,6 +299,11 @@ impl List {
 
     pub fn items(&self) -> &[ListItem] {
         &self.items
+    }
+
+    /// Whether the items are spaced as a compact list.
+    pub fn is_tight(&self) -> bool {
+        self.tight
     }
 }
 

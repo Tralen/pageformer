@@ -3,6 +3,8 @@
   "config": {
     "MD013": false,
     "MD060": false,
+    // Legal numbering is explicit and may skip or restart.
+    "MD029": false,
     // The frontmatter carries the document title; an H1 starts a section.
     "MD025": false,
     // Bold or italic lines are deliberate legal headings.

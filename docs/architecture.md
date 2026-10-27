@@ -27,6 +27,8 @@ The template is parsed and validated separately into a typed structure. An inval
 
 The Markdown subset is CommonMark plus the extensions the Zed preview renders: tables, task lists, strikethrough, footnotes, alert block quotes and YAML frontmatter. Fenced code blocks are preserved. Raw HTML is not part of the contract, so the parser rejects it instead of dropping it silently.
 
+A loose ordered list whose items are one paragraph each becomes a sequence of numbered paragraphs. This keeps legal numbering such as `1.` as written, without a backslash, and without renumbering it as a list. A tight ordered list remains a list. Zed's preview still shows the loose source as a list; the document model and the generated PDF treat it as numbered paragraphs.
+
 ## Crate layout
 
 - `src/document.rs` holds the backend-independent model, with newtypes and smart constructors for the values the pipeline validates.

@@ -58,17 +58,6 @@ fn first_quote(document: &Document) -> &Quote {
         .expect("a block quote")
 }
 
-fn paragraphs(document: &Document) -> Vec<String> {
-    document
-        .blocks()
-        .iter()
-        .filter_map(|block| match block {
-            Block::Paragraph(inlines) => Some(plain_text(inlines)),
-            _ => None,
-        })
-        .collect()
-}
-
 #[test]
 fn contract_frontmatter_is_read() {
     let document = markdown::parse(CONTRACT).expect("the contract fixture must parse");
@@ -195,12 +184,65 @@ fn embargos_frontmatter_and_headings_are_read() {
 }
 
 #[test]
-fn embargos_escaped_numbering_stays_a_paragraph() {
+fn embargos_numbering_is_read_without_escapes() {
     let document = markdown::parse(EMBARGOS).expect("the embargos fixture must parse");
-    let paragraphs = paragraphs(&document);
+    let first = document
+        .blocks()
+        .iter()
+        .find_map(|block| match block {
+            Block::NumberedParagraph(paragraph) if paragraph.number() == 1 => Some(paragraph),
+            _ => None,
+        })
+        .expect("numbered paragraph 1");
+    assert!(plain_text(first.content()).starts_with("Requer"));
     assert!(
-        paragraphs.iter().any(|text| text.starts_with("1. Requer")),
-        "the escaped list marker must stay literal text"
+        !EMBARGOS.contains("\\."),
+        "the fixture must not need escaped numbering"
+    );
+}
+
+fn inlines_end_with_formatted_comma(inlines: &[Inline]) -> bool {
+    inlines.iter().any(|inline| match inline {
+        Inline::Strong(content) | Inline::Emphasis(content) => {
+            plain_text(content).trim_end().ends_with(',')
+                || inlines_end_with_formatted_comma(content)
+        }
+        Inline::Strikethrough(content) => inlines_end_with_formatted_comma(content),
+        Inline::Link { content, .. } => inlines_end_with_formatted_comma(content),
+        Inline::Image { alternative, .. } => inlines_end_with_formatted_comma(alternative),
+        _ => false,
+    })
+}
+
+fn blocks_have_formatted_comma(blocks: &[Block]) -> bool {
+    blocks.iter().any(|block| match block {
+        Block::Heading(heading) => inlines_end_with_formatted_comma(heading.content()),
+        Block::Paragraph(inlines) => inlines_end_with_formatted_comma(inlines),
+        Block::NumberedParagraph(paragraph) => {
+            inlines_end_with_formatted_comma(paragraph.content())
+        }
+        Block::List(list) => list
+            .items()
+            .iter()
+            .any(|item| blocks_have_formatted_comma(item.blocks())),
+        Block::Table(table) => table
+            .header()
+            .iter()
+            .chain(table.rows().iter().flatten())
+            .any(|cell| inlines_end_with_formatted_comma(cell.content())),
+        Block::Quote(quote) => blocks_have_formatted_comma(quote.blocks()),
+        Block::FootnoteDefinition(definition) => blocks_have_formatted_comma(definition.blocks()),
+        Block::CodeBlock(_) | Block::ThematicBreak => false,
+        _ => false,
+    })
+}
+
+#[test]
+fn embargos_commas_are_outside_inline_formatting() {
+    let document = markdown::parse(EMBARGOS).expect("the embargos fixture must parse");
+    assert!(
+        !blocks_have_formatted_comma(document.blocks()),
+        "a formatted span ends with a comma"
     );
 }
 

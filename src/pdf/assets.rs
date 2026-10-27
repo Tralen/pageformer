@@ -111,6 +111,9 @@ fn collect_block_images<'a>(blocks: &'a [Block], destinations: &mut Vec<&'a str>
         match block {
             Block::Heading(heading) => collect_inline_images(heading.content(), destinations),
             Block::Paragraph(inlines) => collect_inline_images(inlines, destinations),
+            Block::NumberedParagraph(paragraph) => {
+                collect_inline_images(paragraph.content(), destinations);
+            }
             Block::List(list) => {
                 for item in list.items() {
                     collect_block_images(item.blocks(), destinations);

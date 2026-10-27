@@ -77,13 +77,13 @@ fn contract_frontmatter_is_read() {
 }
 
 #[test]
-fn contract_headings_are_level_one() {
+fn contract_sections_are_level_two() {
     let document = markdown::parse(CONTRACT).expect("the contract fixture must parse");
     let headings = headings(&document);
     assert_eq!(headings.len(), 8);
     assert!(
-        headings.iter().all(|heading| heading.level().get() == 1),
-        "every contract heading is a first level heading"
+        headings.iter().all(|heading| heading.level().get() == 2),
+        "every contract section is a second level heading"
     );
     let first = headings.first().expect("a first heading");
     assert_eq!(plain_text(first.content()), "Das partes");

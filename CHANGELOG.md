@@ -4,6 +4,12 @@
 
 *Major updates and feature releases.*
 
+### 0.9.1
+
+- Adjusted the example template: leading 8, larger heading sizes, base heading spacing 36/12 and an `h1` spacing of 48.
+- Changed the Contrato section headings to level 2.
+- Regenerated both example PDFs.
+
 ### 0.9.0
 
 - Breaking: template schema 0.5 uses a two-part string version such as `"0.5"` and replaces the `text` section with `formatting`.

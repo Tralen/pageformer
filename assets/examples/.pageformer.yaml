@@ -1,0 +1,27 @@
+# Example template shared by the Markdown files in this directory.
+#
+# The nearest `.pageformer.yaml` wins entirely; there is no merge across
+# directories. This file applies to Contrato.md and Embargos.md.
+
+version: 2
+
+page:
+  size: a4
+  orientation: portrait
+  margins:
+    top: 30mm
+    bottom: 20mm
+    left: 30mm
+    right: 20mm
+  # A letterhead resolves relative to this file.
+  letterhead: Timbre.png
+
+text:
+  font_families:
+    - Liberation Serif
+    - DejaVu Serif
+    - Libertinus Serif
+  size: 12pt
+  leading: 0.5
+  paragraph_spacing: 6pt
+  alignment: justified

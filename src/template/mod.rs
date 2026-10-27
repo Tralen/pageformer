@@ -448,6 +448,7 @@ pub struct TextStyle {
     font_families: Vec<FontFamily>,
     size: Length,
     leading: Leading,
+    paragraph_spacing: Option<Length>,
     alignment: ParagraphAlignment,
 }
 
@@ -456,6 +457,7 @@ impl TextStyle {
         font_families: Vec<FontFamily>,
         size: Length,
         leading: Leading,
+        paragraph_spacing: Option<Length>,
         alignment: ParagraphAlignment,
     ) -> Result<Self, ValueError> {
         if font_families.is_empty() {
@@ -468,6 +470,7 @@ impl TextStyle {
             font_families,
             size,
             leading,
+            paragraph_spacing,
             alignment,
         })
     }
@@ -482,6 +485,10 @@ impl TextStyle {
 
     pub fn leading(&self) -> Leading {
         self.leading
+    }
+
+    pub fn paragraph_spacing(&self) -> Option<Length> {
+        self.paragraph_spacing
     }
 
     pub fn alignment(&self) -> ParagraphAlignment {
@@ -570,6 +577,7 @@ struct RawText {
     font_families: Option<Vec<String>>,
     size: Option<String>,
     leading: Option<f64>,
+    paragraph_spacing: Option<String>,
     alignment: Option<ParagraphAlignment>,
 }
 
@@ -653,10 +661,21 @@ fn convert_text(raw: RawText) -> Result<TextStyle, TemplateError> {
         })?,
         None => DEFAULT_LEADING,
     };
+    let paragraph_spacing = raw
+        .paragraph_spacing
+        .map(|text| {
+            Length::parse(&text).map_err(|problem| TemplateError::Value {
+                field: "text.paragraph_spacing",
+                problem,
+            })
+        })
+        .transpose()?;
     let alignment = raw.alignment.unwrap_or(ParagraphAlignment::Justified);
-    TextStyle::new(families, size, leading, alignment).map_err(|problem| TemplateError::Value {
-        field: "text",
-        problem,
+    TextStyle::new(families, size, leading, paragraph_spacing, alignment).map_err(|problem| {
+        TemplateError::Value {
+            field: "text",
+            problem,
+        }
     })
 }
 
@@ -735,6 +754,7 @@ mod tests {
             default_font_families(),
             Length::new(0.0).expect("zero is a valid length"),
             DEFAULT_LEADING,
+            None,
             ParagraphAlignment::Justified,
         );
         assert_eq!(error, Err(ValueError::Zero));
@@ -746,6 +766,7 @@ mod tests {
             Vec::new(),
             DEFAULT_FONT_SIZE,
             DEFAULT_LEADING,
+            None,
             ParagraphAlignment::Justified,
         );
         assert_eq!(error, Err(ValueError::EmptyList));

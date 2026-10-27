@@ -110,11 +110,15 @@ impl<'a> SourceBuilder<'a> {
         self.output.push_str(")\n\n");
 
         let justify = matches!(template.text().alignment(), ParagraphAlignment::Justified);
-        let _ = writeln!(
+        let _ = write!(
             self.output,
-            "#set par(justify: {justify}, leading: {:.3}em)\n",
+            "#set par(justify: {justify}, leading: {:.3}em",
             template.text().leading().get()
         );
+        if let Some(spacing) = template.text().paragraph_spacing() {
+            let _ = write!(self.output, ", spacing: {}", typst_length(spacing));
+        }
+        self.output.push_str(")\n\n");
     }
 
     fn language_rules(&mut self, language: &Language) {
@@ -732,6 +736,27 @@ mod tests {
         );
         let source = source(&document, &AssetMap::new());
         assert!(source.contains("#par[2\\. Segue\\.]"), "{source}");
+    }
+
+    #[test]
+    fn paragraph_spacing_is_emitted_when_configured() {
+        let template = Template::from_yaml("version: 2\ntext:\n  paragraph_spacing: 6pt\n")
+            .expect("the template");
+        let document = Document::new(
+            Metadata::default(),
+            vec![
+                Block::Paragraph(vec![Inline::Text("Primeiro.".to_owned())]),
+                Block::Paragraph(vec![Inline::Text("Segundo.".to_owned())]),
+            ],
+        );
+        let source = typst_source(&document, &template, &AssetMap::new()).expect("the source");
+        assert!(source.contains("spacing: 6.000pt"), "{source}");
+    }
+
+    #[test]
+    fn absent_paragraph_spacing_is_not_emitted() {
+        let source = source(&paragraph("Texto"), &AssetMap::new());
+        assert!(!source.contains("spacing:"), "{source}");
     }
 
     #[test]

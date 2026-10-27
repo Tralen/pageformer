@@ -43,7 +43,8 @@ fn the_contract_fixture_passes_the_pipeline_check() {
     );
     let report = stdout(&output);
     assert!(report.contains("8 headings"), "{report}");
-    assert!(report.contains("template embedded"), "{report}");
+    assert!(report.contains(".pageformer.yaml"), "{report}");
+    assert!(!report.contains("template embedded"), "{report}");
 }
 
 #[test]

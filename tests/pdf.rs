@@ -79,23 +79,24 @@ fn the_embargos_fixture_is_rendered() {
 }
 
 #[test]
-fn the_embargos_example_template_uses_its_letterhead() {
+fn the_shared_example_template_uses_its_letterhead() {
     let examples = Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("assets")
         .join("examples");
-    let template = loader::load_file(&examples.join("Embargos.pageformer.yaml"))
-        .expect("the example template must load");
+    let resolved = loader::resolve(&examples, None).expect("the example template must resolve");
+    assert_eq!(resolved.base_directory(), Some(examples.as_path()));
+    let template = resolved.template();
     assert_eq!(
         template.page().letterhead().map(|path| path.as_str()),
         Some("Timbre.png")
     );
 
     let document = markdown::parse(EMBARGOS).expect("the embargos fixture must parse");
-    let assets = pdf::load_assets(&document, &template, &examples, Some(&examples))
+    let assets = pdf::load_assets(&document, template, &examples, resolved.base_directory())
         .expect("the letterhead must load");
     assert_eq!(assets.map().letterhead(), Some("assets/letterhead.png"));
 
-    let output = pdf::render(&document, &template, &assets).expect("the example must render");
+    let output = pdf::render(&document, template, &assets).expect("the example must render");
     assert!(output.bytes().starts_with(b"%PDF-"));
     assert!(
         output.warnings().is_empty(),

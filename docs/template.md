@@ -38,6 +38,7 @@ text:
     - Libertinus Serif
   size: 12pt
   leading: 0.65
+  paragraph_spacing: 6pt
   alignment: justified
 ```
 
@@ -75,6 +76,7 @@ The default size is A4 in portrait orientation.
 - `font_families`: a non-empty list of font names, tried in order. The default is `Liberation Serif`, `DejaVu Serif` and `Libertinus Serif`; the last one is embedded in the binary and is always available.
 - `size`: a positive length. The default is `12pt`.
 - `leading`: extra space between lines, in multiples of the font size. It must be finite and not negative; the default is `0.65`.
+- `paragraph_spacing`: space between paragraphs, in the same units as a length. When omitted, Typst's default spacing applies (`1.2em`).
 - `alignment`: `justified` or `left`. The default is `justified`.
 
 ## Lengths
@@ -91,11 +93,13 @@ The PDF backend uses the page and text fields above and reads the document metad
 
 ## Example
 
-`assets/examples/Embargos.pageformer.yaml` is a commented template for the legal fixture. It uses the fictional `Timbre.png` letterhead from the same directory. Copy the template to `.pageformer.yaml` next to the Markdown to have it discovered, or pass it explicitly:
+`assets/examples/.pageformer.yaml` is a commented template shared by both fixtures. It uses the fictional `Timbre.png` letterhead from the same directory and applies automatically because it is the nearest `.pageformer.yaml`:
 
 ```sh
-pageformer --template assets/examples/Embargos.pageformer.yaml assets/examples/Embargos.md
+pageformer assets/examples/Contrato.md assets/examples/Embargos.md
 ```
+
+To use the same settings elsewhere, copy the file to the document directory as `.pageformer.yaml` or pass `--template`.
 
 ## Errors
 

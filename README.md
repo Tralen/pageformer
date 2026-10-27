@@ -27,13 +27,13 @@ Documentation is stored in [`docs/`](docs/). The rendering pipeline and the sett
 The command renders each Markdown file to PDF/A next to its source, using the template resolved for it.
 
 ```sh
-cargo run -- assets/examples/Contrato.md
+cargo run -- assets/examples/Contrato.md assets/examples/Embargos.md
 cargo run -- --check assets/examples/Contrato.md
 cargo run -- --output /tmp/pageformer assets/examples/Contrato.md
 ```
 
-The first command writes `Contrato.pdf` next to the Markdown and replaces the reference file in `assets/examples/`. Use `--output` to write somewhere else and `--check` to parse the Markdown and validate the template without rendering.
+The first command writes each PDF next to its Markdown and updates the versioned examples in `assets/examples/`. Use `--output` to write somewhere else and `--check` to parse the Markdown and validate the template without rendering.
 
 ## Examples
 
-The fixtures in [`assets/examples/`](assets/examples/) exercise the parser and the PDF backend. `Contrato.md` has a generated `Contrato.pdf`; `Embargos.md`, extracted from an anonymized ODT, has `Embargos.pdf` generated with the commented example template `Embargos.pageformer.yaml`. Both PDFs pass veraPDF as PDF/A-2b.
+The fixtures in [`assets/examples/`](assets/examples/) exercise the parser and the PDF backend. `Contrato.md` has a generated `Contrato.pdf`; `Embargos.md`, extracted from an anonymized ODT, has `Embargos.pdf`. Both PDFs are generated with the shared `.pageformer.yaml` in that directory, which includes the fictional `Timbre.png` letterhead, and both pass veraPDF as PDF/A-2b.

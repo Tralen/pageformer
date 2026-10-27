@@ -31,6 +31,7 @@ fn a_minimal_template_uses_the_documented_defaults() {
     assert_eq!(template.text().leading().get(), 0.65);
     assert_eq!(template.text().alignment(), ParagraphAlignment::Justified);
     assert_eq!(template.text().font_families().len(), 3);
+    assert_eq!(template.text().paragraph_spacing(), None);
 }
 
 #[test]
@@ -55,6 +56,7 @@ text:
     - DejaVu Serif
   size: 11pt
   leading: 0.5
+  paragraph_spacing: 6pt
   alignment: left
 "#,
     );
@@ -67,6 +69,10 @@ text:
     );
     assert_eq!(template.text().size().points(), 11.0);
     assert_eq!(template.text().leading().get(), 0.5);
+    assert_eq!(
+        template.text().paragraph_spacing().map(Length::points),
+        Some(6.0)
+    );
     assert_eq!(template.text().alignment(), ParagraphAlignment::Left);
     assert_eq!(template.text().font_families().len(), 2);
 }
@@ -216,6 +222,19 @@ fn an_empty_font_list_is_rejected() {
         TemplateError::Value {
             field: "text.font_families",
             problem: ValueError::EmptyList,
+        }
+    ));
+}
+
+#[test]
+fn a_paragraph_spacing_without_unit_is_rejected() {
+    let error = Template::from_yaml("version: 2\ntext:\n  paragraph_spacing: 6\n")
+        .expect_err("the unit is required");
+    assert!(matches!(
+        error,
+        TemplateError::Value {
+            field: "text.paragraph_spacing",
+            problem: ValueError::MissingUnit,
         }
     ));
 }

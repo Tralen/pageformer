@@ -4,6 +4,15 @@
 
 *Major updates and feature releases.*
 
+### 0.6.0
+
+- Added directory inputs: the command walks each directory recursively, processes `.md` files in path order, and skips hidden directories and `target/`.
+- Added output tree mirroring under `--output` for directory inputs, with collision detection instead of silent overwrites.
+- Added ANSI-colored, bold and italic terminal output with blank lines between results, and a `--color auto|always|never` option that respects `NO_COLOR` and `TERM=dumb`.
+- Generalized atomic writes to any output extension.
+- A failed file no longer stops the rest of the batch; the exit code is 1 when any input fails.
+- Documented directory discovery, output mapping and terminal styling in `docs/architecture.md`, and updated the roadmap status.
+
 ### 0.5.0
 
 - Added `text.paragraph_spacing`, a length that sets the space between paragraphs.

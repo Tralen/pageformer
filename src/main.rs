@@ -1,6 +1,10 @@
 //! Command-line entry point.
 
-use std::ffi::OsString;
+#![forbid(unsafe_code)]
+
+mod cli;
+
+use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
@@ -12,56 +16,173 @@ use pageformer::markdown;
 use pageformer::pdf;
 use pageformer::template::loader::{self, ResolvedTemplate, TemplateOrigin};
 
+use self::cli::{ColorChoice, InputFile, OutputFormat, Painter, Stream, Style, write_atomic};
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Mode {
     Render,
     Check,
 }
 
+impl Mode {
+    fn verb(self) -> &'static str {
+        match self {
+            Self::Render => "rendered",
+            Self::Check => "checked",
+        }
+    }
+}
+
+struct Job {
+    input: InputFile,
+    output: Option<PathBuf>,
+}
+
+enum Outcome {
+    Checked {
+        blocks: usize,
+        headings: usize,
+        template: String,
+    },
+    Rendered {
+        output: PathBuf,
+        warnings: Vec<String>,
+    },
+}
+
+enum Notice {
+    Warning(cli::DiscoveryWarning),
+    Error { path: PathBuf, message: String },
+}
+
 fn main() -> ExitCode {
     let matches = command().get_matches();
+    let color = matches
+        .get_one::<String>("color")
+        .and_then(|value| ColorChoice::parse(value))
+        .unwrap_or(ColorChoice::Auto);
+    let stdout_painter = Painter::new(color.enabled(Stream::Stdout));
+    let stderr_painter = Painter::new(color.enabled(Stream::Stderr));
+
     let Some(inputs) = matches.get_many::<String>("input") else {
-        eprintln!("error: no input was given");
+        eprintln!(
+            "  {} no input was given",
+            label(stderr_painter, Style::Error, "error")
+        );
         return ExitCode::FAILURE;
     };
     let inputs = inputs.map(PathBuf::from).collect::<Vec<_>>();
     let explicit = matches.get_one::<String>("template").map(PathBuf::from);
-    let output = matches.get_one::<String>("output").map(PathBuf::from);
+    let output_directory = matches.get_one::<String>("output").map(PathBuf::from);
     let mode = if matches.get_flag("check") {
         Mode::Check
     } else {
         Mode::Render
     };
+    let format = OutputFormat::Pdf;
     let global = loader::global_template_path();
 
-    let results = inputs
-        .iter()
-        .map(|input| {
-            (
-                input.as_path(),
-                process(
+    let mut discovered = Vec::new();
+    let mut notices = Vec::new();
+    let mut discovery_failures = 0usize;
+    for input in &inputs {
+        match cli::discover(input) {
+            Ok(result) => {
+                discovered.extend(result.files);
+                notices.extend(result.warnings.into_iter().map(Notice::Warning));
+            }
+            Err(error) => {
+                notices.push(Notice::Error {
+                    path: input.clone(),
+                    message: format!("{error}"),
+                });
+                discovery_failures += 1;
+            }
+        }
+    }
+
+    let mut unique: BTreeMap<PathBuf, InputFile> = BTreeMap::new();
+    for file in discovered {
+        unique.entry(file.path().to_path_buf()).or_insert(file);
+    }
+    let files = unique.into_values().collect::<Vec<_>>();
+
+    let (jobs, plan_errors) = match mode {
+        Mode::Render => {
+            let (planned, errors) = cli::plan_outputs(files, output_directory.as_deref(), format);
+            let jobs = planned
+                .into_iter()
+                .map(|planned| {
+                    let (input, output) = planned.into_parts();
+                    Job {
+                        input,
+                        output: Some(output),
+                    }
+                })
+                .collect::<Vec<_>>();
+            (jobs, errors)
+        }
+        Mode::Check => {
+            let jobs = files
+                .into_iter()
+                .map(|input| Job {
                     input,
-                    mode,
-                    explicit.as_deref(),
-                    output.as_deref(),
-                    global.as_deref(),
-                ),
+                    output: None,
+                })
+                .collect::<Vec<_>>();
+            (jobs, Vec::new())
+        }
+    };
+
+    let results = jobs
+        .iter()
+        .map(|job| {
+            (
+                job,
+                process(job, mode, explicit.as_deref(), global.as_deref()),
             )
         })
         .collect::<Vec<_>>();
-    let failures = results.iter().filter(|(_, result)| result.is_err()).count();
-    for (path, result) in results {
+    let process_failures = results.iter().filter(|(_, result)| result.is_err()).count();
+    let succeeded = results.len().saturating_sub(process_failures);
+    let failed = discovery_failures + plan_errors.len() + process_failures;
+
+    let mut printed = false;
+    for notice in &notices {
+        match notice {
+            Notice::Warning(warning) => {
+                print_warning(stderr_painter, &warning.path, &warning.message);
+            }
+            Notice::Error { path, message } => {
+                print_failure(stderr_painter, path, message);
+            }
+        }
+        printed = true;
+    }
+    for error in &plan_errors {
+        print_failure(stderr_painter, &error.input, &error.message);
+        printed = true;
+    }
+    for (job, result) in &results {
+        if printed {
+            println!();
+        }
         match result {
             Ok(outcome) => {
-                for warning in outcome.warnings {
-                    eprintln!("warning: {}: {warning}", path.display());
-                }
-                println!("{}", outcome.message);
+                print_outcome(stdout_painter, stderr_painter, job.input.path(), outcome);
             }
-            Err(error) => eprintln!("error: {}: {error:#}", path.display()),
+            Err(error) => {
+                print_failure(stderr_painter, job.input.path(), &format!("{error:#}"));
+            }
         }
+        printed = true;
     }
-    if failures == 0 {
+    if printed {
+        println!();
+    }
+    println!("{}", summary(stdout_painter, succeeded, failed, mode));
+
+    if failed == 0 {
         ExitCode::SUCCESS
     } else {
         ExitCode::FAILURE
@@ -75,7 +196,7 @@ fn command() -> Command {
         .arg(
             Arg::new("input")
                 .value_name("INPUT")
-                .help("Markdown file to process")
+                .help("Markdown file or directory to process")
                 .num_args(1..)
                 .required(true)
                 .value_parser(clap::value_parser!(String)),
@@ -93,7 +214,7 @@ fn command() -> Command {
                 .short('o')
                 .long("output")
                 .value_name("DIR")
-                .help("Write the PDFs to this directory")
+                .help("Write the generated files under this directory")
                 .conflicts_with("check")
                 .value_parser(clap::value_parser!(String)),
         )
@@ -101,33 +222,40 @@ fn command() -> Command {
             Arg::new("check")
                 .long("check")
                 .action(ArgAction::SetTrue)
-                .help("Parse the Markdown and validate the template without writing a PDF"),
+                .help("Parse the Markdown and validate the template without writing"),
+        )
+        .arg(
+            Arg::new("color")
+                .long("color")
+                .value_name("WHEN")
+                .help("Color the terminal output: auto, always or never")
+                .value_parser(["auto", "always", "never"])
+                .default_value("auto"),
         )
 }
 
 fn process(
-    input: &Path,
+    job: &Job,
     mode: Mode,
     explicit: Option<&Path>,
-    output_directory: Option<&Path>,
     global: Option<&Path>,
 ) -> Result<Outcome> {
+    let input = job.input.path();
     let source =
         fs::read_to_string(input).with_context(|| format!("cannot read {}", input.display()))?;
     let document = markdown::parse(&source).with_context(|| "cannot parse the Markdown")?;
     let resolved = resolve_template(input, explicit, global)?;
     match mode {
-        Mode::Check => Ok(Outcome {
-            message: format!(
-                "{}: {} blocks, {} headings, template {}",
-                input.display(),
-                document.block_count(),
-                document.heading_count(),
-                resolved.origin()
-            ),
-            warnings: Vec::new(),
+        Mode::Check => Ok(Outcome::Checked {
+            blocks: document.block_count(),
+            headings: document.heading_count(),
+            template: resolved.origin().to_string(),
         }),
         Mode::Render => {
+            let output = job
+                .output
+                .as_deref()
+                .context("the output path was not planned")?;
             let source_directory = input
                 .parent()
                 .filter(|parent| !parent.as_os_str().is_empty())
@@ -140,11 +268,9 @@ fn process(
             )?;
             let rendered = pdf::render(&document, resolved.template(), &assets)
                 .with_context(|| "cannot render the PDF")?;
-            let path = output_path(input, output_directory)?;
-            write_atomic(&path, rendered.bytes())
-                .with_context(|| format!("cannot write {}", path.display()))?;
-            Ok(Outcome {
-                message: format!("{} -> {}", input.display(), path.display()),
+            write_atomic(output, rendered.bytes())?;
+            Ok(Outcome::Rendered {
+                output: output.to_path_buf(),
                 warnings: rendered.warnings().to_vec(),
             })
         }
@@ -174,35 +300,77 @@ fn resolve_template(
     }
 }
 
-fn output_path(input: &Path, directory: Option<&Path>) -> Result<PathBuf> {
-    let stem = input
-        .file_stem()
-        .with_context(|| format!("{} has no file name", input.display()))?;
-    let mut name = OsString::from(stem);
-    name.push(".pdf");
-    match directory {
-        Some(directory) => Ok(directory.join(name)),
-        None => Ok(input.with_file_name(name)),
+fn label(painter: Painter, style: Style, text: &str) -> String {
+    painter.render(style, &format!("{text:<6}"))
+}
+
+fn print_warning(painter: Painter, path: &Path, message: &str) {
+    eprintln!(
+        "  {} {}: {message}",
+        label(painter, Style::Warning, "warn"),
+        painter.path(path)
+    );
+}
+
+fn print_failure(painter: Painter, path: &Path, message: &str) {
+    let mut lines = message.lines();
+    if let Some(first) = lines.next() {
+        eprintln!(
+            "  {} {}: {first}",
+            label(painter, Style::Error, "error"),
+            painter.path(path)
+        );
+        for line in lines {
+            eprintln!("        {line}");
+        }
     }
 }
 
-fn write_atomic(path: &Path, bytes: &[u8]) -> Result<()> {
-    if let Some(parent) = path
-        .parent()
-        .filter(|parent| !parent.as_os_str().is_empty())
-    {
-        fs::create_dir_all(parent)
-            .with_context(|| format!("cannot create {}", parent.display()))?;
+fn print_outcome(stdout: Painter, stderr: Painter, input: &Path, outcome: &Outcome) {
+    match outcome {
+        Outcome::Checked {
+            blocks,
+            headings,
+            template,
+        } => {
+            println!(
+                "  {} {}: {blocks} blocks, {headings} headings, template {}",
+                label(stdout, Style::Info, "check"),
+                stdout.path(input),
+                stdout.render(Style::Italic, template)
+            );
+        }
+        Outcome::Rendered { output, warnings } => {
+            println!(
+                "  {} {} {} {}",
+                label(stdout, Style::Success, "ok"),
+                stdout.path(input),
+                stdout.render(Style::Dim, "->"),
+                stdout.path(output)
+            );
+            for warning in warnings {
+                print_warning(stderr, input, warning);
+            }
+        }
     }
-    let temporary = path.with_extension("pdf.tmp");
-    fs::write(&temporary, bytes)
-        .with_context(|| format!("cannot write {}", temporary.display()))?;
-    fs::rename(&temporary, path).with_context(|| format!("cannot replace {}", path.display()))
 }
 
-struct Outcome {
-    message: String,
-    warnings: Vec<String>,
+fn summary(painter: Painter, succeeded: usize, failed: usize, mode: Mode) -> String {
+    let success = format!("{succeeded} {} {}", file_word(succeeded), mode.verb());
+    if failed == 0 {
+        format!("{}.", painter.render(Style::Success, &success))
+    } else {
+        let failure = format!("{failed} failed");
+        format!(
+            "{}, {}.",
+            painter.render(Style::Success, &success),
+            painter.render(Style::Error, &failure)
+        )
+    }
+}
+
+fn file_word(count: usize) -> &'static str {
+    if count == 1 { "file" } else { "files" }
 }
 
 #[cfg(test)]
@@ -240,15 +408,33 @@ mod tests {
     }
 
     #[test]
-    fn the_output_name_replaces_the_extension() {
-        let path = output_path(Path::new("docs/Contrato.md"), None).expect("an output path");
-        assert_eq!(path, PathBuf::from("docs/Contrato.pdf"));
+    fn the_color_option_accepts_the_three_choices() {
+        let matches = command()
+            .try_get_matches_from(["pageformer", "--color", "always", "a.md"])
+            .expect("valid arguments");
+        assert_eq!(
+            matches.get_one::<String>("color").map(String::as_str),
+            Some("always")
+        );
     }
 
     #[test]
-    fn the_output_directory_is_used_when_given() {
-        let path = output_path(Path::new("docs/Contrato.md"), Some(Path::new("out")))
-            .expect("an output path");
-        assert_eq!(path, PathBuf::from("out/Contrato.pdf"));
+    fn the_color_option_rejects_an_unknown_choice() {
+        let error = command()
+            .try_get_matches_from(["pageformer", "--color", "sometimes", "a.md"])
+            .expect_err("the value is not accepted");
+        assert_eq!(error.kind(), clap::error::ErrorKind::InvalidValue);
+    }
+
+    #[test]
+    fn the_summary_counts_files() {
+        assert_eq!(
+            summary(Painter::new(false), 1, 0, Mode::Check),
+            "1 file checked."
+        );
+        assert_eq!(
+            summary(Painter::new(false), 2, 1, Mode::Render),
+            "2 files rendered, 1 failed."
+        );
     }
 }

@@ -28,11 +28,17 @@ The command renders each Markdown file to PDF/A next to its source, using the te
 
 ```sh
 cargo run -- assets/examples/Contrato.md assets/examples/Embargos.md
-cargo run -- --check assets/examples/Contrato.md
-cargo run -- --output /tmp/pageformer assets/examples/Contrato.md
+cargo run -- assets/examples/
+cargo run -- --check assets/examples/
+cargo run -- --output /tmp/pageformer assets/examples/
+cargo run -- --check --color=never assets/examples/Contrato.md
 ```
 
-The first command writes each PDF next to its Markdown and updates the versioned examples in `assets/examples/`. Use `--output` to write somewhere else and `--check` to parse the Markdown and validate the template without rendering.
+The first command writes each PDF next to its Markdown and updates the versioned examples in `assets/examples/`. A file or a directory can be given; a directory is walked recursively and only `.md` files are read. Hidden directories and `target/` are skipped, and directory symlinks are not followed.
+
+`--output` writes under another directory; a directory input mirrors its relative tree there, while a direct file is written flat. `--check` parses the Markdown and validates the template without writing. A failure in one file does not stop the rest of the batch, and the exit code is `1` when any input fails.
+
+The terminal output uses color, bold and italic when the stream is a terminal. `--color=auto` is the default and respects `NO_COLOR` and `TERM=dumb`; use `--color=always` or `--color=never` to force or disable it.
 
 ## Examples
 

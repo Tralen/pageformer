@@ -6,7 +6,7 @@ Pageformer reaches 1.0.0 through ten phases, in the order below. The order is a 
 
 | Phase | Scope | Status | Starts after |
 |---|---|---|---|
-| 1. CLI | Input discovery, format selection, output rules | Partial: files, `--template`, `--output`, `--check` | 0.5.0 |
+| 1. CLI | Input discovery, format selection, output rules | Done in 0.6.0: files and directories, path-ordered batches, mirrored output, ANSI styling | 0.5.0 |
 | 2. PDF | Primary output and reference backend | Partial: PDF/A-2b, page and text, images, letterhead | CLI output rules |
 | 3. Secrets | Placeholder resolution and leak prevention | Design only | PDF pipeline |
 | 4. TXT | Plain-text view and the renderer boundary | Not started | Secrets |
@@ -65,6 +65,8 @@ A phase is closed only when all of the following hold:
 **Goal.** Make one invocation the stable contract for every format: what is read, which format is produced, where it is written and what the exit code means.
 
 **Current state.** Positional file arguments, `--template`, `--output`, `--check`, per-file diagnostics, atomic writes and `--version`. Each input is parsed and resolved independently.
+
+**Status.** Done in 0.6.0: directory discovery, output planning, generalized atomic writes and ANSI-styled output.
 
 **Work.**
 

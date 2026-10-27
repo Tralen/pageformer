@@ -11,7 +11,9 @@ use crate::document::{
     Block, CodeBlock, ColumnAlignment, Document, Inline, Language, List, ListStart, Table,
     TaskState,
 };
-use crate::template::{Length, ParagraphAlignment, Template, TextFace};
+use crate::template::{
+    Length, ParagraphAlignment, RunningText, TableStyle, Template, TextFace, is_lowercase_token,
+};
 
 use super::assets::AssetMap;
 use super::{FIXED_DAY, FIXED_MONTH, FIXED_YEAR, PdfError};
@@ -22,7 +24,7 @@ pub fn typst_source(
     template: &Template,
     assets: &AssetMap,
 ) -> Result<String, PdfError> {
-    let mut builder = SourceBuilder::new(document, assets);
+    let mut builder = SourceBuilder::new(document, template, assets);
     builder.preamble(document, template);
     builder.heading_style(template);
     builder.blocks(document.blocks())?;
@@ -32,17 +34,19 @@ pub fn typst_source(
 struct SourceBuilder<'a> {
     output: String,
     assets: &'a AssetMap,
+    table: &'a TableStyle,
     footnotes: BTreeMap<String, Vec<Block>>,
     footnote_stack: Vec<String>,
 }
 
 impl<'a> SourceBuilder<'a> {
-    fn new(document: &Document, assets: &'a AssetMap) -> Self {
+    fn new(document: &Document, template: &'a Template, assets: &'a AssetMap) -> Self {
         let mut footnotes = BTreeMap::new();
         collect_footnotes(document.blocks(), &mut footnotes);
         Self {
             output: String::new(),
             assets,
+            table: template.table(),
             footnotes,
             footnote_stack: Vec::new(),
         }
@@ -57,9 +61,28 @@ impl<'a> SourceBuilder<'a> {
         if let Some(author) = document.metadata().author() {
             let _ = writeln!(self.output, "  author: {},", typst_string(author.as_str()));
         }
+        if let Some(subject) = document.metadata().subject() {
+            let _ = writeln!(
+                self.output,
+                "  description: {},",
+                typst_string(subject.as_str())
+            );
+        }
+        if !document.metadata().keywords().is_empty() {
+            self.output.push_str("  keywords: (");
+            for keyword in document.metadata().keywords() {
+                let _ = write!(self.output, "{}, ", typst_string(keyword.as_str()));
+            }
+            self.output.push_str("),\n");
+        }
+        let date = document.metadata().date();
+        let (year, month, day) = match date {
+            Some(date) => (date.year(), date.month(), date.day()),
+            None => (FIXED_YEAR, FIXED_MONTH, FIXED_DAY),
+        };
         let _ = writeln!(
             self.output,
-            "  date: datetime(year: {FIXED_YEAR}, month: {FIXED_MONTH}, day: {FIXED_DAY}),"
+            "  date: datetime(year: {year}, month: {month}, day: {day}),"
         );
         self.output.push_str(")\n\n");
 
@@ -91,6 +114,12 @@ impl<'a> SourceBuilder<'a> {
                 "  background: image({}, width: 100%),",
                 typst_string(letterhead)
             );
+        }
+        if let Some(header) = page.header() {
+            self.running("header", header, document, template);
+        }
+        if let Some(footer) = page.footer() {
+            self.running("footer", footer, document, template);
         }
         self.output.push_str(")\n\n");
 
@@ -150,6 +179,87 @@ impl<'a> SourceBuilder<'a> {
             face.weight().get(),
             typst_string(face.slant().as_str())
         );
+    }
+
+    fn running(
+        &mut self,
+        name: &str,
+        running: &RunningText,
+        document: &Document,
+        template: &Template,
+    ) {
+        let face = template.formatting().paragraph().face();
+        let _ = writeln!(self.output, "  {name}: [");
+        self.output.push_str("    #set text(font: (");
+        for family in face.font_families() {
+            let _ = write!(self.output, "{}, ", typst_string(family.as_str()));
+        }
+        let _ = writeln!(
+            self.output,
+            "), size: {}, weight: {}, style: {})",
+            typst_length(face.size()),
+            face.weight().get(),
+            typst_string(face.slant().as_str())
+        );
+        self.output
+            .push_str("    #grid(columns: (1fr, 1fr, 1fr), align: (left, center, right),\n");
+        for slot in [
+            running.slots().left(),
+            running.slots().center(),
+            running.slots().right(),
+        ] {
+            self.output.push_str("      ");
+            self.output.push('[');
+            if let Some(text) = slot {
+                self.running_text(text, document);
+            }
+            self.output.push_str("],\n");
+        }
+        self.output.push_str("    )\n  ],\n");
+    }
+
+    /// Expands the lowercase tokens of a running slot and escapes the rest.
+    fn running_text(&mut self, text: &str, document: &Document) {
+        let mut rest = text;
+        while let Some((before, after)) = rest.split_once('{') {
+            self.output.push_str(&escape_markup(before));
+            match after.split_once('}') {
+                Some((token, remaining)) if is_lowercase_token(token) => {
+                    match token {
+                        "page" => self.output.push_str("#context counter(page).display()"),
+                        "pages" => {
+                            self.output
+                                .push_str("#context counter(page).final().first()");
+                        }
+                        "title" => {
+                            if let Some(title) = document.metadata().title() {
+                                self.output.push_str(&escape_markup(title.as_str()));
+                            }
+                        }
+                        "author" => {
+                            if let Some(author) = document.metadata().author() {
+                                self.output.push_str(&escape_markup(author.as_str()));
+                            }
+                        }
+                        other => {
+                            self.output
+                                .push_str(&escape_markup(&format!("{{{other}}}")));
+                        }
+                    }
+                    rest = remaining;
+                }
+                Some((token, remaining)) => {
+                    self.output
+                        .push_str(&escape_markup(&format!("{{{token}}}")));
+                    rest = remaining;
+                }
+                None => {
+                    self.output.push_str(&escape_markup("{"));
+                    rest = after;
+                }
+            }
+        }
+        self.output.push_str(&escape_markup(rest));
     }
 
     fn heading_style(&mut self, template: &Template) {
@@ -216,6 +326,7 @@ impl<'a> SourceBuilder<'a> {
             }
             Block::CodeBlock(code) => self.code_block(code),
             Block::ThematicBreak => self.output.push_str("#line(length: 100%, stroke: 0.5pt)"),
+            Block::PageBreak => self.output.push_str("#pagebreak()"),
             Block::FootnoteDefinition(_) => {}
         }
         Ok(())
@@ -355,13 +466,35 @@ impl<'a> SourceBuilder<'a> {
         for alignment in table.alignments() {
             let _ = write!(self.output, "{}, ", alignment_name(*alignment));
         }
-        self.output
-            .push_str("),\n  inset: 6pt,\n  stroke: 0.5pt + rgb(\"#bbbbbb\"),\n");
+        let _ = writeln!(
+            self.output,
+            "),\n  inset: {},",
+            typst_length(self.table.cell_padding())
+        );
+        if self.table.border().points() > 0.0 {
+            let _ = writeln!(
+                self.output,
+                "  stroke: {} + rgb(\"{}\"),",
+                typst_length(self.table.border()),
+                self.table.border_color().hex()
+            );
+        } else {
+            self.output.push_str("  stroke: none,\n");
+        }
         self.output.push_str("  table.header(");
         for cell in table.header() {
-            self.output.push('[');
-            self.inlines(cell.content())?;
-            self.output.push_str("], ");
+            match self.table.header_fill() {
+                Some(color) => {
+                    let _ = write!(self.output, "table.cell(fill: rgb(\"{}\"))[", color.hex());
+                    self.inlines(cell.content())?;
+                    self.output.push_str("], ");
+                }
+                None => {
+                    self.output.push('[');
+                    self.inlines(cell.content())?;
+                    self.output.push_str("], ");
+                }
+            }
         }
         self.output.push_str("),\n");
         for row in table.rows() {
@@ -407,7 +540,8 @@ fn collect_footnotes(blocks: &[Block], footnotes: &mut BTreeMap<String, Vec<Bloc
             | Block::NumberedParagraph(_)
             | Block::Table(_)
             | Block::CodeBlock(_)
-            | Block::ThematicBreak => {}
+            | Block::ThematicBreak
+            | Block::PageBreak => {}
         }
     }
 }
@@ -583,7 +717,146 @@ mod tests {
         let source = source(&paragraph("Texto"), &AssetMap::new());
         assert!(!source.contains("title:"), "{source}");
         assert!(!source.contains("author:"), "{source}");
+        assert!(!source.contains("description:"), "{source}");
+        assert!(!source.contains("keywords:"), "{source}");
         assert!(!source.contains("lang:"), "{source}");
+    }
+
+    #[test]
+    fn the_remaining_metadata_reaches_the_pdf_document() {
+        let metadata = Metadata::default()
+            .with_date(crate::document::DocumentDate::parse("2026-03-05").expect("a date"))
+            .with_subject(crate::document::Subject::parse("Contrato").expect("a subject"))
+            .with_keywords(vec![
+                crate::document::Keyword::parse("legal").expect("a keyword"),
+                crate::document::Keyword::parse("contrato").expect("a keyword"),
+            ]);
+        let document = Document::new(metadata, Vec::new());
+        let source = source(&document, &AssetMap::new());
+        assert!(source.contains("description: \"Contrato\""), "{source}");
+        assert!(
+            source.contains("keywords: (\"legal\", \"contrato\", ),"),
+            "{source}"
+        );
+        assert!(
+            source.contains("date: datetime(year: 2026, month: 3, day: 5),"),
+            "{source}"
+        );
+    }
+
+    #[test]
+    fn without_a_date_the_fixed_date_is_kept() {
+        let source = source(&paragraph("Texto"), &AssetMap::new());
+        assert!(
+            source.contains("date: datetime(year: 2026, month: 1, day: 1),"),
+            "{source}"
+        );
+    }
+
+    #[test]
+    fn running_content_expands_the_page_tokens() {
+        let template = Template::from_yaml(
+            "version: \"0.5\"\npage:\n  header:\n    left: \"{title}\"\n    right: \"Página {page} de {pages}\"\n  footer:\n    center: \"{author}\"\n",
+        )
+        .expect("a template with running content");
+        let metadata = Metadata::new(
+            Some(crate::document::Title::parse("Contrato").expect("a title")),
+            Some(crate::document::Author::parse("Pageformer").expect("an author")),
+            None,
+        );
+        let document = Document::new(metadata, Vec::new());
+        let source = typst_source(&document, &template, &AssetMap::new()).expect("the source");
+        assert!(source.contains("  header: ["), "{source}");
+        assert!(source.contains("  footer: ["), "{source}");
+        assert!(
+            source.contains("#context counter(page).display()"),
+            "{source}"
+        );
+        assert!(
+            source.contains("#context counter(page).final().first()"),
+            "{source}"
+        );
+        assert!(source.contains("[Contrato],"), "{source}");
+        assert!(source.contains("[Pageformer],"), "{source}");
+    }
+
+    #[test]
+    fn running_content_without_a_title_renders_an_empty_slot() {
+        let template =
+            Template::from_yaml("version: \"0.5\"\npage:\n  header:\n    center: \"{title}\"\n")
+                .expect("a template with a header");
+        let document = Document::new(Metadata::default(), Vec::new());
+        let source = typst_source(&document, &template, &AssetMap::new()).expect("the source");
+        assert!(source.contains("[],\n"), "{source}");
+    }
+
+    #[test]
+    fn a_page_break_is_a_typst_page_break() {
+        let document = Document::new(
+            Metadata::default(),
+            vec![
+                Block::Paragraph(vec![Inline::Text("Antes".to_owned())]),
+                Block::PageBreak,
+                Block::Paragraph(vec![Inline::Text("Depois".to_owned())]),
+            ],
+        );
+        let source = source(&document, &AssetMap::new());
+        assert!(source.contains("#pagebreak()"), "{source}");
+    }
+
+    #[test]
+    fn the_table_style_is_emitted_from_the_template() {
+        let table = Table::new(
+            vec![ColumnAlignment::Left],
+            vec![TableCell::new(vec![Inline::Text("A".to_owned())])],
+            vec![vec![TableCell::new(vec![Inline::Text("1".to_owned())])]],
+        )
+        .expect("a valid table");
+        let document = Document::new(Metadata::default(), vec![Block::Table(table)]);
+
+        let default_source = source(&document, &AssetMap::new());
+        assert!(
+            default_source.contains("inset: 6.000pt,"),
+            "{default_source}"
+        );
+        assert!(
+            default_source.contains("stroke: 0.500pt + rgb(\"#bbbbbb\"),"),
+            "{default_source}"
+        );
+        assert!(
+            !default_source.contains("table.cell(fill:"),
+            "{default_source}"
+        );
+
+        let template = Template::from_yaml(
+            "version: \"0.5\"\ntable:\n  border: 1pt\n  border_color: \"#112233\"\n  header_fill: \"#eeeeee\"\n  cell_padding: 4pt\n",
+        )
+        .expect("a styled template");
+        let styled = typst_source(&document, &template, &AssetMap::new()).expect("the source");
+        assert!(styled.contains("inset: 4.000pt,"), "{styled}");
+        assert!(
+            styled.contains("stroke: 1.000pt + rgb(\"#112233\"),"),
+            "{styled}"
+        );
+        assert!(
+            styled.contains("table.cell(fill: rgb(\"#eeeeee\"))[A], "),
+            "{styled}"
+        );
+    }
+
+    #[test]
+    fn a_zero_table_border_removes_the_stroke() {
+        let table = Table::new(
+            vec![ColumnAlignment::Default],
+            vec![TableCell::new(Vec::new())],
+            vec![vec![TableCell::new(Vec::new())]],
+        )
+        .expect("a valid table");
+        let document = Document::new(Metadata::default(), vec![Block::Table(table)]);
+        let template = Template::from_yaml("version: \"0.5\"\ntable:\n  border: 0\n")
+            .expect("a template without a border");
+        let source = typst_source(&document, &template, &AssetMap::new()).expect("the source");
+        assert!(source.contains("stroke: none,"), "{source}");
     }
 
     #[test]

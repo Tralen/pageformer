@@ -53,6 +53,9 @@ pub struct Metadata {
     title: Option<Title>,
     author: Option<Author>,
     language: Option<Language>,
+    date: Option<DocumentDate>,
+    subject: Option<Subject>,
+    keywords: Vec<Keyword>,
 }
 
 impl Metadata {
@@ -61,7 +64,28 @@ impl Metadata {
             title,
             author,
             language,
+            date: None,
+            subject: None,
+            keywords: Vec::new(),
         }
+    }
+
+    pub fn with_date(self, date: DocumentDate) -> Self {
+        Self {
+            date: Some(date),
+            ..self
+        }
+    }
+
+    pub fn with_subject(self, subject: Subject) -> Self {
+        Self {
+            subject: Some(subject),
+            ..self
+        }
+    }
+
+    pub fn with_keywords(self, keywords: Vec<Keyword>) -> Self {
+        Self { keywords, ..self }
     }
 
     pub fn title(&self) -> Option<&Title> {
@@ -74,6 +98,18 @@ impl Metadata {
 
     pub fn language(&self) -> Option<&Language> {
         self.language.as_ref()
+    }
+
+    pub fn date(&self) -> Option<DocumentDate> {
+        self.date
+    }
+
+    pub fn subject(&self) -> Option<&Subject> {
+        self.subject.as_ref()
+    }
+
+    pub fn keywords(&self) -> &[Keyword] {
+        &self.keywords
     }
 }
 
@@ -155,6 +191,143 @@ impl fmt::Display for Language {
     }
 }
 
+/// A non-empty document subject.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Subject(String);
+
+impl Subject {
+    pub fn parse(text: &str) -> Result<Self, MetadataError> {
+        let trimmed = text.trim();
+        if trimmed.is_empty() {
+            Err(MetadataError::EmptySubject)
+        } else {
+            Ok(Self(trimmed.to_owned()))
+        }
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl fmt::Display for Subject {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(&self.0)
+    }
+}
+
+/// A non-empty document keyword.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Keyword(String);
+
+impl Keyword {
+    pub fn parse(text: &str) -> Result<Self, MetadataError> {
+        let trimmed = text.trim();
+        if trimmed.is_empty() {
+            Err(MetadataError::EmptyKeyword)
+        } else {
+            Ok(Self(trimmed.to_owned()))
+        }
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl fmt::Display for Keyword {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(&self.0)
+    }
+}
+
+/// A calendar date written in the frontmatter as `YYYY-MM-DD`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DocumentDate {
+    year: i32,
+    month: u8,
+    day: u8,
+}
+
+impl DocumentDate {
+    /// Builds a date from parts already validated by construction.
+    /// This exists only for the fixed default date used by the PDF backend.
+    pub(crate) const fn from_parts(year: i32, month: u8, day: u8) -> Self {
+        Self { year, month, day }
+    }
+
+    pub fn new(year: i32, month: u8, day: u8) -> Result<Self, MetadataError> {
+        if !(1..=9999).contains(&year) {
+            return Err(MetadataError::InvalidDate);
+        }
+        if !(1..=12).contains(&month) {
+            return Err(MetadataError::InvalidDate);
+        }
+        if day < 1 || day > days_in_month(year, month) {
+            return Err(MetadataError::InvalidDate);
+        }
+        Ok(Self { year, month, day })
+    }
+
+    pub fn parse(text: &str) -> Result<Self, MetadataError> {
+        let trimmed = text.trim();
+        let mut parts = trimmed.split('-');
+        let year = parts.next().ok_or(MetadataError::InvalidDate)?;
+        let month = parts.next().ok_or(MetadataError::InvalidDate)?;
+        let day = parts.next().ok_or(MetadataError::InvalidDate)?;
+        if parts.next().is_some()
+            || year.len() != 4
+            || month.len() != 2
+            || day.len() != 2
+            || !year.chars().all(|character| character.is_ascii_digit())
+            || !month.chars().all(|character| character.is_ascii_digit())
+            || !day.chars().all(|character| character.is_ascii_digit())
+        {
+            return Err(MetadataError::InvalidDate);
+        }
+        let year = year.parse().map_err(|_| MetadataError::InvalidDate)?;
+        let month = month.parse().map_err(|_| MetadataError::InvalidDate)?;
+        let day = day.parse().map_err(|_| MetadataError::InvalidDate)?;
+        Self::new(year, month, day)
+    }
+
+    pub fn year(self) -> i32 {
+        self.year
+    }
+
+    pub fn month(self) -> u8 {
+        self.month
+    }
+
+    pub fn day(self) -> u8 {
+        self.day
+    }
+}
+
+impl fmt::Display for DocumentDate {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            formatter,
+            "{:04}-{:02}-{:02}",
+            self.year, self.month, self.day
+        )
+    }
+}
+
+fn days_in_month(year: i32, month: u8) -> u8 {
+    match month {
+        1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
+        4 | 6 | 9 | 11 => 30,
+        2 if is_leap_year(year) => 29,
+        2 => 28,
+        _ => 0,
+    }
+}
+
+fn is_leap_year(year: i32) -> bool {
+    (year % 4 == 0 && year % 100 != 0) || year % 400 == 0
+}
+
 /// Only simple subtags are accepted, which covers the languages this project
 /// documents. Full BCP 47 validation is out of scope.
 fn is_language_tag(tag: &str) -> bool {
@@ -180,7 +353,10 @@ pub enum MetadataError {
     EmptyTitle,
     EmptyAuthor,
     EmptyLanguage,
+    EmptySubject,
+    EmptyKeyword,
     InvalidLanguageTag,
+    InvalidDate,
 }
 
 impl fmt::Display for MetadataError {
@@ -189,7 +365,10 @@ impl fmt::Display for MetadataError {
             Self::EmptyTitle => "the document title is empty",
             Self::EmptyAuthor => "the document author is empty",
             Self::EmptyLanguage => "the document language is empty",
+            Self::EmptySubject => "the document subject is empty",
+            Self::EmptyKeyword => "a document keyword is empty",
             Self::InvalidLanguageTag => "the document language is not a tag such as `pt-BR`",
+            Self::InvalidDate => "the document date is not a calendar date such as `2026-03-05`",
         };
         formatter.write_str(message)
     }
@@ -209,6 +388,7 @@ pub enum Block {
     Quote(Quote),
     CodeBlock(CodeBlock),
     ThematicBreak,
+    PageBreak,
     FootnoteDefinition(FootnoteDefinition),
 }
 
@@ -702,6 +882,50 @@ mod tests {
             Some("rust,linenos".to_owned())
         );
         assert_eq!(CodeLanguage::parse("   "), None);
+    }
+
+    #[test]
+    fn a_date_accepts_a_calendar_day() {
+        let date = DocumentDate::parse("2026-03-05").expect("a valid date");
+        assert_eq!((date.year(), date.month(), date.day()), (2026, 3, 5));
+        assert_eq!(date.to_string(), "2026-03-05");
+        assert!(DocumentDate::parse("2024-02-29").is_ok());
+    }
+
+    #[test]
+    fn a_date_rejects_a_day_outside_the_calendar() {
+        for text in [
+            "2025-02-29",
+            "2026-13-01",
+            "2026-00-10",
+            "2026-04-31",
+            "2026-3-05",
+            "26-03-05",
+            "2026-03-05T10:00",
+            "2026/03/05",
+            "",
+            "0000-01-01",
+        ] {
+            assert_eq!(
+                DocumentDate::parse(text),
+                Err(MetadataError::InvalidDate),
+                "`{text}` should not be a valid date"
+            );
+        }
+    }
+
+    #[test]
+    fn subject_and_keywords_cannot_be_empty() {
+        assert_eq!(Subject::parse("  "), Err(MetadataError::EmptySubject));
+        assert_eq!(
+            Subject::parse(" Contrato ").map(|subject| subject.as_str().to_owned()),
+            Ok("Contrato".to_owned())
+        );
+        assert_eq!(Keyword::parse(" "), Err(MetadataError::EmptyKeyword));
+        assert_eq!(
+            Keyword::parse(" legal ").map(|keyword| keyword.as_str().to_owned()),
+            Ok("legal".to_owned())
+        );
     }
 
     #[test]

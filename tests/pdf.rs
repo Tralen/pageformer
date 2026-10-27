@@ -106,6 +106,42 @@ fn the_shared_example_template_uses_its_letterhead() {
 }
 
 #[test]
+fn running_content_tables_and_page_breaks_render() {
+    let source = "---\ntitle: Contrato\nauthor: Pageformer\ndate: 2026-03-05\nsubject: Teste\nkeywords:\n  - legal\n---\n\n# Título\n\n| A | B |\n|---|---|\n| 1 | 2 |\n\n\\pagebreak\n\nDepois.\n";
+    let document = markdown::parse(source).expect("the document must parse");
+    let template = Template::from_yaml(
+        r##"
+version: "0.5"
+page:
+  header:
+    left: "{title}"
+    right: "Página {page} de {pages}"
+  footer:
+    center: "{author}"
+table:
+  border: 1pt
+  header_fill: "#eeeeee"
+"##,
+    )
+    .expect("the template must be valid");
+
+    let first =
+        pdf::render(&document, &template, &Assets::default()).expect("the document must render");
+    assert!(
+        first.warnings().is_empty(),
+        "the document produced warnings: {:?}",
+        first.warnings()
+    );
+    let second =
+        pdf::render(&document, &template, &Assets::default()).expect("the rerender must work");
+    assert_eq!(
+        first.bytes(),
+        second.bytes(),
+        "the output must be deterministic"
+    );
+}
+
+#[test]
 fn local_images_are_loaded_and_named() {
     let project = TempDir::new().expect("a temporary project");
     fs::write(project.path().join("logo.png"), b"not a real png")

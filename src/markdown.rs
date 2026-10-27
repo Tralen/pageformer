@@ -13,9 +13,9 @@ use serde::Deserialize;
 
 use crate::document::{
     Alert, Author, Block, CodeBlock, CodeLanguage, ColumnAlignment, Destination, Document,
-    FootnoteDefinition, FootnoteId, Heading, HeadingLevel, Inline, Language, List, ListItem,
-    ListStart, Metadata, MetadataError, NumberedParagraph, Quote, QuoteKind, Table, TableCell,
-    TableError, TaskState, Title,
+    DocumentDate, FootnoteDefinition, FootnoteId, Heading, HeadingLevel, Inline, Keyword, Language,
+    List, ListItem, ListStart, Metadata, MetadataError, NumberedParagraph, Quote, QuoteKind,
+    Subject, Table, TableCell, TableError, TaskState, Title,
 };
 
 /// The deepest tag nesting accepted. A deeper document is rejected instead of
@@ -151,7 +151,7 @@ impl<'source> DocumentParser<'source> {
         match tag {
             Tag::Paragraph => {
                 let content = self.parse_inlines(TagEnd::Paragraph, depth)?;
-                Ok(vec![Block::Paragraph(content)])
+                Ok(paragraph_blocks(content))
             }
             Tag::Heading { level: source, .. } => {
                 let end = TagEnd::Heading(source);
@@ -288,7 +288,7 @@ impl<'source> DocumentParser<'source> {
                         task = self.take_task_marker();
                     }
                     let content = self.parse_inlines(TagEnd::Paragraph, depth)?;
-                    blocks.push(Block::Paragraph(content));
+                    blocks.extend(paragraph_blocks(content));
                 }
                 Some(event) if is_inline_event(&event) => {
                     let content = self.parse_inline_run(None, depth)?;
@@ -528,6 +528,21 @@ impl<'source> DocumentParser<'source> {
     }
 }
 
+/// A standalone `\pagebreak` paragraph is an explicit page break. CommonMark
+/// keeps the backslash as text, so the marker survives the parser and the Zed
+/// preview without raw HTML.
+fn paragraph_blocks(content: Vec<Inline>) -> Vec<Block> {
+    if is_page_break(&content) {
+        vec![Block::PageBreak]
+    } else {
+        vec![Block::Paragraph(content)]
+    }
+}
+
+fn is_page_break(content: &[Inline]) -> bool {
+    matches!(content, [Inline::Text(text)] if text == "\\pagebreak")
+}
+
 /// A loose ordered list whose items are one paragraph each is a sequence of
 /// numbered paragraphs. This keeps legal numbering such as `1.` as text,
 /// without an escape and without renumbering it as a list.
@@ -634,6 +649,9 @@ struct Frontmatter {
     title: Option<String>,
     author: Option<String>,
     language: Option<String>,
+    date: Option<String>,
+    subject: Option<String>,
+    keywords: Option<Vec<String>>,
 }
 
 fn frontmatter_metadata(yaml: &str) -> Result<Metadata, MarkdownError> {
@@ -659,7 +677,33 @@ fn frontmatter_metadata(yaml: &str) -> Result<Metadata, MarkdownError> {
         .map(|text| Language::parse(&text))
         .transpose()
         .map_err(MarkdownError::Metadata)?;
-    Ok(Metadata::new(title, author, language))
+    let date = raw
+        .date
+        .map(|text| DocumentDate::parse(&text))
+        .transpose()
+        .map_err(MarkdownError::Metadata)?;
+    let subject = raw
+        .subject
+        .map(|text| Subject::parse(&text))
+        .transpose()
+        .map_err(MarkdownError::Metadata)?;
+    let keywords = raw
+        .keywords
+        .unwrap_or_default()
+        .iter()
+        .map(|text| Keyword::parse(text))
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(MarkdownError::Metadata)?;
+    let metadata = Metadata::new(title, author, language);
+    let metadata = match date {
+        Some(date) => metadata.with_date(date),
+        None => metadata,
+    };
+    let metadata = match subject {
+        Some(subject) => metadata.with_subject(subject),
+        None => metadata,
+    };
+    Ok(metadata.with_keywords(keywords))
 }
 
 #[cfg(test)]
@@ -711,9 +755,59 @@ mod tests {
     }
 
     #[test]
+    fn frontmatter_fills_the_remaining_metadata() {
+        let document = parse(
+            "---\ndate: 2026-03-05\nsubject: Contrato\nkeywords:\n  - legal\n  - contrato\n---\n\nTexto.\n",
+        )
+        .expect("valid frontmatter");
+        let metadata = document.metadata();
+        assert_eq!(
+            metadata.date().map(|date| date.to_string()),
+            Some("2026-03-05".to_owned())
+        );
+        assert_eq!(metadata.subject().map(Subject::as_str), Some("Contrato"));
+        assert_eq!(
+            metadata
+                .keywords()
+                .iter()
+                .map(Keyword::as_str)
+                .collect::<Vec<_>>(),
+            vec!["legal", "contrato"]
+        );
+    }
+
+    #[test]
+    fn an_invalid_frontmatter_date_is_rejected() {
+        let error = parse("---\ndate: 2025-02-29\n---\n").expect_err("an invalid date");
+        assert!(matches!(
+            error,
+            MarkdownError::Metadata(MetadataError::InvalidDate)
+        ));
+    }
+
+    #[test]
+    fn a_standalone_pagebreak_paragraph_is_a_page_break() {
+        let document = parse("Antes.\n\n\\pagebreak\n\nDepois.\n").expect("a page break");
+        assert_eq!(
+            document.blocks(),
+            &[
+                Block::Paragraph(vec![Inline::Text("Antes.".to_owned())]),
+                Block::PageBreak,
+                Block::Paragraph(vec![Inline::Text("Depois.".to_owned())]),
+            ]
+        );
+    }
+
+    #[test]
+    fn a_pagebreak_inside_a_paragraph_stays_text() {
+        let document = parse("Texto \\pagebreak aqui.\n").expect("inline text");
+        assert!(matches!(first_block(&document), Block::Paragraph(_)));
+    }
+
+    #[test]
     fn unknown_frontmatter_fields_are_rejected() {
         let error =
-            parse("---\ntitle: Contrato\nsubject: Outro\n---\n").expect_err("an unknown field");
+            parse("---\ntitle: Contrato\nreviewer: Outro\n---\n").expect_err("an unknown field");
         assert!(matches!(error, MarkdownError::Frontmatter { .. }));
     }
 

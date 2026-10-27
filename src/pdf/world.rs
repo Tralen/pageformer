@@ -10,7 +10,9 @@ use typst::utils::LazyHash;
 use typst::{Library, LibraryExt, World, WorldExt};
 use typst_kit::fonts::FontStore;
 
-use super::{FIXED_DAY, FIXED_MONTH, FIXED_YEAR, PdfError};
+use crate::document::DocumentDate;
+
+use super::PdfError;
 
 const MAIN_PATH: &str = "document.typ";
 
@@ -20,13 +22,17 @@ pub(crate) struct PdfWorld<'a> {
     main: FileId,
     source: Source,
     files: &'a BTreeMap<String, Bytes>,
+    date: Datetime,
 }
 
 impl<'a> PdfWorld<'a> {
     pub(crate) fn new(
         source: String,
         files: &'a BTreeMap<String, Bytes>,
+        date: DocumentDate,
     ) -> Result<Self, PdfError> {
+        let datetime = Datetime::from_ymd(date.year(), date.month(), date.day())
+            .ok_or(PdfError::InvalidDate)?;
         let virtual_path = VirtualPath::new(MAIN_PATH).map_err(|_| PdfError::InvalidPath)?;
         let main = FileId::unique(RootedPath::new(VirtualRoot::Project, virtual_path));
         let mut fonts = FontStore::new();
@@ -38,6 +44,7 @@ impl<'a> PdfWorld<'a> {
             main,
             source: Source::new(main, source),
             files,
+            date: datetime,
         })
     }
 }
@@ -79,7 +86,7 @@ impl World for PdfWorld<'_> {
     }
 
     fn today(&self, _offset: Option<Duration>) -> Option<Datetime> {
-        Datetime::from_ymd(FIXED_YEAR, FIXED_MONTH, FIXED_DAY)
+        Some(self.date)
     }
 }
 

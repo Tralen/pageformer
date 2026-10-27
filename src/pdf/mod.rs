@@ -16,7 +16,7 @@ use std::path::PathBuf;
 use typst_layout::PagedDocument;
 use typst_pdf::{PdfOptions, PdfStandard, PdfStandards};
 
-use crate::document::Document;
+use crate::document::{Document, DocumentDate};
 use crate::template::Template;
 
 use self::world::{PdfWorld, format_diagnostics};
@@ -27,6 +27,10 @@ pub use source::typst_source;
 pub(crate) const FIXED_YEAR: i32 = 2026;
 pub(crate) const FIXED_MONTH: u8 = 1;
 pub(crate) const FIXED_DAY: u8 = 1;
+
+/// The date used when the frontmatter declares none, so the output stays
+/// deterministic.
+const FIXED_DATE: DocumentDate = DocumentDate::from_parts(FIXED_YEAR, FIXED_MONTH, FIXED_DAY);
 
 /// A rendered PDF and the warnings Typst reported.
 #[derive(Debug, Clone)]
@@ -56,7 +60,8 @@ pub fn render(
     assets: &Assets,
 ) -> Result<PdfOutput, PdfError> {
     let source = typst_source(document, template, assets.map())?;
-    let world = PdfWorld::new(source, assets.files())?;
+    let date = document.metadata().date().unwrap_or(FIXED_DATE);
+    let world = PdfWorld::new(source, assets.files(), date)?;
     let warned = typst::compile::<PagedDocument>(&world);
     let warnings = warned
         .warnings
@@ -89,6 +94,7 @@ pub enum PdfError {
     AssetRead { path: PathBuf, source: io::Error },
     UnsupportedImageFormat { path: PathBuf },
     MissingTemplateDirectory,
+    InvalidDate,
 }
 
 impl fmt::Display for PdfError {
@@ -115,6 +121,7 @@ impl fmt::Display for PdfError {
             ),
             Self::MissingTemplateDirectory => formatter
                 .write_str("the template has a letterhead but no directory to resolve it from"),
+            Self::InvalidDate => formatter.write_str("the document date is not a calendar date"),
         }
     }
 }
@@ -130,7 +137,8 @@ impl std::error::Error for PdfError {
             | Self::MissingAsset { .. }
             | Self::UnsupportedImage { .. }
             | Self::UnsupportedImageFormat { .. }
-            | Self::MissingTemplateDirectory => None,
+            | Self::MissingTemplateDirectory
+            | Self::InvalidDate => None,
         }
     }
 }

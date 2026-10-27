@@ -30,6 +30,11 @@ page:
     left: 30mm
     right: 25mm
   letterhead: images/letterhead.png
+  header:
+    left: "{title}"
+    right: "Page {page} of {pages}"
+  footer:
+    center: "{author}"
 
 formatting:
   paragraph:
@@ -76,13 +81,19 @@ formatting:
       size: 12
       spacing_before: 8
       spacing_after: 2
+
+table:
+  border: 0.5pt
+  border_color: "#bbbbbb"
+  header_fill: "#eeeeee"
+  cell_padding: 6pt
 ```
 
 Every section and every key is optional except `version`. Missing keys take the defaults described below, but an unknown key is an error, so a typo never changes the layout silently.
 
 ### `version`
 
-The schema version is a string in the form `major.minor`, quoted so YAML cannot turn it into a float. This build accepts `"0.5"` and rejects every other value. Version 0.5 replaced the `text` section with `formatting`, made `paragraph` and `heading` explicit, added `weight` and `style`, and added the `emphasis` and `strong` inline overrides.
+The schema version is a string in the form `major.minor`, quoted so YAML cannot turn it into a float. This build accepts `"0.5"` and rejects every other value. Version 0.5 replaced the `text` section with `formatting`, made `paragraph` and `heading` explicit, added `weight` and `style`, and added the `emphasis` and `strong` inline overrides. The optional `page.header`, `page.footer` and `table` sections and the frontmatter `date`, `subject` and `keywords` were added inside version 0.5, because omitting them preserves the output of an existing template.
 
 ### Document metadata
 
@@ -93,10 +104,19 @@ The template carries no title, author or language, so one template serves many d
 title: Contrato de Prestação de Serviços
 author: Pageformer
 language: pt-BR
+date: 2026-02-01
+subject: Prestação de serviços
+keywords:
+  - contrato
+  - prestação de serviços
 ---
 ```
 
-`title` and `author` must be non-empty, and `language` must be a BCP 47 style tag such as `pt-BR`. Without a language, the PDF sets no language and Typst uses its default.
+`title`, `author`, `subject` and each keyword must be non-empty, and `language` must be a BCP 47 style tag such as `pt-BR`. Without a language, the PDF sets no language and Typst uses its default.
+
+`date` is a calendar date written as `YYYY-MM-DD`, such as `2026-02-01`, and must be a real day. It replaces the fixed document date in the PDF metadata and drives the Typst world date, so the output stays deterministic. Without it, the fixed date `2026-01-01` is used.
+
+`subject` reaches the PDF document description and `keywords` reaches its keyword list. Both are optional and omitted from the PDF when absent.
 
 The frontmatter `title` is document metadata. The visible title is the first-level heading, styled by `formatting.heading.h1`.
 
@@ -106,8 +126,26 @@ The frontmatter `title` is document metadata. The visible title is the first-lev
 - `orientation`: `portrait` or `landscape`. Landscape swaps the width and the height.
 - `margins`: `top`, `bottom`, `left` and `right`. A missing side defaults to `20mm` (`56.69pt`); a negative value is invalid.
 - `letterhead`: a path relative to the template file. The file must be `png`, `jpg`, `gif`, `svg` or `webp`.
+- `header` and `footer`: running content above and below the body, each with `left`, `center` and `right` slot strings. The slots are the same on every page, while their tokens expand per page.
 
 The default size is A4 in portrait orientation.
+
+### Running header and footer
+
+A `header` or `footer` map holds up to three slots. Only declared and non-blank slots are drawn; the other positions stay empty, so the remaining slots keep their place.
+
+Slots expand four lowercase tokens from the document metadata:
+
+| Token | Value |
+|---|---|
+| `{page}` | The current page number |
+| `{pages}` | The page count of the whole document |
+| `{title}` | The frontmatter title, empty when absent |
+| `{author}` | The frontmatter author, empty when absent |
+
+Any other lowercase token, such as `{nome}`, is a template error, because a typo must not reach the page as literal text. Uppercase tokens such as `{NAME}` stay literal here and are reserved for body secrets. Braces that do not form a lowercase token stay literal text.
+
+The header and footer use the paragraph face. Their content sits inside the top and bottom margins, so a letterhead that already fills those margins needs no running content.
 
 ### `formatting.paragraph`
 
@@ -137,6 +175,19 @@ The `h1` to `h6` maps are optional overrides with the same keys. Only declared k
 
 The template sets explicit values for each level. There is no hidden multiplier per level: what the YAML declares is what the PDF uses.
 
+### `table`
+
+The `table` section styles every table in the document:
+
+- `border`: the border thickness as a length. The default is `0.5pt`; `0` removes the borders.
+- `border_color`: a color written as `#rrggbb`. The default is `#bbbbbb`.
+- `header_fill`: the background of the header row, as `#rrggbb`. When omitted, the header has no fill.
+- `cell_padding`: the inset of every cell as a length. The default is `6pt`.
+
+## Page breaks
+
+A paragraph that contains only `\pagebreak` starts a new page. The marker becomes a page break in the document model, so every paged backend reads the same block. Any other occurrence, such as `\pagebreak` inside a sentence, stays literal text.
+
 ## Weights and styles
 
 `weight` and `style` are independent, as in CSS and Typst. Weight is the stroke thickness; style is the slant. A font can offer regular, italic, bold and bold italic faces, and the PDF picks the closest face for the requested weight and style.
@@ -155,7 +206,7 @@ Images in the Markdown body resolve relative to the Markdown file, not to the te
 
 ## Current backend
 
-The PDF backend applies the paragraph face, leading, spacing and alignment. It emits one show rule per heading level with the resolved font, size, weight, style and spacing, and show rules for `emph` and `strong` from the inline overrides. Running headers and footers, explicit page breaks, configurable table styling and PDF metadata fields are not in the schema yet.
+The PDF backend applies the paragraph face, leading, spacing and alignment. It emits one show rule per heading level with the resolved font, size, weight, style and spacing, and show rules for `emph` and `strong` from the inline overrides. It draws the running header and footer, expands their tokens, applies the table style and explicit page breaks, and writes the frontmatter title, author, subject, keywords, language and date into the PDF metadata.
 
 ## Example
 
@@ -169,4 +220,4 @@ To use the same settings elsewhere, copy the file to the document directory as `
 
 ## Errors
 
-The template is validated before any document is rendered. A YAML syntax error, an unknown key, an unsupported version, a rejected weight, an unknown style, a negative spacing or a missing font family all stop the run with a diagnostic. The YAML parser reports the line and the column, and the loader adds the template path.
+The template is validated before any document is rendered. A YAML syntax error, an unknown key, an unsupported version, a rejected weight, an unknown style, an invalid color, an unknown lowercase running token, a negative spacing or a missing font family all stop the run with a diagnostic. The YAML parser reports the line and the column, and the loader adds the template path.

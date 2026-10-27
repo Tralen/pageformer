@@ -27,6 +27,8 @@ The template is parsed and validated separately into a typed structure. An inval
 
 The Markdown subset is CommonMark plus the extensions the Zed preview renders: tables, task lists, strikethrough, footnotes, alert block quotes and YAML frontmatter. Fenced code blocks are preserved. Raw HTML is not part of the contract, so the parser rejects it instead of dropping it silently.
 
+A paragraph that contains only `\pagebreak` becomes `Block::PageBreak`. The marker is ordinary text to CommonMark, so the parser and the Zed preview keep it, and every paged backend reads the same block instead of a backend-specific string. Any other occurrence stays literal text.
+
 A loose ordered list whose items are one paragraph each becomes a sequence of numbered paragraphs. This keeps legal numbering such as `1.` as written, without a backslash, and without renumbering it as a list. A tight ordered list remains a list. Zed's preview still shows the loose source as a list; the document model and the generated PDF treat it as numbered paragraphs.
 
 ## Crate layout
@@ -41,7 +43,7 @@ The library is the pure core. File reading, the environment and the terminal liv
 
 ## Consistency
 
-Every format shares the semantic template. The current schema defines page size, orientation, margins, paragraph and heading styles, weight, style, leading, spacing, inline emphasis and strong overrides, alignment and the letterhead image. Colors, explicit page breaks, table styling, and running header and footer content are pending schema work.
+Every format shares the semantic template. The current schema defines page size, orientation, margins, running header and footer content, paragraph and heading styles, weight, style, leading, spacing, inline emphasis and strong overrides, alignment, the letterhead image and table borders, header fill and cell padding.
 
 The promise is consistency of presentation, not identical content distribution. Pagination differs between paged formats, such as PDF, and reflowable formats, such as ODT, DOCX and EPUB. The project does not try to force the same distribution. Widows and orphans must be avoided where the engine allows it.
 
@@ -95,13 +97,13 @@ The crate is Apache-2.0, compatible with the project license.
 
 ### The current backend
 
-`src/pdf` turns the model into Typst source and compiles it with the same Typst 0.15.1 library the spike used. The template sets the page dimensions, orientation, margins, letterhead, paragraph face, leading, spacing, alignment, one heading style per level and the inline emphasis and strong styles. The frontmatter supplies the title, author and language. The document date is fixed to 2026-01-01 UTC and the world reports the same date, so the same input produces the same bytes.
+`src/pdf` turns the model into Typst source and compiles it with the same Typst 0.15.1 library the spike used. The template sets the page dimensions, orientation, margins, letterhead, running header and footer, paragraph face, leading, spacing, alignment, one heading style per level, the inline emphasis and strong styles and the table style. The frontmatter supplies the title, author, subject, keywords, language and date. The date defaults to 2026-01-01, and the world reports the same date, so the same input produces the same bytes.
 
 User text is escaped for Typst markup (`\`, `#`, `$`, `*`, `_`, `` ` ``, brackets, angle brackets, `@`, `~`, `-`, `+`, `/`, `=`, `:`, `&`, braces and periods; the period keeps `1.` from becoming an enum marker). Strings passed to Typst functions are escaped for Typst string literals. Local images are read at the edge, stored under a synthetic project path and served by the world; remote images are rejected. The letterhead resolves against the template file and the images resolve against the Markdown file.
 
 Embedded fonts are loaded before system fonts, so Libertinus Serif is always available as the last family in the default list. This keeps the binary self-contained, while a template can still prefer system fonts.
 
-Running header and footer content, explicit page breaks and configurable table styling are not part of the schema yet. The backend emits an explicit heading rule for each level, applies the inline emphasis and strong faces, uses Typst's default list styles and a neutral table grid, and adds no running header or footer.
+Running header and footer slots expand the lowercase tokens `{page}`, `{pages}`, `{title}` and `{author}`; any other lowercase token is a template error, and an uppercase token stays literal until the secret phase. The backend emits an explicit heading rule for each level, applies the inline emphasis and strong faces, uses Typst's default list styles, draws the configured table grid and header fill and emits `#pagebreak()` for a page-break block.
 
 ### Spike results
 
@@ -134,9 +136,6 @@ The fixtures are in `assets/examples/`: `Contrato.md` with `Contrato.pdf`, and `
 
 ## Open decisions
 
-- Explicit page breaks and the Markdown syntax that requests them.
-- Running header and footer content, explicit page breaks and table styling in the template schema.
 - ODT implementation: a native ODF writer or another path.
 - DOCX library choice and the shared document model for reflowable formats.
 - Secret file format and permission checks.
-- Folder input and generating every Markdown file found inside it.

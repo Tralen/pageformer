@@ -7,7 +7,7 @@ Pageformer reaches 1.0.0 through ten phases, in the order below. The order is a 
 | Phase | Scope | Status | Starts after |
 |---|---|---|---|
 | 1. CLI | Input discovery, format selection, output rules | Done in 0.6.0: files and directories, path-ordered batches, mirrored output, ANSI styling | 0.5.0 |
-| 2. PDF | Primary output and reference backend | In progress in 0.9.0: schema 0.5 with `formatting`, paragraph and heading styles, `h1` to `h6`, weight/style and inline overrides; running header/footer, page breaks and table styling remain | CLI output rules |
+| 2. PDF | Primary output and reference backend | In progress in 0.10.0: running header and footer with tokens, explicit page breaks, table styling and the frontmatter `date`, `subject` and `keywords`; per-level page starts, widow/orphan fields and the PDF/A-2u decision remain | CLI output rules |
 | 3. Secrets | Placeholder resolution and leak prevention | Design only | PDF pipeline |
 | 4. TXT | Plain-text view and the renderer boundary | Not started | Secrets |
 | 5. ODT | Second-priority paged format | Not started | Renderer boundary |
@@ -85,11 +85,11 @@ A phase is closed only when all of the following hold:
 
 **Current state.** PDF/A-2b through Typst 0.15.1, page size, orientation, margins, letterhead, body and title styles, leading, paragraph spacing, header spacing, alignment, local images, headings, lists, tables, quotes, code, footnotes, embedded fonts and a fixed document date.
 
-**Status.** Started in 0.7.0 and expanded in 0.9.0: template schema 0.5, `formatting.paragraph`, `formatting.heading` with `h1` to `h6`, weight, style, inline emphasis and strong overrides, point lengths and a length-based leading. The rest of the list below remains.
+**Status.** Started in 0.7.0 and expanded in 0.9.0 with schema 0.5, `formatting.paragraph`, `formatting.heading` with `h1` to `h6`, weight, style, inline emphasis and strong overrides, point lengths and a length-based leading. In 0.10.0 the optional `page.header`, `page.footer` and `table` sections, the `Block::PageBreak` model block and the frontmatter `date`, `subject` and `keywords` landed inside schema 0.5, because omitting them preserves the output of an existing template. The shared example template styles its tables; its letterhead already fills both margins, so it sets no running content. The rest of the list below remains.
 
 **Work.**
 
-- Add optional template fields with defaults that preserve the current output: `page.header` and `page.footer` with left, center and right slots; `text.heading` for size, weight, spacing before and after, and whether that level starts a new page; `table` for borders, header fill and cell padding.
+- Add optional template fields with defaults that preserve the current output: `page.header` and `page.footer` with left, center and right slots; `table` for borders, header fill and cell padding; and a per-level heading flag that starts a new page.
 - Define template tokens separately from document secrets. Lowercase tokens such as `{page}`, `{pages}`, `{title}` and `{author}` are expanded only in header and footer slots, and an unknown lowercase token is a template error. Uppercase `{NAME}` remains reserved for body secrets from phase 3.
 - Settle the page-break syntax before coding it. A standalone `\pagebreak` paragraph is the leading candidate because CommonMark preserves it as text and the Zed preview shows it, while raw HTML stays rejected. Whatever the choice, it becomes a `Block::PageBreak` in the model, never a backend-specific string.
 - Set the Typst text language from the frontmatter, pass image alternative text, keep table header rows and footnotes semantic, and let Typst build the outline from headings. Check that the tagged output survives these changes.
@@ -231,8 +231,8 @@ A phase is closed only when all of the following hold:
 | Paragraph | `formatting.paragraph` | 0.9.0 | Font families, size, weight, style, leading, spacing, alignment and inline overrides. |
 | Inline spans | `formatting.paragraph.emphasis`, `formatting.paragraph.strong` | 0.9.0 | Inherit the paragraph face; style italic and weight bold are the semantic defaults. |
 | Headings | `formatting.heading`, `formatting.heading.h1` to `h6` | 0.9.0 | Base plus per-level overrides for fonts, size, weight, style and spacing. |
-| Header and footer | `page.header`, `page.footer` | 2 | Running header and footer; not heading spacing. |
-| Tables | `table` | 2 | Borders, header fill, cell padding. |
+| Header and footer | `page.header`, `page.footer` | 0.10.0 | Running content in left, center and right slots; lowercase tokens only. |
+| Tables | `table` | 0.10.0 | Border, border color, header fill and cell padding. |
 | EPUB | `epub.split_at` | After 1.0.0 | Defaults to first-level headings. |
 
 Schema evolution follows one rule: an optional key that preserves the meaning and the output of existing templates keeps the current schema version; removing a key or changing the meaning of an existing one bumps the schema version and is a breaking change. A newer template with an unknown key is rejected by an older build, which is the intended failure.
@@ -242,8 +242,8 @@ Schema evolution follows one rule: an optional key that preserves the meaning an
 | Field | Phase | Purpose |
 |---|---|---|
 | `title`, `author`, `language` | 0.5.0 | Document metadata; the PDF uses the title as metadata, and level-1 headings use `formatting.heading.h1`. |
-| `date` | 2 | Document date; replaces the fixed date when present. |
-| `subject`, `keywords` | 2 | PDF metadata and HTML meta tags. |
+| `date` | 0.10.0 | Document date; replaces the fixed date when present. |
+| `subject`, `keywords` | 0.10.0 | PDF metadata and HTML meta tags. |
 | `identifier` | 9 | Stable EPUB identifier; overrides the derived UUID. |
 
 ## Risks to watch

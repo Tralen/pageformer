@@ -2,6 +2,11 @@
 title: Contrato de Prestação de Serviços
 author: Pageformer
 language: pt-BR
+date: 2026-02-01
+subject: Prestação de serviços
+keywords:
+  - contrato
+  - prestação de serviços
 ---
 
 *Instrumento particular de prestação de serviços*

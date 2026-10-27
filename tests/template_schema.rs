@@ -213,6 +213,8 @@ fn unknown_keys_are_rejected() {
         "version: \"0.5\"\nformatting:\n  paragraph:\n    font: Serif\n",
         "version: \"0.5\"\nformatting:\n  heading:\n    h7:\n      size: 12\n",
         "version: \"0.5\"\nformatting:\n  paragraph:\n    emphasis:\n      unknown: 1\n",
+        "version: \"0.5\"\npage:\n  header:\n    middle: x\n",
+        "version: \"0.5\"\ntable:\n  colour: red\n",
     ] {
         assert!(
             matches!(Template::from_yaml(yaml), Err(TemplateError::Yaml { .. })),
@@ -381,6 +383,108 @@ fn an_unknown_style_is_rejected() {
         Template::from_yaml("version: \"0.5\"\nformatting:\n  paragraph:\n    style: oblique\n")
             .expect_err("oblique is not supported");
     assert!(matches!(error, TemplateError::Yaml { .. }));
+}
+
+#[test]
+fn a_running_header_and_footer_keep_their_slots() {
+    let template = parse(
+        r#"
+version: "0.5"
+page:
+  header:
+    left: "{title}"
+    right: "Página {page} de {pages}"
+  footer:
+    center: "{author}"
+    right: ""
+"#,
+    );
+    let header = template.page().header().expect("a header");
+    assert_eq!(header.slots().left(), Some("{title}"));
+    assert_eq!(header.slots().center(), None);
+    assert_eq!(header.slots().right(), Some("Página {page} de {pages}"));
+    let footer = template.page().footer().expect("a footer");
+    assert_eq!(footer.slots().center(), Some("{author}"));
+    assert_eq!(footer.slots().right(), None);
+}
+
+#[test]
+fn an_empty_running_section_is_none() {
+    let template = parse("version: \"0.5\"\npage:\n  header:\n    left: \"  \"\n  footer: {}\n");
+    assert_eq!(template.page().header(), None);
+    assert_eq!(template.page().footer(), None);
+}
+
+#[test]
+fn an_unknown_lowercase_token_is_rejected() {
+    let error = Template::from_yaml(
+        "version: \"0.5\"\npage:\n  header:\n    center: \"Página {pagina}\"\n",
+    )
+    .expect_err("an unknown token");
+    assert!(matches!(
+        error,
+        TemplateError::UnknownToken { ref field, ref token }
+            if field == "page.header.center" && token == "pagina"
+    ));
+    let message = error.to_string();
+    assert!(message.contains("{page}"), "{message}");
+}
+
+#[test]
+fn an_uppercase_token_is_left_for_the_secret_phase() {
+    let template = parse("version: \"0.5\"\npage:\n  header:\n    right: \"{NOME}\"\n");
+    assert_eq!(
+        template
+            .page()
+            .header()
+            .and_then(|header| header.slots().right()),
+        Some("{NOME}")
+    );
+}
+
+#[test]
+fn the_table_style_defaults_preserve_the_plain_grid() {
+    let template = parse("version: \"0.5\"\n");
+    let table = template.table();
+    assert_eq!(table.border().points(), 0.5);
+    assert_eq!(table.border_color().hex(), "#bbbbbb");
+    assert_eq!(table.header_fill(), None);
+    assert_eq!(table.cell_padding().points(), 6.0);
+}
+
+#[test]
+fn the_table_style_is_read_field_by_field() {
+    let template = parse(
+        r##"
+version: "0.5"
+table:
+  border: 1.5pt
+  border_color: "#112233"
+  header_fill: "#EEEEEE"
+  cell_padding: 3mm
+"##,
+    );
+    let table = template.table();
+    assert_eq!(table.border().points(), 1.5);
+    assert_eq!(table.border_color().hex(), "#112233");
+    assert_eq!(
+        table.header_fill().map(|color| color.hex()),
+        Some("#eeeeee".to_owned())
+    );
+    assert_millimetres(millimetres(table.cell_padding()), 3.0);
+}
+
+#[test]
+fn an_invalid_color_is_rejected() {
+    for yaml in [
+        "version: \"0.5\"\ntable:\n  border_color: bbbbbb\n",
+        "version: \"0.5\"\ntable:\n  border_color: \"#bbb\"\n",
+        "version: \"0.5\"\ntable:\n  border_color: \"#gggggg\"\n",
+        "version: \"0.5\"\ntable:\n  header_fill: \"red\"\n",
+    ] {
+        let error = Template::from_yaml(yaml).expect_err("an invalid color");
+        assert!(matches!(error, TemplateError::Value { .. }), "{yaml}");
+    }
 }
 
 #[test]

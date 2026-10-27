@@ -2,6 +2,11 @@
 title: "EMBARGOS DE TERCEIRO"
 author: "Escritório Exemplo"
 language: "pt-BR"
+date: 2026-02-15
+subject: "Embargos de terceiro"
+keywords:
+  - "embargos de terceiro"
+  - "tutela de urgência"
 ---
 
 **AO JUÍZO DA 10ª VARA DO TRABALHO DE CIDADE/XF DO TRIBUNAL REGIONAL DO TRABALHO DA 20ª REGIÃO.**

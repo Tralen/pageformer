@@ -4,6 +4,15 @@
 
 *Major updates and feature releases.*
 
+### 0.10.0
+
+- Added `page.header` and `page.footer` with left, center and right slots. Slots expand the lowercase tokens `{page}`, `{pages}`, `{title}` and `{author}`; an unknown lowercase token is a template error, while an uppercase token stays literal for the secret phase.
+- Added the `table` section with `border`, `border_color`, `header_fill` and `cell_padding`. The defaults keep the previous plain grid, and a zero border removes the stroke.
+- Added the frontmatter `date`, `subject` and `keywords`. The date replaces the fixed document date and also sets the Typst world date, so the output stays deterministic; the subject and keywords reach the PDF metadata.
+- A paragraph that contains only `\pagebreak` is an explicit page break, represented as `Block::PageBreak` in the document model.
+- The template schema stays 0.5, because the new keys are optional and preserve the output of an existing template.
+- The shared example template now styles tables, and both fixtures carry the new metadata. Regenerated both example PDFs.
+
 ### 0.9.1
 
 - Adjusted the example template: leading 8, larger heading sizes, base heading spacing 36/12 and an `h1` spacing of 48.

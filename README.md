@@ -34,7 +34,7 @@ cargo run -- --output /tmp/pageformer assets/examples/
 cargo run -- --check --color=never assets/examples/Contrato.md
 ```
 
-The first command writes each PDF next to its Markdown and updates the versioned examples in `assets/examples/`. A file or a directory can be given; a directory is walked recursively and only `.md` files are read. Hidden directories and `target/` are skipped, and directory symlinks are not followed.
+The first command writes each PDF next to its Markdown and updates the versioned examples in `assets/examples/`. A file or a directory can be given; a directory is walked recursively and only `.md` files are read. Hidden directories and `target/` are skipped, and directory symlinks are not followed. A paragraph that contains only `\pagebreak` starts a new page.
 
 `--output` writes under another directory; a directory input mirrors its relative tree there, while a direct file is written flat. `--check` parses the Markdown and validates the template without writing. A failure in one file does not stop the rest of the batch, and the exit code is `1` when any input fails.
 

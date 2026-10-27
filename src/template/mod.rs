@@ -20,6 +20,16 @@ pub const CURRENT_SCHEMA_VERSION: SchemaVersion = SchemaVersion { major: 0, mino
 const DEFAULT_MARGIN: Length = Length(20.0 * MM_TO_POINTS);
 const DEFAULT_FONT_SIZE: Length = Length(12.0);
 const DEFAULT_LEADING: Length = Length(7.8);
+const DEFAULT_TABLE_BORDER: Length = Length(0.5);
+const DEFAULT_TABLE_COLOR: Color = Color {
+    red: 0xbb,
+    green: 0xbb,
+    blue: 0xbb,
+};
+const DEFAULT_TABLE_PADDING: Length = Length(6.0);
+
+/// The tokens a running header or footer slot expands.
+const RUNNING_TOKENS: [&str; 4] = ["page", "pages", "title", "author"];
 
 const A4_DIMENSIONS: PageDimensions = PageDimensions {
     width: Length(210.0 * MM_TO_POINTS),
@@ -48,6 +58,7 @@ pub struct Template {
     version: SchemaVersion,
     page: Page,
     formatting: Formatting,
+    table: TableStyle,
 }
 
 impl Template {
@@ -85,6 +96,7 @@ impl Template {
             version: SchemaVersion::CURRENT,
             page: convert_page(raw.page)?,
             formatting: convert_formatting(raw.formatting)?,
+            table: convert_table(raw.table)?,
         })
     }
 
@@ -98,6 +110,10 @@ impl Template {
 
     pub fn formatting(&self) -> &Formatting {
         &self.formatting
+    }
+
+    pub fn table(&self) -> &TableStyle {
+        &self.table
     }
 }
 
@@ -177,6 +193,10 @@ pub enum TemplateError {
         field: String,
         problem: ValueError,
     },
+    UnknownToken {
+        field: String,
+        token: String,
+    },
 }
 
 impl fmt::Display for TemplateError {
@@ -190,6 +210,10 @@ impl fmt::Display for TemplateError {
             Self::Value { field, problem } => {
                 write!(formatter, "invalid value for `{field}`: {problem}")
             }
+            Self::UnknownToken { field, token } => write!(
+                formatter,
+                "unknown token `{{{token}}}` in `{field}`; use {{page}}, {{pages}}, {{title}} or {{author}}"
+            ),
         }
     }
 }
@@ -197,7 +221,10 @@ impl fmt::Display for TemplateError {
 impl std::error::Error for TemplateError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
-            Self::Yaml { .. } | Self::UnsupportedVersion { .. } | Self::Value { .. } => None,
+            Self::Yaml { .. }
+            | Self::UnsupportedVersion { .. }
+            | Self::Value { .. }
+            | Self::UnknownToken { .. } => None,
         }
     }
 }
@@ -214,6 +241,7 @@ pub enum ValueError {
     Zero,
     EmptyList,
     InvalidWeight,
+    InvalidColor,
 }
 
 impl fmt::Display for ValueError {
@@ -227,6 +255,7 @@ impl fmt::Display for ValueError {
             Self::Zero => "the number must be greater than zero",
             Self::EmptyList => "the list must not be empty",
             Self::InvalidWeight => "the weight must be a name or a number from 100 to 900",
+            Self::InvalidColor => "the color must be written as `#rrggbb`",
         };
         formatter.write_str(message)
     }
@@ -445,6 +474,8 @@ pub struct Page {
     orientation: Orientation,
     margins: Margins,
     letterhead: Option<TemplatePath>,
+    header: Option<RunningText>,
+    footer: Option<RunningText>,
 }
 
 impl Page {
@@ -459,7 +490,17 @@ impl Page {
             orientation,
             margins,
             letterhead,
+            header: None,
+            footer: None,
         }
+    }
+
+    pub fn with_header(self, header: Option<RunningText>) -> Self {
+        Self { header, ..self }
+    }
+
+    pub fn with_footer(self, footer: Option<RunningText>) -> Self {
+        Self { footer, ..self }
     }
 
     pub fn size(&self) -> PageSize {
@@ -476,6 +517,14 @@ impl Page {
 
     pub fn letterhead(&self) -> Option<&TemplatePath> {
         self.letterhead.as_ref()
+    }
+
+    pub fn header(&self) -> Option<&RunningText> {
+        self.header.as_ref()
+    }
+
+    pub fn footer(&self) -> Option<&RunningText> {
+        self.footer.as_ref()
     }
 
     /// The final page size, with the orientation applied.
@@ -508,6 +557,170 @@ impl TemplatePath {
     pub fn as_str(&self) -> &str {
         &self.0
     }
+}
+
+/// The text of a running header or footer, split into page slots.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RunningText {
+    slots: Slots,
+}
+
+/// The three horizontal slots of a running header or footer.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Slots {
+    left: Option<String>,
+    center: Option<String>,
+    right: Option<String>,
+}
+
+impl RunningText {
+    pub fn new(left: Option<String>, center: Option<String>, right: Option<String>) -> Self {
+        let present = |slot: Option<String>| slot.filter(|text| !text.trim().is_empty());
+        Self {
+            slots: Slots {
+                left: present(left),
+                center: present(center),
+                right: present(right),
+            },
+        }
+    }
+
+    pub fn slots(&self) -> &Slots {
+        &self.slots
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.slots.left.is_none() && self.slots.center.is_none() && self.slots.right.is_none()
+    }
+}
+
+impl Slots {
+    pub fn left(&self) -> Option<&str> {
+        self.left.as_deref()
+    }
+
+    pub fn center(&self) -> Option<&str> {
+        self.center.as_deref()
+    }
+
+    pub fn right(&self) -> Option<&str> {
+        self.right.as_deref()
+    }
+}
+
+/// The table grid style shared by every backend.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TableStyle {
+    border: Length,
+    border_color: Color,
+    header_fill: Option<Color>,
+    cell_padding: Length,
+}
+
+impl TableStyle {
+    pub fn new(
+        border: Length,
+        border_color: Color,
+        header_fill: Option<Color>,
+        cell_padding: Length,
+    ) -> Self {
+        Self {
+            border,
+            border_color,
+            header_fill,
+            cell_padding,
+        }
+    }
+
+    pub fn border(&self) -> Length {
+        self.border
+    }
+
+    pub fn border_color(&self) -> Color {
+        self.border_color
+    }
+
+    pub fn header_fill(&self) -> Option<Color> {
+        self.header_fill
+    }
+
+    pub fn cell_padding(&self) -> Length {
+        self.cell_padding
+    }
+}
+
+impl Default for TableStyle {
+    fn default() -> Self {
+        Self {
+            border: DEFAULT_TABLE_BORDER,
+            border_color: DEFAULT_TABLE_COLOR,
+            header_fill: None,
+            cell_padding: DEFAULT_TABLE_PADDING,
+        }
+    }
+}
+
+/// A color written as `#rrggbb`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Color {
+    red: u8,
+    green: u8,
+    blue: u8,
+}
+
+impl Color {
+    pub fn parse(text: &str) -> Result<Self, ValueError> {
+        let trimmed = text.trim();
+        let hex = trimmed.strip_prefix('#').ok_or(ValueError::InvalidColor)?;
+        if hex.len() != 6 || !hex.chars().all(|character| character.is_ascii_hexdigit()) {
+            return Err(ValueError::InvalidColor);
+        }
+        let pair = |start: usize| -> Result<u8, ValueError> {
+            let digits = hex
+                .get(start..start.saturating_add(2))
+                .ok_or(ValueError::InvalidColor)?;
+            u8::from_str_radix(digits, 16).map_err(|_| ValueError::InvalidColor)
+        };
+        Ok(Self {
+            red: pair(0)?,
+            green: pair(2)?,
+            blue: pair(4)?,
+        })
+    }
+
+    pub fn hex(self) -> String {
+        format!("#{:02x}{:02x}{:02x}", self.red, self.green, self.blue)
+    }
+}
+
+/// The text of one running slot.
+fn validate_running_text(text: &str, field: &str) -> Result<(), TemplateError> {
+    let mut rest = text;
+    while let Some(start) = rest.find('{') {
+        let after = rest.get(start.saturating_add(1)..).unwrap_or_default();
+        let Some(end) = after.find('}') else {
+            break;
+        };
+        let token = after.get(..end).unwrap_or_default();
+        if is_lowercase_token(token) && !RUNNING_TOKENS.contains(&token) {
+            return Err(TemplateError::UnknownToken {
+                field: field.to_owned(),
+                token: token.to_owned(),
+            });
+        }
+        rest = after.get(end.saturating_add(1)..).unwrap_or_default();
+    }
+    Ok(())
+}
+
+pub(crate) fn is_lowercase_token(token: &str) -> bool {
+    let mut characters = token.chars();
+    characters
+        .next()
+        .is_some_and(|first| first.is_ascii_lowercase())
+        && characters.all(|character| {
+            character.is_ascii_lowercase() || character.is_ascii_digit() || character == '_'
+        })
 }
 
 /// A font weight from 100 to 900.
@@ -775,6 +988,7 @@ struct RawTemplate {
     page: RawPage,
     #[serde(default)]
     formatting: RawFormatting,
+    table: Option<RawTable>,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -784,6 +998,16 @@ struct RawPage {
     orientation: Option<Orientation>,
     margins: Option<RawMargins>,
     letterhead: Option<String>,
+    header: Option<RawRunning>,
+    footer: Option<RawRunning>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawRunning {
+    left: Option<String>,
+    center: Option<String>,
+    right: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -860,6 +1084,15 @@ struct DimensionsInput {
     height: String,
 }
 
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawTable {
+    border: Option<String>,
+    border_color: Option<String>,
+    header_fill: Option<String>,
+    cell_padding: Option<String>,
+}
+
 fn convert_page(raw: RawPage) -> Result<Page, TemplateError> {
     let margins = match raw.margins {
         Some(margins) => Margins::new(
@@ -875,11 +1108,69 @@ fn convert_page(raw: RawPage) -> Result<Page, TemplateError> {
         .map(|text| TemplatePath::parse(&text))
         .transpose()
         .map_err(|problem| value_error("page.letterhead", problem))?;
+    let header = convert_running(raw.header, "page.header")?;
+    let footer = convert_running(raw.footer, "page.footer")?;
     Ok(Page::new(
         raw.size.unwrap_or(PageSize::A4),
         raw.orientation.unwrap_or(Orientation::Portrait),
         margins,
         letterhead,
+    )
+    .with_header(header)
+    .with_footer(footer))
+}
+
+fn convert_running(
+    raw: Option<RawRunning>,
+    prefix: &str,
+) -> Result<Option<RunningText>, TemplateError> {
+    let Some(raw) = raw else {
+        return Ok(None);
+    };
+    for (slot, value) in [
+        ("left", &raw.left),
+        ("center", &raw.center),
+        ("right", &raw.right),
+    ] {
+        if let Some(text) = value {
+            validate_running_text(text, &format!("{prefix}.{slot}"))?;
+        }
+    }
+    let running = RunningText::new(raw.left, raw.center, raw.right);
+    Ok(if running.is_empty() {
+        None
+    } else {
+        Some(running)
+    })
+}
+
+fn convert_table(raw: Option<RawTable>) -> Result<TableStyle, TemplateError> {
+    let defaults = TableStyle::default();
+    let Some(raw) = raw else {
+        return Ok(defaults);
+    };
+    let border = parse_size_field(raw.border, "table.border", defaults.border())?;
+    let border_color = raw
+        .border_color
+        .map(|text| Color::parse(&text))
+        .transpose()
+        .map_err(|problem| value_error("table.border_color", problem))?
+        .unwrap_or(defaults.border_color());
+    let header_fill = raw
+        .header_fill
+        .map(|text| Color::parse(&text))
+        .transpose()
+        .map_err(|problem| value_error("table.header_fill", problem))?;
+    let cell_padding = parse_size_field(
+        raw.cell_padding,
+        "table.cell_padding",
+        defaults.cell_padding(),
+    )?;
+    Ok(TableStyle::new(
+        border,
+        border_color,
+        header_fill,
+        cell_padding,
     ))
 }
 

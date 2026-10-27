@@ -898,6 +898,69 @@ mod tests {
     }
 
     #[test]
+    fn reference_links_and_autolinks_become_links() {
+        let document = parse(
+            "[site][ref] <https://example.org> <mail@example.org>\n\n[ref]: https://example.org \"Exemplo\"\n",
+        )
+        .expect("reference links and autolinks");
+        let inlines = match first_block(&document) {
+            Block::Paragraph(inlines) => inlines,
+            _ => panic!("expected a paragraph"),
+        };
+        let links: Vec<(&str, Option<&str>)> = inlines
+            .iter()
+            .filter_map(|inline| match inline {
+                Inline::Link {
+                    destination, title, ..
+                } => Some((destination.as_str(), title.as_deref())),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(
+            links,
+            vec![
+                ("https://example.org", Some("Exemplo")),
+                ("https://example.org", None),
+                ("mail@example.org", None),
+            ]
+        );
+    }
+
+    #[test]
+    fn entities_and_escapes_become_text() {
+        let document = parse(r"\*literal\* &amp; &copy;").expect("entities and escapes");
+        let inlines = match first_block(&document) {
+            Block::Paragraph(inlines) => inlines,
+            _ => panic!("expected a paragraph"),
+        };
+        assert_eq!(plain_text(inlines), "*literal* & ©");
+    }
+
+    #[test]
+    fn extensions_outside_the_contract_stay_text() {
+        let document = parse("==marca== ^sobrescrito^ $x^2$").expect("ordinary text");
+        let inlines = match first_block(&document) {
+            Block::Paragraph(inlines) => inlines,
+            _ => panic!("expected a paragraph"),
+        };
+        assert_eq!(plain_text(inlines), "==marca== ^sobrescrito^ $x^2$");
+    }
+
+    #[test]
+    fn single_and_double_tildes_are_strikethrough() {
+        let document = parse("~riscado~ e ~~também~~").expect("strikethrough");
+        let inlines = match first_block(&document) {
+            Block::Paragraph(inlines) => inlines,
+            _ => panic!("expected a paragraph"),
+        };
+        let spans = inlines
+            .iter()
+            .filter(|inline| matches!(inline, Inline::Strikethrough(_)))
+            .count();
+        assert_eq!(spans, 2, "both tilde forms are strikethrough: {inlines:?}");
+    }
+
+    #[test]
     fn alert_block_quotes_keep_their_kind() {
         let document = parse("> [!WARNING]\n> Cuidado.\n").expect("alert");
         let quote = match first_block(&document) {

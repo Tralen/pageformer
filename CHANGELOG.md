@@ -4,6 +4,11 @@
 
 *Major updates and feature releases.*
 
+### 0.12.1
+
+- Added tests for every inline construct: reference links, angle autolinks, entities, escapes, single and double tilde strikethrough, and a rendering test with every inline variant.
+- Documented the inline contract and its deliberate exclusions: math, superscript, subscript, highlight, wikilinks, inline HTML and smart punctuation.
+
 ### 0.12.0
 
 - Added `page_break_before` to `formatting.heading` and to the `h1` to `h6` overrides. The break is weak, so a heading already at the top of a page does not create a blank page.

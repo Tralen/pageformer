@@ -179,6 +179,30 @@ fn the_technical_report_uses_its_own_template() {
 }
 
 #[test]
+fn every_inline_construct_renders() {
+    let project = TempDir::new().expect("a temporary project");
+    fs::copy(
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("assets")
+            .join("examples")
+            .join("Timbre.png"),
+        project.path().join("logo.png"),
+    )
+    .expect("the image must be copied");
+
+    let source = "Texto **forte** *ênfase* ~~riscado~~ `código` [link](https://example.org) e uma nota[^1].\n\nAntes ![logo](logo.png) depois.\n\nQuebra dura  \naqui.\n\n[^1]: Nota.";
+    let document = markdown::parse(source).expect("the document must parse");
+    let assets = pdf::load_assets(&document, &embedded(), project.path(), None)
+        .expect("the image must load");
+    let output = pdf::render(&document, &embedded(), &assets).expect("the document must render");
+    assert!(
+        output.warnings().is_empty(),
+        "the document produced warnings: {:?}",
+        output.warnings()
+    );
+}
+
+#[test]
 fn local_images_are_loaded_and_named() {
     let project = TempDir::new().expect("a temporary project");
     fs::write(project.path().join("logo.png"), b"not a real png")

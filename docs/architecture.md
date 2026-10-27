@@ -31,6 +31,10 @@ A paragraph that contains only `{pagebreak}` becomes `Block::PageBreak`. Braces 
 
 A loose ordered list whose items are one paragraph each becomes a sequence of numbered paragraphs. This keeps legal numbering such as `1.` as written, without a backslash, and without renumbering it as a list. A tight ordered list remains a list. Zed's preview still shows the loose source as a list; the document model and the generated PDF treat it as numbered paragraphs.
 
+### Inline contract
+
+The inline model covers every construct of that subset: text, code spans, emphasis, strong, strikethrough with single or double tildes, links (inline, reference and angle autolinks), images, soft and hard breaks, entities, escapes and footnote references. Each one has a source-generation test and a rendering test. Extensions outside the contract stay literal text: `==highlight==`, `^superscript^` and `$math$` are not enabled, because the Zed preview does not render them either. Inline HTML is rejected, and smart punctuation is not enabled because it would rewrite quotes and dashes in a legal document.
+
 ## Crate layout
 
 - `src/document.rs` holds the backend-independent model, with newtypes and smart constructors for the values the pipeline validates.

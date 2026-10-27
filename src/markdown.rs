@@ -662,6 +662,20 @@ fn frontmatter_metadata(yaml: &str) -> Result<Metadata, MarkdownError> {
         serde_yaml::from_str(yaml).map_err(|error| MarkdownError::Frontmatter {
             message: error.to_string(),
         })?;
+    for (value, field) in [
+        (&raw.title, "title"),
+        (&raw.author, "author"),
+        (&raw.language, "language"),
+        (&raw.date, "date"),
+        (&raw.subject, "subject"),
+    ] {
+        if let Some(text) = value {
+            reject_confidential(text, field)?;
+        }
+    }
+    for keyword in raw.keywords.iter().flatten() {
+        reject_confidential(keyword, "keywords")?;
+    }
     let title = raw
         .title
         .map(|text| Title::parse(&text))
@@ -704,6 +718,19 @@ fn frontmatter_metadata(yaml: &str) -> Result<Metadata, MarkdownError> {
         None => metadata,
     };
     Ok(metadata.with_keywords(keywords))
+}
+
+/// Confidential fields belong to the body, never to metadata that reaches the
+/// PDF package.
+fn reject_confidential(text: &str, field: &str) -> Result<(), MarkdownError> {
+    match crate::confidential::first_field(text) {
+        Some(name) => Err(MarkdownError::Frontmatter {
+            message: format!(
+                "confidential field `{{{name}}}` is not allowed in frontmatter `{field}`"
+            ),
+        }),
+        None => Ok(()),
+    }
 }
 
 #[cfg(test)]
@@ -824,6 +851,32 @@ mod tests {
             error,
             MarkdownError::Metadata(MetadataError::EmptyTitle)
         ));
+    }
+
+    #[test]
+    fn a_confidential_field_in_frontmatter_is_rejected() {
+        for yaml in [
+            "---\ntitle: \"{NOME}\"\n---\n",
+            "---\nauthor: \"{NOME}\"\n---\n",
+            "---\nsubject: \"{NOME}\"\n---\n",
+            "---\nkeywords:\n  - \"{NOME}\"\n---\n",
+            "---\nlanguage: \"{NOME}\"\n---\n",
+            "---\ndate: \"{NOME}\"\n---\n",
+        ] {
+            let error = parse(yaml).expect_err("a confidential field in frontmatter");
+            let message = error.to_string();
+            assert!(message.contains("{NOME}"), "{message}");
+            assert!(message.contains("frontmatter"), "{message}");
+        }
+    }
+
+    #[test]
+    fn a_lowercase_brace_in_frontmatter_is_ordinary_text() {
+        let document = parse("---\ntitle: \"{nome}\"\n---\n").expect("a literal brace");
+        assert_eq!(
+            document.metadata().title().map(Title::as_str),
+            Some("{nome}")
+        );
     }
 
     #[test]

@@ -8,8 +8,8 @@ Pageformer reaches 1.0.0 through ten phases, in the order below. The order is a 
 |---|---|---|---|
 | 1. CLI | Input discovery, format selection, output rules | Done in 0.6.0: files and directories, path-ordered batches, mirrored output, ANSI styling | 0.5.0 |
 | 2. PDF | Primary output and reference backend | Done in 0.12.0: running header and footer with tokens, explicit page breaks, per-level page starts, table styling and the frontmatter `date`, `subject` and `keywords`; PDF/A-2b stays the declared profile | CLI output rules |
-| 3. Secrets | Placeholder resolution and leak prevention | Design only | PDF pipeline |
-| 4. TXT | Plain-text view and the renderer boundary | Not started | Secrets |
+| 3. Confidentiality | Placeholder resolution and leak prevention | Done in 0.13.0: `{NAME}` fields, environment and file loading, output rule, redaction | PDF pipeline |
+| 4. TXT | Plain-text view and the renderer boundary | Not started | Confidentiality |
 | 5. ODT | Second-priority paged format | Not started | Renderer boundary |
 | 6. DOCX | Office format for review and exchange | Not started | ODT style mapping |
 | 7. GUI | Minimal egui window over the pipeline | Not started | Every format it exposes |
@@ -20,16 +20,16 @@ Pageformer reaches 1.0.0 through ten phases, in the order below. The order is a 
 ```mermaid
 flowchart TD
     CLI[1. CLI] --> PDF[2. PDF]
-    PDF --> Secrets[3. Secrets]
-    Secrets --> TXT[4. TXT and renderer boundary]
+    PDF --> Confidentiality[3. Confidentiality]
+    Confidentiality --> TXT[4. TXT and renderer boundary]
     TXT --> ODT[5. ODT]
     ODT --> DOCX[6. DOCX]
     DOCX --> GUI[7. GUI]
     GUI --> HTML[8. HTML]
     HTML --> EPUB[9. EPUB]
     EPUB --> Release[10. Release 1.0.0]
-    Secrets -. placeholders resolved once .-> ODT
-    Secrets -. placeholders resolved once .-> HTML
+    Confidentiality -. placeholders resolved once .-> ODT
+    Confidentiality -. placeholders resolved once .-> HTML
     TXT -. same backend contract .-> HTML
 ```
 
@@ -39,7 +39,7 @@ The CLI comes first because input discovery, format selection and output rules a
 
 PDF comes second because it is the primary output and the reference for the document model. Every later backend copies decisions about headings, lists, tables, footnotes, images and metadata that the PDF backend forces us to make now.
 
-Secrets come third, before the remaining backends. Placeholder resolution belongs to the pipeline, after parsing and before rendering. Implementing it after TXT, ODT or DOCX would mean writing the same scanner into several backends and then removing it.
+Confidentiality comes third, before the remaining backends. Placeholder resolution belongs to the pipeline, after parsing and before rendering. Implementing it after TXT, ODT or DOCX would mean writing the same scanner into several backends and then removing it.
 
 TXT comes fourth because it is the cheapest backend and the first one that justifies a shared renderer boundary. It proves the trait with the least machinery, and it supplies the copy-as-plain-text action the GUI needs later.
 
@@ -85,12 +85,12 @@ A phase is closed only when all of the following hold:
 
 **Current state.** PDF/A-2b through Typst 0.15.1, page size, orientation, margins, letterhead, body and title styles, leading, paragraph spacing, header spacing, alignment, local images, headings, lists, tables, quotes, code, footnotes, embedded fonts and a fixed document date.
 
-**Status.** Started in 0.7.0 and expanded in 0.9.0 with schema 0.5, `formatting.paragraph`, `formatting.heading` with `h1` to `h6`, weight, style, inline emphasis and strong overrides, point lengths and a length-based leading. In 0.10.0 the optional `page.header`, `page.footer` and `table` sections, the `Block::PageBreak` model block and the frontmatter `date`, `subject` and `keywords` landed inside schema 0.5, because omitting them preserves the output of an existing template. The examples demonstrate them in 0.10.1: the shared template adds a page-number header clear of the letterhead, and the nested `tecnico/` example uses its own template without a letterhead to show the full header, footer, table style and page break. In 0.11.0 the page-break marker became `{pagebreak}`. Phase 2 closed in 0.12.0 with `page_break_before` per heading level, a weak break that does not create a blank page. An inline audit in 0.12.1 added tests for every inline construct and documented the exclusions: math, superscript, subscript, highlight, wikilinks and inline HTML stay outside the contract. Typst already avoids widows and orphans through its paragraph costs, so no field is exposed, and PDF/A-2u is not declared: veraPDF reports only the conformance identifier for 2u when the file declares B.
+**Status.** Started in 0.7.0 and expanded in 0.9.0 with schema 0.5, `formatting.paragraph`, `formatting.heading` with `h1` to `h6`, weight, style, inline emphasis and strong overrides, point lengths and a length-based leading. In 0.10.0 the optional `page.header`, `page.footer` and `table` sections, the `Block::PageBreak` model block and the frontmatter `date`, `subject` and `keywords` landed inside schema 0.5, because omitting them preserves the output of an existing template. The examples demonstrate them in 0.10.1: the shared template adds a page-number header clear of the letterhead, and the nested `tecnico/` example uses its own template without a letterhead to show the full header, footer, table style and page break. In 0.11.0 the page-break marker became `{pagebreak}`. Phase 2 closed in 0.12.0 with `page_break_before` per heading level, a weak break that does not create a blank page. An inline audit in 0.12.1 added tests for every inline construct and documented the exclusions: math, superscript, subscript, highlight, wikilinks and inline HTML stay outside the contract. Superscript and subscript are deferred until after 1.0.0, because the Zed preview does not render them and `~x~` is already strikethrough. Typst already avoids widows and orphans through its paragraph costs, so no field is exposed, and PDF/A-2u is not declared: veraPDF reports only the conformance identifier for 2u when the file declares B.
 
 **Work.**
 
 - Add optional template fields with defaults that preserve the current output: `page.header` and `page.footer` with left, center and right slots; `table` for borders, header fill and cell padding; and a per-level heading flag that starts a new page.
-- Define template tokens separately from document secrets. Lowercase tokens such as `{page}`, `{pages}`, `{title}` and `{author}` are expanded only in header and footer slots, and an unknown lowercase token is a template error. Uppercase `{NAME}` remains reserved for body secrets from phase 3.
+- Define template tokens separately from document confidential fields. Lowercase tokens such as `{page}`, `{pages}`, `{title}` and `{author}` are expanded only in header and footer slots, and an unknown lowercase token is a template error. Uppercase `{NAME}` is a body field and is rejected in running content.
 - Set the Typst text language from the frontmatter, pass image alternative text, keep table header rows and footnotes semantic, and let Typst build the outline from headings. Check that the tagged output survives these changes.
 - Extend the frontmatter only when a backend needs the field. Candidate fields for this phase are `date`, which replaces the fixed date when present and must also drive the Typst world date so deterministic output holds, plus `subject` and `keywords`. Each new field is validated and documented in `docs/template.md`.
 - Expose Typst's widow and orphan handling only through template fields that the examples actually use. Do not add knobs speculatively.
@@ -98,24 +98,24 @@ A phase is closed only when all of the following hold:
 
 **Done when.** Every new field has a schema test, a source-generation test and an example that uses it; all fixtures still pass veraPDF as PDF/A-2b; two runs produce identical bytes; the page-break and token rules are documented in `docs/architecture.md` and `docs/template.md`.
 
-## Phase 3: Secrets
+## Phase 3: Confidentiality
 
 **Goal.** Resolve placeholders once, in the model, before any backend, and make a leak impossible by construction.
 
-**Current state.** The design is settled in [`architecture.md`](architecture.md#secrets); no code exists.
+**Status.** Done in 0.13.0. The design is described in [`architecture.md`](architecture.md#confidentiality) and the implementation lives in `src/confidential.rs` and `src/confidential/loader.rs`.
 
 **Work.**
 
-- Add `SecretName`, an uppercase `[A-Z][A-Z0-9_]*` newtype, and `SecretValue`, a newtype whose `Debug` and `Display` never print the value. The value is built only by the loader, never from an arbitrary string.
-- Scan text inlines only. Code spans, code blocks, link destinations, link titles, image destinations and frontmatter are excluded. A lowercase or spaced brace such as `{nome}` stays ordinary text.
-- Treat an unknown placeholder as fatal. The error names the placeholder and its location, never a value, and never leaves the token in the output.
-- Load values from the environment or from a file outside the source tree; accept no command-line flag for a value. Settle the file format as plain `KEY=VALUE` without shell evaluation, decide the file-over-environment precedence, and check `0600` permissions on Unix. Document the Windows behavior.
-- Substitute after parsing and before asset loading, so every backend receives final text. The model gains a resolution function that returns a new document; the store never reaches a backend.
-- Require `--output` when the document contains placeholders, and require that directory to resolve outside the canonical source tree. Refuse `.`, `..` tricks and a source tree that contains the output. `--check` lists placeholder names only.
-- Redact known values from backend diagnostics before they reach stderr. Typst compilation errors can quote the generated source, which contains the substituted text, so redaction belongs at the error boundary.
-- Test with dummy values injected through a temporary file and the environment: unknown placeholder, code span untouched, frontmatter rejection, output rule, `--check` names only, permission check, and an assertion that no dummy value appears in stdout, stderr or document metadata.
+- `ConfidentialName` is an uppercase `[A-Z][A-Z0-9_]*` newtype, and `ConfidentialValue` never prints itself through `Debug` or `Display`. The value is built only by the loader.
+- Only text inlines are scanned. Code spans, code blocks, link destinations, link titles, image destinations and frontmatter are excluded. A lowercase or spaced brace such as `{nome}` stays ordinary text.
+- An unknown placeholder is fatal. The error names the placeholder and its block location, never a value, and never leaves the token in the output.
+- Values come from `PAGEFORMER_CONFIDENTIAL_<NAME>` environment variables or from a `NAME=value` file outside the source tree; no value is accepted on the command line. The file overrides the environment, comments and blank lines are ignored, duplicate names are rejected and Unix requires `chmod 600`.
+- Substitution happens after parsing and before asset loading, so every backend receives final text. The model returns a new document; the store never reaches a backend.
+- A document with confidential fields requires an output directory outside its source tree. Paths are canonicalized before the comparison, so `.` and `..` cannot disguise an output inside the tree. `--check` lists field names only.
+- Known values are redacted from warnings and errors before they reach stderr, because Typst diagnostics can quote the generated source.
+- Tests cover substitution in every container, code and destinations untouched, frontmatter rejection, the output rule, `--check` names only, the permission check and the file and environment precedence. The CLI test asserts that no value appears in stdout, stderr or the PDF XMP metadata.
 
-**Done when.** A secret-bearing document cannot be written next to its source, no output path can expose a value, and every later backend receives substituted text from the model without ever seeing the secret store.
+**Done when.** A confidential document cannot be written next to its source, no output path can expose a value, and every later backend receives substituted text from the model without ever seeing the store.
 
 ## Phase 4: TXT
 
@@ -142,7 +142,7 @@ A phase is closed only when all of the following hold:
 - Build the package with `mimetype` first and stored, then `META-INF/manifest.xml`, `content.xml`, `styles.xml` and `meta.xml`. Fix the entry order and timestamps.
 - Map the template to ODF styles: page layout, font faces with a generic fallback, size, leading, paragraph spacing, alignment, headings, lists, tables, letterhead and footnotes.
 - Map the document to ODF content: blocks, inlines, images under `Pictures/`, links and footnotes. Alerts become block quotes with a visible label, because ODF has no alert concept.
-- Write title, author, language and generator to the metadata. Never write a secret value.
+- Write title, author, language and generator to the metadata. Never write a confidential value.
 - Test the package structurally: unzip, parse every XML part, assert that `mimetype` is first and stored, and compare two renders byte for byte. Add an optional LibreOffice headless conversion as a smoke test and document the command in `docs/verification.md`.
 
 **Done when.** Both fixtures open without repair, the text and structure match the model, a style change in the template is visible in the ODT, and two runs are byte-identical.
@@ -172,7 +172,7 @@ A phase is closed only when all of the following hold:
 - Follow the sketch: a drop box, format buttons enabled only after a valid Markdown file, a template label with edit and open-folder actions, a status line and an open-output action.
 - Model the window as a state machine with `Idle`, `Working`, `Succeeded` and `Failed`. Render on a worker thread and communicate through a channel, so the frame loop never blocks; a second request while working is disabled, not queued.
 - Call the same pipeline. The GUI never parses Markdown, resolves a template or writes a file itself.
-- Require an output directory outside the source tree when the document contains placeholders, and never display a secret value.
+- Require an output directory outside the source tree when the document contains placeholders, and never display a confidential value.
 - Show errors in the status line and never panic on a bad file, a missing template or a failed render.
 - Test the pure state transitions, input validation and button enablement. Keep the manual smoke test documented; use snapshot tests only if they stay deterministic.
 
@@ -249,7 +249,7 @@ Schema evolution follows one rule: an optional key that preserves the meaning an
 
 - **Repeated escaping.** Each output language needs its own escaper: Typst markup and strings, XML, HTML and JSON in EPUB metadata. Share nothing between them except the tests and the rule that user text is never trusted.
 - **Broken determinism.** ZIP timestamps, random identifiers, map iteration order and current time are the usual causes. Fix the first three as soon as the first ZIP format lands, and assert byte equality in every output test.
-- **Secret leaks through diagnostics.** Compilers quote source text. Redact known values at the error boundary, not only in the happy path.
+- **Confidential leaks through diagnostics.** Compilers quote source text. Redact known values at the error boundary, not only in the happy path.
 - **Unsafe link schemes.** The parser accepts any link destination today. HTML must reject `javascript:` and `data:`, and the shared model should validate schemes once so no backend can emit a dangerous target.
 - **Blocking the GUI.** A render takes long enough to freeze a frame loop. Keep it on a worker thread from the first version.
 - **Schema drift.** Adding fields without updating `docs/template.md` and the tests makes the version meaningless. Treat the schema map above as part of the phase contract.

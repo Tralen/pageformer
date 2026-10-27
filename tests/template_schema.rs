@@ -435,15 +435,15 @@ fn an_unknown_lowercase_token_is_rejected() {
 }
 
 #[test]
-fn an_uppercase_token_is_left_for_the_secret_phase() {
-    let template = parse("version: \"0.5\"\npage:\n  header:\n    right: \"{NOME}\"\n");
-    assert_eq!(
-        template
-            .page()
-            .header()
-            .and_then(|header| header.slots().right()),
-        Some("{NOME}")
-    );
+fn a_confidential_field_in_running_content_is_rejected() {
+    let error = Template::from_yaml("version: \"0.5\"\npage:\n  header:\n    right: \"{NOME}\"\n")
+        .expect_err("confidential fields are not resolved in running content");
+    assert!(matches!(
+        error,
+        TemplateError::ConfidentialToken { ref field, ref token }
+            if field == "page.header.right" && token == "NOME"
+    ));
+    assert!(error.to_string().contains("{NOME}"), "{error}");
 }
 
 #[test]

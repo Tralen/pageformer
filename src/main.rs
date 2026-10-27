@@ -12,6 +12,7 @@ use std::process::ExitCode;
 use anyhow::{Context, Result};
 use clap::{Arg, ArgAction, Command};
 
+use pageformer::confidential::{self, ConfidentialStore};
 use pageformer::markdown;
 use pageformer::pdf;
 use pageformer::template::loader::{self, ResolvedTemplate, TemplateOrigin};
@@ -43,6 +44,7 @@ enum Outcome {
         blocks: usize,
         headings: usize,
         template: String,
+        confidential: Vec<String>,
     },
     Rendered {
         output: PathBuf,
@@ -74,6 +76,9 @@ fn main() -> ExitCode {
     let inputs = inputs.map(PathBuf::from).collect::<Vec<_>>();
     let explicit = matches.get_one::<String>("template").map(PathBuf::from);
     let output_directory = matches.get_one::<String>("output").map(PathBuf::from);
+    let confidential_file = matches
+        .get_one::<String>("confidential-file")
+        .map(PathBuf::from);
     let mode = if matches.get_flag("check") {
         Mode::Check
     } else {
@@ -107,6 +112,24 @@ fn main() -> ExitCode {
     }
     let files = unique.into_values().collect::<Vec<_>>();
 
+    let roots = {
+        let mut roots = files
+            .iter()
+            .map(|file| file.root().to_path_buf())
+            .collect::<Vec<_>>();
+        roots.sort();
+        roots.dedup();
+        roots
+    };
+    let root_refs = roots.iter().map(PathBuf::as_path).collect::<Vec<_>>();
+    let store = match confidential::loader::load(confidential_file.as_deref(), &root_refs) {
+        Ok(store) => store,
+        Err(error) => {
+            eprintln!("  {} {error}", label(stderr_painter, Style::Error, "error"));
+            return ExitCode::FAILURE;
+        }
+    };
+
     let (jobs, plan_errors) = match mode {
         Mode::Render => {
             let (planned, errors) = cli::plan_outputs(files, output_directory.as_deref(), format);
@@ -139,7 +162,7 @@ fn main() -> ExitCode {
         .map(|job| {
             (
                 job,
-                process(job, mode, explicit.as_deref(), global.as_deref()),
+                process(job, mode, explicit.as_deref(), global.as_deref(), &store),
             )
         })
         .collect::<Vec<_>>();
@@ -151,16 +174,16 @@ fn main() -> ExitCode {
     for notice in &notices {
         match notice {
             Notice::Warning(warning) => {
-                print_warning(stderr_painter, &warning.path, &warning.message);
+                print_warning(stderr_painter, &warning.path, &warning.message, &store);
             }
             Notice::Error { path, message } => {
-                print_failure(stderr_painter, path, message);
+                print_failure(stderr_painter, path, message, &store);
             }
         }
         printed = true;
     }
     for error in &plan_errors {
-        print_failure(stderr_painter, &error.input, &error.message);
+        print_failure(stderr_painter, &error.input, &error.message, &store);
         printed = true;
     }
     for (job, result) in &results {
@@ -169,10 +192,21 @@ fn main() -> ExitCode {
         }
         match result {
             Ok(outcome) => {
-                print_outcome(stdout_painter, stderr_painter, job.input.path(), outcome);
+                print_outcome(
+                    stdout_painter,
+                    stderr_painter,
+                    job.input.path(),
+                    outcome,
+                    &store,
+                );
             }
             Err(error) => {
-                print_failure(stderr_painter, job.input.path(), &format!("{error:#}"));
+                print_failure(
+                    stderr_painter,
+                    job.input.path(),
+                    &format!("{error:#}"),
+                    &store,
+                );
             }
         }
         printed = true;
@@ -232,6 +266,13 @@ fn command() -> Command {
                 .value_parser(["auto", "always", "never"])
                 .default_value("auto"),
         )
+        .arg(
+            Arg::new("confidential-file")
+                .long("confidential-file")
+                .value_name("FILE")
+                .help("Read confidential fields from a NAME=value file outside the source tree")
+                .value_parser(clap::value_parser!(String)),
+        )
 }
 
 fn process(
@@ -239,34 +280,47 @@ fn process(
     mode: Mode,
     explicit: Option<&Path>,
     global: Option<&Path>,
+    store: &ConfidentialStore,
 ) -> Result<Outcome> {
     let input = job.input.path();
     let source =
         fs::read_to_string(input).with_context(|| format!("cannot read {}", input.display()))?;
     let document = markdown::parse(&source).with_context(|| "cannot parse the Markdown")?;
+    let resolution = confidential::resolve(&document, store)
+        .with_context(|| "cannot resolve confidential fields")?;
+    let names = resolution
+        .names()
+        .iter()
+        .map(|name| name.as_str().to_owned())
+        .collect::<Vec<_>>();
     let resolved = resolve_template(input, explicit, global)?;
     match mode {
         Mode::Check => Ok(Outcome::Checked {
             blocks: document.block_count(),
             headings: document.heading_count(),
             template: resolved.origin().to_string(),
+            confidential: names,
         }),
         Mode::Render => {
             let output = job
                 .output
                 .as_deref()
                 .context("the output path was not planned")?;
+            if !names.is_empty() {
+                require_confidential_output(job)?;
+            }
+            let document = resolution.document();
             let source_directory = input
                 .parent()
                 .filter(|parent| !parent.as_os_str().is_empty())
                 .unwrap_or_else(|| Path::new("."));
             let assets = pdf::load_assets(
-                &document,
+                document,
                 resolved.template(),
                 source_directory,
                 resolved.base_directory(),
             )?;
-            let rendered = pdf::render(&document, resolved.template(), &assets)
+            let rendered = pdf::render(document, resolved.template(), &assets)
                 .with_context(|| "cannot render the PDF")?;
             write_atomic(output, rendered.bytes())?;
             Ok(Outcome::Rendered {
@@ -275,6 +329,25 @@ fn process(
             })
         }
     }
+}
+
+/// A document with confidential fields must be written outside its source tree.
+fn require_confidential_output(job: &Job) -> Result<()> {
+    let output = job
+        .output
+        .as_deref()
+        .context("the output path was not planned")?;
+    let directory = output
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+    if confidential::is_within(job.input.root(), directory) {
+        anyhow::bail!(
+            "a document with confidential fields must be written outside its source tree; use --output with a directory outside {}",
+            job.input.root().display()
+        );
+    }
+    Ok(())
 }
 
 fn resolve_template(
@@ -304,7 +377,8 @@ fn label(painter: Painter, style: Style, text: &str) -> String {
     painter.render(style, &format!("{text:<6}"))
 }
 
-fn print_warning(painter: Painter, path: &Path, message: &str) {
+fn print_warning(painter: Painter, path: &Path, message: &str, store: &ConfidentialStore) {
+    let message = store.redact(message);
     eprintln!(
         "  {} {}: {message}",
         label(painter, Style::Warning, "warn"),
@@ -312,7 +386,8 @@ fn print_warning(painter: Painter, path: &Path, message: &str) {
     );
 }
 
-fn print_failure(painter: Painter, path: &Path, message: &str) {
+fn print_failure(painter: Painter, path: &Path, message: &str, store: &ConfidentialStore) {
+    let message = store.redact(message);
     let mut lines = message.lines();
     if let Some(first) = lines.next() {
         eprintln!(
@@ -326,15 +401,27 @@ fn print_failure(painter: Painter, path: &Path, message: &str) {
     }
 }
 
-fn print_outcome(stdout: Painter, stderr: Painter, input: &Path, outcome: &Outcome) {
+fn print_outcome(
+    stdout: Painter,
+    stderr: Painter,
+    input: &Path,
+    outcome: &Outcome,
+    store: &ConfidentialStore,
+) {
     match outcome {
         Outcome::Checked {
             blocks,
             headings,
             template,
+            confidential,
         } => {
+            let fields = if confidential.is_empty() {
+                String::new()
+            } else {
+                format!(", confidential fields: {}", confidential.join(", "))
+            };
             println!(
-                "  {} {}: {blocks} blocks, {headings} headings, template {}",
+                "  {} {}: {blocks} blocks, {headings} headings, template {}{fields}",
                 label(stdout, Style::Info, "check"),
                 stdout.path(input),
                 stdout.render(Style::Italic, template)
@@ -349,7 +436,7 @@ fn print_outcome(stdout: Painter, stderr: Painter, input: &Path, outcome: &Outco
                 stdout.path(output)
             );
             for warning in warnings {
-                print_warning(stderr, input, warning);
+                print_warning(stderr, input, warning, store);
             }
         }
     }

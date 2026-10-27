@@ -32,11 +32,14 @@ cargo run -- assets/examples/
 cargo run -- --check assets/examples/
 cargo run -- --output /tmp/pageformer assets/examples/
 cargo run -- --check --color=never assets/examples/Contrato.md
+cargo run -- --confidential-file /tmp/values.env --output /tmp/pageformer documento.md
 ```
 
 The first command writes each PDF next to its Markdown and updates the versioned examples in `assets/examples/`. A file or a directory can be given; a directory is walked recursively and only `.md` files are read. Hidden directories and `target/` are skipped, and directory symlinks are not followed. A paragraph that contains only `{pagebreak}` starts a new page.
 
 `--output` writes under another directory; a directory input mirrors its relative tree there, while a direct file is written flat. `--check` parses the Markdown and validates the template without writing. A failure in one file does not stop the rest of the batch, and the exit code is `1` when any input fails.
+
+A `{NAME}` field in the body is a confidential field. Its value comes from a `PAGEFORMER_CONFIDENTIAL_NAME` environment variable or from a `NAME=value` file passed with `--confidential-file`; the file must sit outside the source tree and, on Unix, be readable only by its owner (`chmod 600`). A document with fields must be written with `--output` to a directory outside its source tree. `--check` lists the field names without their values, and unknown fields are errors.
 
 The terminal output uses color, bold and italic when the stream is a terminal. `--color=auto` is the default and respects `NO_COLOR` and `TERM=dumb`; use `--color=always` or `--color=never` to force or disable it.
 

@@ -40,6 +40,11 @@ impl InputFile {
         &self.path
     }
 
+    /// The source tree that discovered this file.
+    pub fn root(&self) -> &Path {
+        &self.root
+    }
+
     /// Computes the output path for this input.
     ///
     /// A directory root keeps the relative tree under the output directory; a

@@ -118,6 +118,8 @@ keywords:
 
 `subject` reaches the PDF document description and `keywords` reaches its keyword list. Both are optional and omitted from the PDF when absent.
 
+A confidential field such as `{NOME}` is not allowed in any frontmatter value; fields belong to the document body. See the confidentiality section in [`architecture.md`](architecture.md#confidentiality).
+
 The frontmatter `title` is document metadata. The visible title is the first-level heading, styled by `formatting.heading.h1`.
 
 ### `page`
@@ -143,7 +145,7 @@ Slots expand four lowercase tokens from the document metadata:
 | `{title}` | The frontmatter title, empty when absent |
 | `{author}` | The frontmatter author, empty when absent |
 
-Any other lowercase token, such as `{nome}`, is a template error, because a typo must not reach the page as literal text. Uppercase tokens such as `{NAME}` stay literal here and are reserved for body secrets. Braces that do not form a lowercase token stay literal text.
+Any other lowercase token, such as `{nome}`, is a template error, because a typo must not reach the page as literal text. An uppercase token such as `{NOME}` is a confidential field and is also a template error: fields are resolved only in the document body. Braces that do not form a token stay literal text.
 
 The header and footer use the paragraph face. Their content sits inside the top and bottom margins, so a letterhead that already fills those margins needs no running content.
 
@@ -227,4 +229,4 @@ To use the same settings elsewhere, copy the file to the document directory as `
 
 ## Errors
 
-The template is validated before any document is rendered. A YAML syntax error, an unknown key, an unsupported version, a rejected weight, an unknown style, an invalid color, an unknown lowercase running token, a negative spacing or a missing font family all stop the run with a diagnostic. The YAML parser reports the line and the column, and the loader adds the template path.
+The template is validated before any document is rendered. A YAML syntax error, an unknown key, an unsupported version, a rejected weight, an unknown style, an invalid color, an unknown lowercase running token, a confidential field in running content, a negative spacing or a missing font family all stop the run with a diagnostic. The YAML parser reports the line and the column, and the loader adds the template path.

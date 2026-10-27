@@ -10,7 +10,7 @@ flowchart TD
     Resolver --> Template[Typed template]
     AST --> Render[Render model]
     Template --> Render
-    Secrets[Secret values] --> Render
+    Confidential[Confidential values] --> Render
     Render --> PDF[PDF]
     Render --> ODT[ODT]
     Render --> DOCX[DOCX]
@@ -33,7 +33,7 @@ A loose ordered list whose items are one paragraph each becomes a sequence of nu
 
 ### Inline contract
 
-The inline model covers every construct of that subset: text, code spans, emphasis, strong, strikethrough with single or double tildes, links (inline, reference and angle autolinks), images, soft and hard breaks, entities, escapes and footnote references. Each one has a source-generation test and a rendering test. Extensions outside the contract stay literal text: `==highlight==`, `^superscript^` and `$math$` are not enabled, because the Zed preview does not render them either. Inline HTML is rejected, and smart punctuation is not enabled because it would rewrite quotes and dashes in a legal document.
+The inline model covers every construct of that subset: text, code spans, emphasis, strong, strikethrough with single or double tildes, links (inline, reference and angle autolinks), images, soft and hard breaks, entities, escapes and footnote references. Each one has a source-generation test and a rendering test. Extensions outside the contract stay literal text: `==highlight==`, `^superscript^` and `$math$` are not enabled, because the Zed preview does not render them either. Superscript and subscript are deferred until after 1.0.0, since `~x~` is strikethrough today. Inline HTML is rejected, and smart punctuation is not enabled because it would rewrite quotes and dashes in a legal document.
 
 ## Crate layout
 
@@ -61,27 +61,29 @@ Paths inside the template, such as the letterhead image or a font file, resolve 
 
 ## Output
 
-Without secrets, the output is written next to the Markdown source, with the same name and the new extension. `--output` selects another directory, and the program creates it when missing. Writes are atomic: the bytes go to a temporary file in the destination directory and are renamed into place.
+Without confidential fields, the output is written next to the Markdown source, with the same name and the new extension. `--output` selects another directory, and the program creates it when missing. Writes are atomic: the bytes go to a temporary file in the destination directory and are renamed into place.
 
 An input may be a file or a directory. A directory is walked recursively in path order; only `.md` files are read, hidden directories and `target/` are skipped, and directory symlinks are not followed. A file reached from more than one input is processed once, under the first input that found it. With `--output`, a directory input mirrors its relative tree under the destination, while a direct file is written flat. Two inputs that would write the same output are an error, never a silent overwrite.
 
-With secrets, the output must be written to a directory outside the source tree, given explicitly; the program refuses to write a secret-bearing document next to its sources. Secrets are not implemented yet.
+With confidential fields, the output must be written to a directory outside the source tree, given explicitly; the program refuses to write such a document next to its sources.
 
 ## Terminal output
 
 Results go to stdout; warnings and errors go to stderr. When the stream is a terminal, labels and paths use ANSI color, bold and italic, and results are separated by a blank line. `--color=auto` is the default and respects `NO_COLOR` and `TERM=dumb`; `--color=always` and `--color=never` force or disable it. The styling is presentation only and never changes the exit code or the generated files.
 
-## Secrets
+## Confidentiality
 
 Placeholders use the form `{NAME}` in the document body, with an uppercase name such as `{NOME_COMPLETO}`. Single braces are literal text in CommonMark, so both the parser and the Zed preview keep them intact. The angle-bracket form is rejected because `<NAME>` is parsed as inline HTML.
 
-Every token that matches `{[A-Z][A-Z0-9_]*}` is reserved for a secret. An unknown placeholder is a fatal error, never text left in the final document. The pattern does not apply inside code spans, code blocks or URLs, where the text is reproduced literally. A lowercase or spaced brace, such as `{nome}`, is ordinary text; the only exception is `{pagebreak}` alone in a paragraph, which is a page break.
+Every token that matches `{[A-Z][A-Z0-9_]*}` is reserved for a confidential field. An unknown placeholder is a fatal error, never text left in the final document. The pattern does not apply inside code spans, code blocks, link destinations, link titles, image destinations or URLs, where the text is reproduced literally. A lowercase or spaced brace, such as `{nome}`, is ordinary text; the only exception is `{pagebreak}` alone in a paragraph, which is a page break. A substituted value is inserted once and never scanned again. A field must stay within one text run: inline formatting or a line break inside the name splits it, and the parts stay literal text.
 
-Placeholders are resolved only in body content. One found in frontmatter metadata is an error, because secret values must never reach the PDF XMP package, the DOCX core properties or the ODT metadata.
+Placeholders are resolved only in body content. One found in frontmatter metadata is an error, because confidential values must never reach the PDF XMP package, the DOCX core properties or the ODT metadata. Running header and footer slots are template content, so an uppercase token there is a template error instead of literal text.
 
-Secret values are loaded from a file outside the source tree, or from the environment, and are never accepted as command-line arguments. They are redacted from debug output and error messages and never printed to the console. A `--check` run reports placeholder names only.
+Values come from the environment and from a file, never from a command-line argument. Environment variables use the `PAGEFORMER_CONFIDENTIAL_` prefix, such as `PAGEFORMER_CONFIDENTIAL_NOME`. The file is named with `--confidential-file`, resolves outside every source tree, and must not be readable by group or others on Unix; the file must use `chmod 600`. The file format is plain `NAME=value`, one per line, with `#` comments and blank lines ignored, no shell evaluation, a duplicate name rejected and the value kept exactly after the first `=`. The file overrides the environment.
 
-Metadata comes from the frontmatter only. The template carries no document metadata, so one template serves many documents. The document model replaces placeholders at render time, after parsing and before a backend sees the content.
+The document model resolves the placeholders after parsing and before asset loading, and returns a new document plus the names that were found. Every backend receives only final text and never the store. A `--check` run reports the field names only. Values are redacted from warnings and errors before they reach the terminal.
+
+Metadata comes from the frontmatter only. The template carries no document metadata, so one template serves many documents.
 
 ## Formats
 
@@ -107,7 +109,7 @@ User text is escaped for Typst markup (`\`, `#`, `$`, `*`, `_`, `` ` ``, bracket
 
 Embedded fonts are loaded before system fonts, so Libertinus Serif is always available as the last family in the default list. This keeps the binary self-contained, while a template can still prefer system fonts.
 
-Running header and footer slots expand the lowercase tokens `{page}`, `{pages}`, `{title}` and `{author}`; any other lowercase token is a template error, and an uppercase token stays literal until the secret phase. The backend emits an explicit heading rule for each level, applies the inline emphasis and strong faces, uses Typst's default list styles, draws the configured table grid and header fill and emits `#pagebreak()` for a page-break block.
+Running header and footer slots expand the lowercase tokens `{page}`, `{pages}`, `{title}` and `{author}`; any other lowercase token is a template error, and an uppercase confidential field is a template error too. The backend emits an explicit heading rule for each level, applies the inline emphasis and strong faces, uses Typst's default list styles, draws the configured table grid and header fill and emits `#pagebreak()` for a page-break block.
 
 ### Spike results
 
@@ -142,10 +144,9 @@ The fixtures are in `assets/examples/`: `Contrato.md` with `Contrato.pdf` and `E
 
 ## Editor support
 
-The document syntax stays plain Markdown so the Zed preview renders it without a plugin. Zed highlights standard Markdown constructs and injects languages into code fences, but it has no rule for the project's `{pagebreak}` or `{SECRET}` tokens. No widely adopted free Markdown extension closes that gap: Pandoc and markdown-it containers (`::: pagebreak`) and CriticMarkup annotations (`{>> ... <<}`) are not highlighted by Zed either, and HTML comments would only suit block markers, not inline secrets. The tokens stay plain text in the editor; highlighting would need a dedicated Zed language extension with its own file type, or an upstream grammar change. Correctness never depends on an editor feature.
+The document syntax stays plain Markdown so the Zed preview renders it without a plugin. Zed highlights standard Markdown constructs and injects languages into code fences, but it has no rule for the project's `{pagebreak}` or `{NOME}` tokens. No widely adopted free Markdown extension closes that gap: Pandoc and markdown-it containers (`::: pagebreak`) and CriticMarkup annotations (`{>> ... <<}`) are not highlighted by Zed either, and HTML comments would only suit block markers, not inline confidential fields. The tokens stay plain text in the editor; highlighting would need a dedicated Zed language extension with its own file type, or an upstream grammar change. Correctness never depends on an editor feature.
 
 ## Open decisions
 
 - ODT implementation: a native ODF writer or another path.
 - DOCX library choice and the shared document model for reflowable formats.
-- Secret file format and permission checks.

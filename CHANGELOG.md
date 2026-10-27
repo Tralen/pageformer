@@ -4,6 +4,16 @@
 
 *Major updates and feature releases.*
 
+### 0.13.0
+
+- Renamed the secrets phase to confidentiality and implemented it. A `{NAME}` in the body is a confidential field.
+- Added `--confidential-file`, a `NAME=value` file outside the source tree with `0600` permissions on Unix; the file overrides the `PAGEFORMER_CONFIDENTIAL_<NAME>` environment variables.
+- Added the document model resolution: text placeholders are substituted once, code spans and blocks, destinations, titles and frontmatter are excluded, and an unknown field is fatal.
+- A document with confidential fields requires `--output` outside its source tree; `--check` lists names only.
+- Known values are redacted from warnings and errors before stderr.
+- A confidential field in frontmatter or in running header and footer content is now an error.
+- Superscript and subscript are deferred until after 1.0.0; the roadmap records the decision.
+
 ### 0.12.1
 
 - Added tests for every inline construct: reference links, angle autolinks, entities, escapes, single and double tilde strikethrough, and a rendering test with every inline variant.

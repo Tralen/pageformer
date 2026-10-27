@@ -197,6 +197,10 @@ pub enum TemplateError {
         field: String,
         token: String,
     },
+    ConfidentialToken {
+        field: String,
+        token: String,
+    },
 }
 
 impl fmt::Display for TemplateError {
@@ -214,6 +218,10 @@ impl fmt::Display for TemplateError {
                 formatter,
                 "unknown token `{{{token}}}` in `{field}`; use {{page}}, {{pages}}, {{title}} or {{author}}"
             ),
+            Self::ConfidentialToken { field, token } => write!(
+                formatter,
+                "confidential field `{{{token}}}` is not resolved in `{field}`; running content accepts only {{page}}, {{pages}}, {{title}} and {{author}}"
+            ),
         }
     }
 }
@@ -224,7 +232,8 @@ impl std::error::Error for TemplateError {
             Self::Yaml { .. }
             | Self::UnsupportedVersion { .. }
             | Self::Value { .. }
-            | Self::UnknownToken { .. } => None,
+            | Self::UnknownToken { .. }
+            | Self::ConfidentialToken { .. } => None,
         }
     }
 }
@@ -704,6 +713,12 @@ fn validate_running_text(text: &str, field: &str) -> Result<(), TemplateError> {
         let token = after.get(..end).unwrap_or_default();
         if is_lowercase_token(token) && !RUNNING_TOKENS.contains(&token) {
             return Err(TemplateError::UnknownToken {
+                field: field.to_owned(),
+                token: token.to_owned(),
+            });
+        }
+        if crate::confidential::ConfidentialName::parse(token).is_some() {
+            return Err(TemplateError::ConfidentialToken {
                 field: field.to_owned(),
                 token: token.to_owned(),
             });

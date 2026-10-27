@@ -43,6 +43,261 @@ fn write_markdown(path: &Path, title: &str) {
     fs::write(path, format!("# {title}\n\nText.\n")).expect("the Markdown must be written");
 }
 
+fn write_private(path: &Path, contents: &str) {
+    fs::write(path, contents).expect("the confidential file must be written");
+    make_private(path);
+}
+
+#[cfg(unix)]
+fn make_private(path: &Path) {
+    use std::os::unix::fs::PermissionsExt;
+
+    fs::set_permissions(path, fs::Permissions::from_mode(0o600))
+        .expect("the permissions must change");
+}
+
+#[cfg(not(unix))]
+fn make_private(_path: &Path) {}
+
+fn run_with_environment(arguments: &[&OsStr], variables: &[(&str, &str)]) -> Output {
+    let mut command = Command::new(binary());
+    command.args(arguments);
+    for (key, value) in variables {
+        command.env(key, value);
+    }
+    command.output().expect("the binary must run")
+}
+
+fn confidential_project() -> (TempDir, TempDir, PathBuf) {
+    let project = TempDir::new().expect("a temporary project");
+    let source = TempDir::new().expect("a temporary source");
+    let values = project.path().join("values.env");
+    write_private(&values, "NOME=Fulano de Tal\nCPF=000.000.000-00\n");
+    fs::write(
+        source.path().join("Doc.md"),
+        "---\ntitle: Documento\nlanguage: pt-BR\n---\n\n# Documento\n\nNome: {NOME}; CPF: {CPF}.\n",
+    )
+    .expect("the document must be written");
+    (project, source, values)
+}
+
+#[test]
+fn a_confidential_check_lists_names_only() {
+    let (project, source, values) = confidential_project();
+    let _project = project;
+    let output = run(&[
+        OsStr::new("--check"),
+        OsStr::new("--color=never"),
+        OsStr::new("--confidential-file"),
+        values.as_os_str(),
+        source.path().join("Doc.md").as_os_str(),
+    ]);
+    assert!(output.status.success(), "{}", stderr(&output));
+    let report = stdout(&output);
+    assert!(
+        report.contains("confidential fields: CPF, NOME"),
+        "{report}"
+    );
+    assert!(!report.contains("Fulano"), "{report}");
+    assert!(!stderr(&output).contains("Fulano"), "{}", stderr(&output));
+}
+
+#[test]
+fn an_unknown_confidential_field_names_the_field_and_location() {
+    let (project, source, values) = confidential_project();
+    let _project = project;
+    fs::write(
+        source.path().join("Doc.md"),
+        "# Documento\n\nNome: {DESCONHECIDO}.\n",
+    )
+    .expect("the document must be written");
+    let output = run(&[
+        OsStr::new("--check"),
+        OsStr::new("--color=never"),
+        OsStr::new("--confidential-file"),
+        values.as_os_str(),
+        source.path().join("Doc.md").as_os_str(),
+    ]);
+    assert!(!output.status.success());
+    let errors = stderr(&output);
+    assert!(errors.contains("{DESCONHECIDO}"), "{errors}");
+    assert!(errors.contains("block 2"), "{errors}");
+    assert!(!errors.contains("Fulano"), "{errors}");
+}
+
+#[test]
+fn a_confidential_document_requires_an_output_outside_the_source_tree() {
+    let (project, source, values) = confidential_project();
+    let document = source.path().join("Doc.md");
+
+    let default_output = run(&[
+        OsStr::new("--color=never"),
+        OsStr::new("--confidential-file"),
+        values.as_os_str(),
+        document.as_os_str(),
+    ]);
+    assert!(!default_output.status.success());
+    assert!(
+        stderr(&default_output).contains("must be written outside its source tree"),
+        "{}",
+        stderr(&default_output)
+    );
+
+    let inside = run(&[
+        OsStr::new("--color=never"),
+        OsStr::new("--confidential-file"),
+        values.as_os_str(),
+        OsStr::new("--output"),
+        source.path().join("out").as_os_str(),
+        document.as_os_str(),
+    ]);
+    assert!(!inside.status.success());
+    assert!(
+        stderr(&inside).contains("must be written outside its source tree"),
+        "{}",
+        stderr(&inside)
+    );
+
+    fs::create_dir_all(source.path().join("nested")).expect("the nested directory must exist");
+    let escape = run(&[
+        OsStr::new("--color=never"),
+        OsStr::new("--confidential-file"),
+        values.as_os_str(),
+        OsStr::new("--output"),
+        source
+            .path()
+            .join("nested")
+            .join("..")
+            .join("out")
+            .as_os_str(),
+        document.as_os_str(),
+    ]);
+    assert!(!escape.status.success());
+
+    let output_directory = project.path().join("output");
+    let success = run(&[
+        OsStr::new("--color=never"),
+        OsStr::new("--confidential-file"),
+        values.as_os_str(),
+        OsStr::new("--output"),
+        output_directory.as_os_str(),
+        document.as_os_str(),
+    ]);
+    assert!(success.status.success(), "{}", stderr(&success));
+    let pdf = output_directory.join("Doc.pdf");
+    let bytes = fs::read(&pdf).expect("the PDF must exist");
+    assert!(bytes.starts_with(b"%PDF-"));
+    let text = String::from_utf8_lossy(&bytes);
+    let metadata = text
+        .split_once("<x:xmpmeta")
+        .and_then(|(_, rest)| rest.split_once("</x:xmpmeta>"))
+        .map(|(packet, _)| packet)
+        .unwrap_or_default();
+    assert!(
+        !metadata.contains("Fulano"),
+        "the value reached the XMP metadata"
+    );
+    assert!(!stdout(&success).contains("Fulano"), "{}", stdout(&success));
+    assert!(!stderr(&success).contains("Fulano"), "{}", stderr(&success));
+}
+
+#[test]
+fn a_confidential_directory_input_needs_an_output_outside_the_tree() {
+    let project = TempDir::new().expect("a temporary project");
+    let source = TempDir::new().expect("a temporary source");
+    fs::write(source.path().join("Doc.md"), "# Doc\n\n{NOME}.\n")
+        .expect("the document must be written");
+    let values = project.path().join("values.env");
+    write_private(&values, "NOME=Fulano\n");
+
+    let output = run(&[
+        OsStr::new("--color=never"),
+        OsStr::new("--confidential-file"),
+        values.as_os_str(),
+        OsStr::new("--output"),
+        source.path().join("out").as_os_str(),
+        source.path().as_os_str(),
+    ]);
+    assert!(!output.status.success());
+    assert!(
+        stderr(&output).contains("must be written outside its source tree"),
+        "{}",
+        stderr(&output)
+    );
+}
+
+#[test]
+fn a_confidential_file_inside_the_source_tree_is_rejected() {
+    let source = TempDir::new().expect("a source");
+    let values = source.path().join("values.env");
+    write_private(&values, "NOME=Fulano\n");
+    write_markdown(&source.path().join("Doc.md"), "Doc");
+    let output = run(&[
+        OsStr::new("--check"),
+        OsStr::new("--color=never"),
+        OsStr::new("--confidential-file"),
+        values.as_os_str(),
+        source.path().join("Doc.md").as_os_str(),
+    ]);
+    assert!(!output.status.success());
+    assert!(
+        stderr(&output).contains("is inside the source tree"),
+        "{}",
+        stderr(&output)
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn a_readable_confidential_file_is_rejected() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let project = TempDir::new().expect("a project");
+    let values = project.path().join("values.env");
+    fs::write(&values, "NOME=Fulano\n").expect("the file must be written");
+    fs::set_permissions(&values, fs::Permissions::from_mode(0o644))
+        .expect("the permissions must change");
+    let output = run(&[
+        OsStr::new("--check"),
+        OsStr::new("--color=never"),
+        OsStr::new("--confidential-file"),
+        values.as_os_str(),
+        fixture("Contrato.md").as_os_str(),
+    ]);
+    assert!(!output.status.success());
+    assert!(stderr(&output).contains("chmod 600"), "{}", stderr(&output));
+}
+
+#[test]
+fn confidential_values_can_come_from_the_environment() {
+    let source = TempDir::new().expect("a source");
+    fs::write(
+        source.path().join("Doc.md"),
+        "# Documento\n\nValor: {TEST_FIELD}.\n",
+    )
+    .expect("the document must be written");
+    let output = run_with_environment(
+        &[
+            OsStr::new("--check"),
+            OsStr::new("--color=never"),
+            source.path().join("Doc.md").as_os_str(),
+        ],
+        &[("PAGEFORMER_CONFIDENTIAL_TEST_FIELD", "Do ambiente")],
+    );
+    assert!(output.status.success(), "{}", stderr(&output));
+    let report = stdout(&output);
+    assert!(
+        report.contains("confidential fields: TEST_FIELD"),
+        "{report}"
+    );
+    assert!(!report.contains("Do ambiente"), "{report}");
+    assert!(
+        !stderr(&output).contains("Do ambiente"),
+        "{}",
+        stderr(&output)
+    );
+}
+
 #[test]
 fn the_contract_fixture_passes_the_pipeline_check() {
     let output = run(&[OsStr::new("--check"), fixture("Contrato.md").as_os_str()]);

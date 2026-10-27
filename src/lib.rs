@@ -6,6 +6,7 @@
 
 #![forbid(unsafe_code)]
 
+pub mod confidential;
 pub mod document;
 pub mod markdown;
 pub mod pdf;

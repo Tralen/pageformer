@@ -56,6 +56,7 @@ fn a_minimal_template_uses_the_documented_defaults() {
     assert_eq!(heading[1].face().size().points(), 14.0);
     assert_eq!(heading[2].face().size().points(), 12.0);
     assert_eq!(heading[0].face().weight(), FontWeight::BOLD);
+    assert!(!heading[0].page_break_before());
 }
 
 #[test]
@@ -100,6 +101,7 @@ formatting:
     h1:
       size: 22
       weight: bold
+      page_break_before: true
     h2:
       spacing_before: 10
 "#,
@@ -132,11 +134,13 @@ formatting:
     assert_eq!(heading[0].face().slant(), FontSlant::Italic);
     assert_eq!(heading[0].spacing_before().points(), 14.0);
     assert_eq!(heading[0].spacing_after().points(), 5.0);
+    assert!(heading[0].page_break_before());
 
     assert_eq!(heading[1].face().size().points(), 20.0);
     assert_eq!(heading[1].face().weight(), FontWeight::NORMAL);
     assert_eq!(heading[1].spacing_before().points(), 10.0);
     assert_eq!(heading[1].spacing_after().points(), 5.0);
+    assert!(!heading[1].page_break_before());
 
     assert_eq!(heading[2].face().size().points(), 20.0);
     assert_eq!(heading[2].face().weight(), FontWeight::NORMAL);
@@ -485,6 +489,34 @@ fn an_invalid_color_is_rejected() {
         let error = Template::from_yaml(yaml).expect_err("an invalid color");
         assert!(matches!(error, TemplateError::Value { .. }), "{yaml}");
     }
+}
+
+#[test]
+fn a_heading_page_break_can_be_inherited_or_overridden() {
+    let base = parse(
+        "version: \"0.5\"\nformatting:\n  heading:\n    page_break_before: true\n    h3:\n      page_break_before: false\n",
+    );
+    let levels = base.formatting().heading().levels();
+    assert!(levels[0].page_break_before());
+    assert!(levels[1].page_break_before());
+    assert!(!levels[2].page_break_before());
+    assert!(levels[5].page_break_before());
+
+    let level = parse(
+        "version: \"0.5\"\nformatting:\n  heading:\n    h2:\n      page_break_before: true\n",
+    );
+    let levels = level.formatting().heading().levels();
+    assert!(!levels[0].page_break_before());
+    assert!(levels[1].page_break_before());
+}
+
+#[test]
+fn an_unknown_heading_key_is_rejected_with_page_breaks() {
+    let error = Template::from_yaml(
+        "version: \"0.5\"\nformatting:\n  heading:\n    h1:\n      page_break: true\n",
+    )
+    .expect_err("the key is not supported");
+    assert!(matches!(error, TemplateError::Yaml { .. }));
 }
 
 #[test]

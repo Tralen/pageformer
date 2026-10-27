@@ -887,14 +887,21 @@ pub struct HeadingStyle {
     face: TextFace,
     spacing_before: Length,
     spacing_after: Length,
+    page_break_before: bool,
 }
 
 impl HeadingStyle {
-    pub fn new(face: TextFace, spacing_before: Length, spacing_after: Length) -> Self {
+    pub fn new(
+        face: TextFace,
+        spacing_before: Length,
+        spacing_after: Length,
+        page_break_before: bool,
+    ) -> Self {
         Self {
             face,
             spacing_before,
             spacing_after,
+            page_break_before,
         }
     }
 
@@ -908,6 +915,10 @@ impl HeadingStyle {
 
     pub fn spacing_after(&self) -> Length {
         self.spacing_after
+    }
+
+    pub fn page_break_before(&self) -> bool {
+        self.page_break_before
     }
 }
 
@@ -1058,6 +1069,7 @@ struct RawHeading {
     style: Option<FontSlant>,
     spacing_before: Option<String>,
     spacing_after: Option<String>,
+    page_break_before: Option<bool>,
     h1: Option<RawHeadingLevel>,
     h2: Option<RawHeadingLevel>,
     h3: Option<RawHeadingLevel>,
@@ -1075,6 +1087,7 @@ struct RawHeadingLevel {
     style: Option<FontSlant>,
     spacing_before: Option<String>,
     spacing_after: Option<String>,
+    page_break_before: Option<bool>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -1266,6 +1279,7 @@ fn convert_headings(raw: RawHeading) -> Result<HeadingStyles, TemplateError> {
         style,
         spacing_before,
         spacing_after,
+        page_break_before,
         h1,
         h2,
         h3,
@@ -1274,12 +1288,15 @@ fn convert_headings(raw: RawHeading) -> Result<HeadingStyles, TemplateError> {
         h6,
     } = raw;
     let base = HeadingOverrides::parse(
-        font_families,
-        size,
-        weight,
-        style,
-        spacing_before,
-        spacing_after,
+        RawHeadingOverrides {
+            font_families,
+            size,
+            weight,
+            style,
+            spacing_before,
+            spacing_after,
+            page_break_before,
+        },
         "formatting.heading",
     )?;
     let raw_levels = [h1, h2, h3, h4, h5, h6];
@@ -1288,12 +1305,15 @@ fn convert_headings(raw: RawHeading) -> Result<HeadingStyles, TemplateError> {
         if let Some(raw_level) = raw_level {
             let prefix = format!("formatting.heading.h{}", index + 1);
             overrides[index] = Some(HeadingOverrides::parse(
-                raw_level.font_families,
-                raw_level.size,
-                raw_level.weight,
-                raw_level.style,
-                raw_level.spacing_before,
-                raw_level.spacing_after,
+                RawHeadingOverrides {
+                    font_families: raw_level.font_families,
+                    size: raw_level.size,
+                    weight: raw_level.weight,
+                    style: raw_level.style,
+                    spacing_before: raw_level.spacing_before,
+                    spacing_after: raw_level.spacing_after,
+                    page_break_before: raw_level.page_break_before,
+                },
                 &prefix,
             )?);
         }
@@ -1310,6 +1330,17 @@ fn convert_headings(raw: RawHeading) -> Result<HeadingStyles, TemplateError> {
 }
 
 #[derive(Debug, Default)]
+struct RawHeadingOverrides {
+    font_families: Option<Vec<String>>,
+    size: Option<String>,
+    weight: Option<String>,
+    style: Option<FontSlant>,
+    spacing_before: Option<String>,
+    spacing_after: Option<String>,
+    page_break_before: Option<bool>,
+}
+
+#[derive(Debug, Default)]
 struct HeadingOverrides {
     font_families: Option<Vec<FontFamily>>,
     size: Option<Length>,
@@ -1317,18 +1348,20 @@ struct HeadingOverrides {
     slant: Option<FontSlant>,
     spacing_before: Option<Length>,
     spacing_after: Option<Length>,
+    page_break_before: Option<bool>,
 }
 
 impl HeadingOverrides {
-    fn parse(
-        font_families: Option<Vec<String>>,
-        size: Option<String>,
-        weight: Option<String>,
-        slant: Option<FontSlant>,
-        spacing_before: Option<String>,
-        spacing_after: Option<String>,
-        prefix: &str,
-    ) -> Result<Self, TemplateError> {
+    fn parse(raw: RawHeadingOverrides, prefix: &str) -> Result<Self, TemplateError> {
+        let RawHeadingOverrides {
+            font_families,
+            size,
+            weight,
+            style: slant,
+            spacing_before,
+            spacing_after,
+            page_break_before,
+        } = raw;
         let size = size
             .map(|text| parse_length_field(&text, &format!("{prefix}.size")))
             .transpose()?;
@@ -1352,6 +1385,7 @@ impl HeadingOverrides {
             spacing_after: spacing_after
                 .map(|text| parse_length_field(&text, &format!("{prefix}.spacing_after")))
                 .transpose()?,
+            page_break_before,
         })
     }
 
@@ -1373,6 +1407,9 @@ impl HeadingOverrides {
         }
         if let Some(after) = self.spacing_after {
             style.spacing_after = after;
+        }
+        if let Some(page_break_before) = self.page_break_before {
+            style.page_break_before = page_break_before;
         }
     }
 }
@@ -1468,6 +1505,7 @@ fn default_heading_style(level: usize) -> HeadingStyle {
         },
         Length(HEADING_SPACING_BEFORE[index]),
         Length(HEADING_SPACING_AFTER[index]),
+        false,
     )
 }
 

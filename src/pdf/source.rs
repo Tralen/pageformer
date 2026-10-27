@@ -286,6 +286,12 @@ impl<'a> SourceBuilder<'a> {
                 typst_length(style.spacing_before()),
                 typst_length(style.spacing_after())
             );
+            if style.page_break_before() {
+                let _ = writeln!(
+                    self.output,
+                    "#show heading.where(level: {level}): it => {{\n  pagebreak(weak: true)\n  it\n}}"
+                );
+            }
         }
         self.output.push('\n');
     }
@@ -1133,6 +1139,32 @@ mod tests {
             "{source}"
         );
         assert!(source.contains("#heading(level: 1)[Contrato]"), "{source}");
+    }
+
+    #[test]
+    fn a_heading_page_break_emits_a_weak_page_break_rule() {
+        let document = Document::new(Metadata::default(), Vec::new());
+        let default_source = source(&document, &AssetMap::new());
+        assert!(
+            !default_source.contains("pagebreak(weak: true)"),
+            "{default_source}"
+        );
+
+        let template = Template::from_yaml(
+            "version: \"0.5\"\nformatting:\n  heading:\n    h1:\n      page_break_before: true\n",
+        )
+        .expect("the template");
+        let source = typst_source(&document, &template, &AssetMap::new()).expect("the source");
+        assert!(
+            source.contains(
+                "#show heading.where(level: 1): it => {\n  pagebreak(weak: true)\n  it\n}"
+            ),
+            "{source}"
+        );
+        assert!(
+            !source.contains("#show heading.where(level: 2): it =>"),
+            "{source}"
+        );
     }
 
     #[test]

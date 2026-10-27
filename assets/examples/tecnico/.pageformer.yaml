@@ -41,6 +41,7 @@ formatting:
       size: 18
       spacing_before: 0
       spacing_after: 12
+      page_break_before: true
     h2:
       size: 14
       spacing_before: 16

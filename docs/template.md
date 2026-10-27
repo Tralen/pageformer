@@ -170,6 +170,7 @@ The `heading` map is the base for every heading level:
 - `weight`: the base weight. The default is `bold`.
 - `style`: `normal` or `italic`. The default is `normal`.
 - `spacing_before` and `spacing_after`: lengths around the heading. They apply to every level that does not override them.
+- `page_break_before`: `true` starts the level on a new page. The break is weak: a heading already at the top of a page does not create a blank page. The default is `false`.
 
 The `h1` to `h6` maps are optional overrides with the same keys. Only declared keys replace the base values. The default sizes are `18pt` for `h1`, `14pt` for `h2` and `12pt` for `h3` to `h6`; the default spacing is 18/6 for `h1`, 12/4 for `h2`, 10/4 for `h3` and 8/2 for `h4` to `h6`.
 
@@ -206,7 +207,7 @@ Images in the Markdown body resolve relative to the Markdown file, not to the te
 
 ## Current backend
 
-The PDF backend applies the paragraph face, leading, spacing and alignment. It emits one show rule per heading level with the resolved font, size, weight, style and spacing, and show rules for `emph` and `strong` from the inline overrides. It draws the running header and footer, expands their tokens, applies the table style and explicit page breaks, and writes the frontmatter title, author, subject, keywords, language and date into the PDF metadata.
+The PDF backend applies the paragraph face, leading, spacing and alignment. It emits one show rule per heading level with the resolved font, size, weight, style and spacing, and show rules for `emph` and `strong` from the inline overrides. A level with `page_break_before` also gets a weak page-break show rule. The backend draws the running header and footer, expands their tokens, applies the table style and explicit page breaks, and writes the frontmatter title, author, subject, keywords, language and date into the PDF metadata.
 
 ## Example
 

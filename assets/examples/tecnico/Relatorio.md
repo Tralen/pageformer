@@ -33,6 +33,10 @@ O bloco seguinte força uma quebra de página explícita antes do anexo. Sem o m
 
 {pagebreak}
 
-## Anexo
+# Anexo
 
 O anexo começa em uma página nova por causa do parágrafo que contém apenas o marcador de quebra de página. Qualquer outra ocorrência, como {pagebreak} nesta frase, permanece texto comum.
+
+# Apêndice
+
+Este apêndice começa em uma página nova por causa de `page_break_before` no nível 1 do template, sem nenhum marcador no texto. A quebra é fraca, então não cria uma página vazia quando o título já está no topo.

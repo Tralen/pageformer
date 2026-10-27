@@ -4,6 +4,12 @@
 
 *Major updates and feature releases.*
 
+### 0.12.0
+
+- Added `page_break_before` to `formatting.heading` and to the `h1` to `h6` overrides. The break is weak, so a heading already at the top of a page does not create a blank page.
+- Closed phase 2 of the roadmap. Typst already avoids widows and orphans, so no template field is exposed; PDF/A-2b remains the declared profile, since PDF/A-2u would only change the conformance identifier without a user need.
+- The technical example starts each first-level heading on a new page; regenerated its PDF.
+
 ### 0.11.0
 
 - Breaking: the explicit page-break marker is `{pagebreak}` instead of `\pagebreak`. The backslash form is now ordinary text.

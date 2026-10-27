@@ -7,7 +7,7 @@ Pageformer reaches 1.0.0 through ten phases, in the order below. The order is a 
 | Phase | Scope | Status | Starts after |
 |---|---|---|---|
 | 1. CLI | Input discovery, format selection, output rules | Done in 0.6.0: files and directories, path-ordered batches, mirrored output, ANSI styling | 0.5.0 |
-| 2. PDF | Primary output and reference backend | In progress in 0.10.0: running header and footer with tokens, explicit page breaks, table styling and the frontmatter `date`, `subject` and `keywords`; per-level page starts, widow/orphan fields and the PDF/A-2u decision remain | CLI output rules |
+| 2. PDF | Primary output and reference backend | Done in 0.12.0: running header and footer with tokens, explicit page breaks, per-level page starts, table styling and the frontmatter `date`, `subject` and `keywords`; PDF/A-2b stays the declared profile | CLI output rules |
 | 3. Secrets | Placeholder resolution and leak prevention | Design only | PDF pipeline |
 | 4. TXT | Plain-text view and the renderer boundary | Not started | Secrets |
 | 5. ODT | Second-priority paged format | Not started | Renderer boundary |
@@ -85,7 +85,7 @@ A phase is closed only when all of the following hold:
 
 **Current state.** PDF/A-2b through Typst 0.15.1, page size, orientation, margins, letterhead, body and title styles, leading, paragraph spacing, header spacing, alignment, local images, headings, lists, tables, quotes, code, footnotes, embedded fonts and a fixed document date.
 
-**Status.** Started in 0.7.0 and expanded in 0.9.0 with schema 0.5, `formatting.paragraph`, `formatting.heading` with `h1` to `h6`, weight, style, inline emphasis and strong overrides, point lengths and a length-based leading. In 0.10.0 the optional `page.header`, `page.footer` and `table` sections, the `Block::PageBreak` model block and the frontmatter `date`, `subject` and `keywords` landed inside schema 0.5, because omitting them preserves the output of an existing template. The examples demonstrate them in 0.10.1: the shared template adds a page-number header clear of the letterhead, and the nested `tecnico/` example uses its own template without a letterhead to show the full header, footer, table style and page break. In 0.11.0 the page-break marker became `{pagebreak}`, because braces are ordinary text to CommonMark and to the Zed preview and the name says what it does; the old backslash form stays literal text. The rest of the list below remains.
+**Status.** Started in 0.7.0 and expanded in 0.9.0 with schema 0.5, `formatting.paragraph`, `formatting.heading` with `h1` to `h6`, weight, style, inline emphasis and strong overrides, point lengths and a length-based leading. In 0.10.0 the optional `page.header`, `page.footer` and `table` sections, the `Block::PageBreak` model block and the frontmatter `date`, `subject` and `keywords` landed inside schema 0.5, because omitting them preserves the output of an existing template. The examples demonstrate them in 0.10.1: the shared template adds a page-number header clear of the letterhead, and the nested `tecnico/` example uses its own template without a letterhead to show the full header, footer, table style and page break. In 0.11.0 the page-break marker became `{pagebreak}`. Phase 2 closed in 0.12.0 with `page_break_before` per heading level, a weak break that does not create a blank page. Typst already avoids widows and orphans through its paragraph costs, so no field is exposed, and PDF/A-2u is not declared: veraPDF reports only the conformance identifier for 2u when the file declares B.
 
 **Work.**
 
@@ -96,7 +96,7 @@ A phase is closed only when all of the following hold:
 - Expose Typst's widow and orphan handling only through template fields that the examples actually use. Do not add knobs speculatively.
 - Keep PDF/A-2b as the default. Decide whether to emit PDF/A-2u when every character maps to Unicode, as the architecture allows, and keep PDF/UA-1 out unless a user need appears.
 
-**Done when.** Every new field has a schema test, a source-generation test and an example that uses it; both fixtures still pass veraPDF as PDF/A-2b; two runs produce identical bytes; the page-break and token rules are documented in `docs/architecture.md` and `docs/template.md`.
+**Done when.** Every new field has a schema test, a source-generation test and an example that uses it; all fixtures still pass veraPDF as PDF/A-2b; two runs produce identical bytes; the page-break and token rules are documented in `docs/architecture.md` and `docs/template.md`.
 
 ## Phase 3: Secrets
 
@@ -229,7 +229,7 @@ A phase is closed only when all of the following hold:
 | Page | `page.size`, `page.orientation`, `page.margins`, `page.letterhead` | 0.5.0 | Shared by every paged format. |
 | Paragraph | `formatting.paragraph` | 0.9.0 | Font families, size, weight, style, leading, spacing, alignment and inline overrides. |
 | Inline spans | `formatting.paragraph.emphasis`, `formatting.paragraph.strong` | 0.9.0 | Inherit the paragraph face; style italic and weight bold are the semantic defaults. |
-| Headings | `formatting.heading`, `formatting.heading.h1` to `h6` | 0.9.0 | Base plus per-level overrides for fonts, size, weight, style and spacing. |
+| Headings | `formatting.heading`, `formatting.heading.h1` to `h6` | 0.12.0 | Base plus per-level overrides for fonts, size, weight, style, spacing and `page_break_before`. |
 | Header and footer | `page.header`, `page.footer` | 0.10.0 | Running content in left, center and right slots; lowercase tokens only. |
 | Tables | `table` | 0.10.0 | Border, border color, header fill and cell padding. |
 | EPUB | `epub.split_at` | After 1.0.0 | Defaults to first-level headings. |

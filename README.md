@@ -13,8 +13,8 @@ Rust with egui for the graphical interface. The main workflow runs in the termin
 SemVer; source: `Cargo.toml` (`[package].version`).
 
 - Patch: fixes and minor refinements.
-- Minor: new user-facing features or output formats.
-- Major: breaking changes to the template format or the document model, or major release milestones.
+- Minor: new user-facing features or output formats. While the project is 0.x, breaking changes to the template format or the document model also use the minor field.
+- Major: breaking changes to the template format or the document model after 1.0.0, or major release milestones.
 
 ## Goal
 

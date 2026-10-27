@@ -2,22 +2,30 @@
 #
 # A local `.pageformer.yaml` replaces this file entirely: there is no merge.
 # The schema version is an integer and must be the one this build supports.
-version: 2
+# Lengths without a unit are points; `leading` is a multiplier of the font size.
+version: 3
 
 page:
   size: a4
   orientation: portrait
   margins:
-    top: 25mm
-    bottom: 20mm
-    left: 25mm
-    right: 20mm
+    top: 71
+    bottom: 57
+    left: 71
+    right: 57
 
 text:
-  font_families:
-    - Liberation Serif
-    - DejaVu Serif
-    - Libertinus Serif
-  size: 12pt
+  body:
+    font_families:
+      - Liberation Serif
+      - DejaVu Serif
+      - Libertinus Serif
+    size: 12
+  title:
+    font_families:
+      - Liberation Sans
+      - DejaVu Sans
+      - Libertinus Serif
+    size: 18
   leading: 0.65
   alignment: justified

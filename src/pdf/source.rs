@@ -24,6 +24,7 @@ pub fn typst_source(
 ) -> Result<String, PdfError> {
     let mut builder = SourceBuilder::new(document, assets);
     builder.preamble(document, template);
+    builder.heading_style(template);
     builder.blocks(document.blocks())?;
     Ok(builder.output)
 }
@@ -95,14 +96,14 @@ impl<'a> SourceBuilder<'a> {
 
         let language = document.metadata().language();
         self.output.push_str("#set text(\n  font: (");
-        for family in template.text().font_families() {
+        for family in template.text().body().font_families() {
             let _ = write!(self.output, "{}, ", typst_string(family.as_str()));
         }
         self.output.push_str("),\n");
         let _ = writeln!(
             self.output,
             "  size: {},",
-            typst_length(template.text().size())
+            typst_length(template.text().body().size())
         );
         if let Some(language) = language {
             self.language_rules(language);
@@ -127,6 +128,28 @@ impl<'a> SourceBuilder<'a> {
         if let Some(region) = region {
             let _ = writeln!(self.output, "  region: {},", typst_string(region));
         }
+    }
+
+    fn heading_style(&mut self, template: &Template) {
+        let text = template.text();
+        self.output
+            .push_str("#show heading.where(level: 1): set text(font: (");
+        for family in text.title().font_families() {
+            let _ = write!(self.output, "{}, ", typst_string(family.as_str()));
+        }
+        let _ = writeln!(
+            self.output,
+            "), size: {})",
+            typst_length(text.title().size())
+        );
+        if let Some(spacing) = text.header_spacing() {
+            let _ = writeln!(
+                self.output,
+                "#show heading.where(level: 1): set block(above: {})",
+                typst_length(spacing)
+            );
+        }
+        self.output.push('\n');
     }
 
     fn blocks(&mut self, blocks: &[Block]) -> Result<(), PdfError> {
@@ -468,7 +491,7 @@ mod tests {
     use crate::template::Template;
 
     fn template() -> Template {
-        Template::from_yaml("version: 2\n").expect("the default template")
+        Template::from_yaml("version: 3\n").expect("the default template")
     }
 
     fn paragraph(text: &str) -> Document {
@@ -538,7 +561,7 @@ mod tests {
     #[test]
     fn the_page_uses_the_template_dimensions_and_margins() {
         let template = Template::from_yaml(
-            "version: 2\npage:\n  size: a5\n  orientation: landscape\n  margins:\n    top: 10mm\n    bottom: 20mm\n    left: 30mm\n    right: 40mm\n",
+            "version: 3\npage:\n  size: a5\n  orientation: landscape\n  margins:\n    top: 10mm\n    bottom: 20mm\n    left: 30mm\n    right: 40mm\n",
         )
         .expect("the template");
         let document = Document::new(Metadata::default(), Vec::new());
@@ -740,7 +763,7 @@ mod tests {
 
     #[test]
     fn paragraph_spacing_is_emitted_when_configured() {
-        let template = Template::from_yaml("version: 2\ntext:\n  paragraph_spacing: 6pt\n")
+        let template = Template::from_yaml("version: 3\ntext:\n  paragraph_spacing: 6pt\n")
             .expect("the template");
         let document = Document::new(
             Metadata::default(),
@@ -757,6 +780,33 @@ mod tests {
     fn absent_paragraph_spacing_is_not_emitted() {
         let source = source(&paragraph("Texto"), &AssetMap::new());
         assert!(!source.contains("spacing:"), "{source}");
+    }
+
+    #[test]
+    fn level_one_headings_use_the_title_style_and_header_spacing() {
+        let template = Template::from_yaml(
+            "version: 3\ntext:\n  header_spacing: 18pt\n  title:\n    font_families:\n      - Liberation Sans\n    size: 20pt\n",
+        )
+        .expect("the template");
+        let document = Document::new(
+            Metadata::default(),
+            vec![Block::Heading(Heading::new(
+                HeadingLevel::new(1).expect("a level"),
+                vec![Inline::Text("Contrato".to_owned())],
+            ))],
+        );
+        let source = typst_source(&document, &template, &AssetMap::new()).expect("the source");
+        assert!(
+            source.contains(
+                "#show heading.where(level: 1): set text(font: (\"Liberation Sans\", ), size: 20.000pt)"
+            ),
+            "{source}"
+        );
+        assert!(
+            source.contains("#show heading.where(level: 1): set block(above: 18.000pt)"),
+            "{source}"
+        );
+        assert!(source.contains("#heading(level: 1)[Contrato]"), "{source}");
     }
 
     #[test]

@@ -4,6 +4,15 @@
 
 *Major updates and feature releases.*
 
+### 0.7.0
+
+- Breaking: template schema 3 replaces `text.font_families` and `text.size` with `text.body` and `text.title`, each with its own font families and size. Version 2 templates are rejected.
+- A template length without a unit is now in points, and the example and default templates use points consistently.
+- Added `text.header_spacing`, the space above a level-1 heading. When omitted, Typst's default heading spacing applies.
+- Applied the title font and size to level-1 headings.
+- Adjusted the example leading to 0.65.
+- Regenerated both example PDFs with the new template.
+
 ### 0.6.0
 
 - Added directory inputs: the command walks each directory recursively, processes `.md` files in path order, and skips hidden directories and `target/`.

@@ -15,10 +15,11 @@ use serde::de::{self, Deserializer, MapAccess, Unexpected, Visitor};
 const MM_TO_POINTS: f64 = 72.0 / 25.4;
 
 /// The current schema version. A template for another version is rejected.
-pub const CURRENT_SCHEMA_VERSION: u16 = 2;
+pub const CURRENT_SCHEMA_VERSION: u16 = 3;
 
 const DEFAULT_MARGIN: Length = Length(20.0 * MM_TO_POINTS);
 const DEFAULT_FONT_SIZE: Length = Length(12.0);
+const DEFAULT_TITLE_SIZE: Length = Length(18.0);
 const DEFAULT_LEADING: Leading = Leading(0.65);
 
 const A4_DIMENSIONS: PageDimensions = PageDimensions {
@@ -53,6 +54,16 @@ pub struct Template {
 impl Template {
     /// Parses and validates a template written as YAML.
     pub fn from_yaml(yaml: &str) -> Result<Self, TemplateError> {
+        let probe: VersionProbe =
+            serde_yaml::from_str(yaml).map_err(|error| TemplateError::Yaml {
+                message: error.to_string(),
+            })?;
+        if probe.version != CURRENT_SCHEMA_VERSION {
+            return Err(TemplateError::UnsupportedVersion {
+                found: probe.version,
+                supported: CURRENT_SCHEMA_VERSION,
+            });
+        }
         let raw: RawTemplate = serde_yaml::from_str(yaml).map_err(|error| TemplateError::Yaml {
             message: error.to_string(),
         })?;
@@ -147,7 +158,6 @@ impl std::error::Error for TemplateError {
 #[non_exhaustive]
 pub enum ValueError {
     EmptyText,
-    MissingUnit,
     InvalidNumber,
     UnknownUnit,
     NonFinite,
@@ -160,7 +170,6 @@ impl fmt::Display for ValueError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         let message = match self {
             Self::EmptyText => "the text is empty",
-            Self::MissingUnit => "the length has no unit; use mm, cm, in or pt",
             Self::InvalidNumber => "the number is not valid",
             Self::UnknownUnit => "the unit is not supported; use mm, cm, in or pt",
             Self::NonFinite => "the number must be finite",
@@ -190,6 +199,7 @@ impl Length {
     }
 
     /// Parses a length such as `30mm`, `2.5cm`, `1in` or `12pt`.
+    /// A number without a unit is in points.
     pub fn parse(text: &str) -> Result<Self, ValueError> {
         let trimmed = text.trim();
         let (number, factor) = if let Some(number) = trimmed.strip_suffix("mm") {
@@ -203,7 +213,7 @@ impl Length {
         } else if trimmed.ends_with(|character: char| character.is_ascii_alphabetic()) {
             return Err(ValueError::UnknownUnit);
         } else {
-            return Err(ValueError::MissingUnit);
+            (trimmed, 1.0)
         };
         let value: f64 = number
             .trim()
@@ -442,24 +452,15 @@ impl TemplatePath {
     }
 }
 
-/// The text styling shared by every backend.
+/// The font families and size for one kind of text.
 #[derive(Debug, Clone, PartialEq)]
-pub struct TextStyle {
+pub struct FontStyle {
     font_families: Vec<FontFamily>,
     size: Length,
-    leading: Leading,
-    paragraph_spacing: Option<Length>,
-    alignment: ParagraphAlignment,
 }
 
-impl TextStyle {
-    pub fn new(
-        font_families: Vec<FontFamily>,
-        size: Length,
-        leading: Leading,
-        paragraph_spacing: Option<Length>,
-        alignment: ParagraphAlignment,
-    ) -> Result<Self, ValueError> {
+impl FontStyle {
+    pub fn new(font_families: Vec<FontFamily>, size: Length) -> Result<Self, ValueError> {
         if font_families.is_empty() {
             return Err(ValueError::EmptyList);
         }
@@ -469,9 +470,6 @@ impl TextStyle {
         Ok(Self {
             font_families,
             size,
-            leading,
-            paragraph_spacing,
-            alignment,
         })
     }
 
@@ -482,6 +480,45 @@ impl TextStyle {
     pub fn size(&self) -> Length {
         self.size
     }
+}
+
+/// The text styling shared by every backend.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TextStyle {
+    body: FontStyle,
+    title: FontStyle,
+    leading: Leading,
+    paragraph_spacing: Option<Length>,
+    header_spacing: Option<Length>,
+    alignment: ParagraphAlignment,
+}
+
+impl TextStyle {
+    pub fn new(
+        body: FontStyle,
+        title: FontStyle,
+        leading: Leading,
+        paragraph_spacing: Option<Length>,
+        header_spacing: Option<Length>,
+        alignment: ParagraphAlignment,
+    ) -> Self {
+        Self {
+            body,
+            title,
+            leading,
+            paragraph_spacing,
+            header_spacing,
+            alignment,
+        }
+    }
+
+    pub fn body(&self) -> &FontStyle {
+        &self.body
+    }
+
+    pub fn title(&self) -> &FontStyle {
+        &self.title
+    }
 
     pub fn leading(&self) -> Leading {
         self.leading
@@ -489,6 +526,11 @@ impl TextStyle {
 
     pub fn paragraph_spacing(&self) -> Option<Length> {
         self.paragraph_spacing
+    }
+
+    /// The space above a level-1 heading.
+    pub fn header_spacing(&self) -> Option<Length> {
+        self.header_spacing
     }
 
     pub fn alignment(&self) -> ParagraphAlignment {
@@ -544,6 +586,11 @@ pub enum ParagraphAlignment {
 }
 
 #[derive(Debug, Deserialize)]
+struct VersionProbe {
+    version: u16,
+}
+
+#[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct RawTemplate {
     version: u16,
@@ -574,11 +621,19 @@ struct RawMargins {
 #[derive(Debug, Default, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct RawText {
-    font_families: Option<Vec<String>>,
-    size: Option<String>,
+    body: Option<RawFontStyle>,
+    title: Option<RawFontStyle>,
     leading: Option<f64>,
     paragraph_spacing: Option<String>,
+    header_spacing: Option<String>,
     alignment: Option<ParagraphAlignment>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawFontStyle {
+    font_families: Option<Vec<String>>,
+    size: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -621,39 +676,20 @@ fn margin(value: Option<String>, field: &'static str) -> Result<Option<Length>, 
 }
 
 fn convert_text(raw: RawText) -> Result<TextStyle, TemplateError> {
-    let families = match raw.font_families {
-        Some(values) if values.is_empty() => {
-            return Err(TemplateError::Value {
-                field: "text.font_families",
-                problem: ValueError::EmptyList,
-            });
-        }
-        Some(values) => values
-            .into_iter()
-            .map(|value| FontFamily::parse(&value))
-            .collect::<Result<Vec<_>, _>>()
-            .map_err(|problem| TemplateError::Value {
-                field: "text.font_families",
-                problem,
-            })?,
-        None => default_font_families(),
-    };
-    let size = raw
-        .size
-        .map(|text| {
-            Length::parse(&text).map_err(|problem| TemplateError::Value {
-                field: "text.size",
-                problem,
-            })
-        })
-        .transpose()?
-        .unwrap_or(DEFAULT_FONT_SIZE);
-    if size.points() <= 0.0 {
-        return Err(TemplateError::Value {
-            field: "text.size",
-            problem: ValueError::Zero,
-        });
-    }
+    let body = convert_font_style(
+        raw.body,
+        "text.body.font_families",
+        "text.body.size",
+        default_font_families(),
+        DEFAULT_FONT_SIZE,
+    )?;
+    let title = convert_font_style(
+        raw.title,
+        "text.title.font_families",
+        "text.title.size",
+        default_font_families(),
+        DEFAULT_TITLE_SIZE,
+    )?;
     let leading = match raw.leading {
         Some(value) => Leading::new(value).map_err(|problem| TemplateError::Value {
             field: "text.leading",
@@ -670,12 +706,75 @@ fn convert_text(raw: RawText) -> Result<TextStyle, TemplateError> {
             })
         })
         .transpose()?;
+    let header_spacing = raw
+        .header_spacing
+        .map(|text| {
+            Length::parse(&text).map_err(|problem| TemplateError::Value {
+                field: "text.header_spacing",
+                problem,
+            })
+        })
+        .transpose()?;
     let alignment = raw.alignment.unwrap_or(ParagraphAlignment::Justified);
-    TextStyle::new(families, size, leading, paragraph_spacing, alignment).map_err(|problem| {
-        TemplateError::Value {
-            field: "text",
-            problem,
+    Ok(TextStyle::new(
+        body,
+        title,
+        leading,
+        paragraph_spacing,
+        header_spacing,
+        alignment,
+    ))
+}
+
+fn convert_font_style(
+    raw: Option<RawFontStyle>,
+    families_field: &'static str,
+    size_field: &'static str,
+    default_families: Vec<FontFamily>,
+    default_size: Length,
+) -> Result<FontStyle, TemplateError> {
+    let Some(raw) = raw else {
+        return FontStyle::new(default_families, default_size).map_err(|problem| {
+            let field = match problem {
+                ValueError::Zero => size_field,
+                _ => families_field,
+            };
+            TemplateError::Value { field, problem }
+        });
+    };
+    let families = match raw.font_families {
+        Some(values) if values.is_empty() => {
+            return Err(TemplateError::Value {
+                field: families_field,
+                problem: ValueError::EmptyList,
+            });
         }
+        Some(values) => values
+            .into_iter()
+            .map(|value| FontFamily::parse(&value))
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|problem| TemplateError::Value {
+                field: families_field,
+                problem,
+            })?,
+        None => default_families,
+    };
+    let size = raw
+        .size
+        .map(|text| {
+            Length::parse(&text).map_err(|problem| TemplateError::Value {
+                field: size_field,
+                problem,
+            })
+        })
+        .transpose()?
+        .unwrap_or(default_size);
+    FontStyle::new(families, size).map_err(|problem| {
+        let field = match problem {
+            ValueError::Zero => size_field,
+            _ => families_field,
+        };
+        TemplateError::Value { field, problem }
     })
 }
 
@@ -702,6 +801,7 @@ mod tests {
     #[test]
     fn lengths_parse_the_supported_units() {
         assert_eq!(Length::parse("12pt").map(Length::points), Ok(12.0));
+        assert_eq!(Length::parse("12").map(Length::points), Ok(12.0));
         assert_eq!(Length::parse("1in").map(Length::points), Ok(72.0));
         let centimetres = Length::parse("2.54cm").expect("a length");
         millimetres_are(centimetres.points(), 25.4);
@@ -711,7 +811,6 @@ mod tests {
 
     #[test]
     fn lengths_reject_bad_values() {
-        assert_eq!(Length::parse("30"), Err(ValueError::MissingUnit));
         assert_eq!(Length::parse("abcmm"), Err(ValueError::InvalidNumber));
         assert_eq!(Length::parse("30px"), Err(ValueError::UnknownUnit));
         assert_eq!(Length::parse("-30mm"), Err(ValueError::Negative));
@@ -749,27 +848,26 @@ mod tests {
     }
 
     #[test]
-    fn text_style_rejects_a_zero_font_size() {
-        let error = TextStyle::new(
+    fn font_style_rejects_a_zero_size() {
+        let error = FontStyle::new(
             default_font_families(),
             Length::new(0.0).expect("zero is a valid length"),
-            DEFAULT_LEADING,
-            None,
-            ParagraphAlignment::Justified,
         );
         assert_eq!(error, Err(ValueError::Zero));
     }
 
     #[test]
-    fn text_style_rejects_an_empty_font_list() {
-        let error = TextStyle::new(
-            Vec::new(),
-            DEFAULT_FONT_SIZE,
-            DEFAULT_LEADING,
-            None,
-            ParagraphAlignment::Justified,
-        );
+    fn font_style_rejects_an_empty_font_list() {
+        let error = FontStyle::new(Vec::new(), DEFAULT_FONT_SIZE);
         assert_eq!(error, Err(ValueError::EmptyList));
+    }
+
+    #[test]
+    fn title_and_header_defaults_are_distinct_from_the_body() {
+        let template = Template::from_yaml("version: 3\n").expect("the default template");
+        assert_eq!(template.text().body().size().points(), 12.0);
+        assert_eq!(template.text().title().size().points(), 18.0);
+        assert_eq!(template.text().header_spacing(), None);
     }
 
     #[test]
@@ -778,6 +876,7 @@ mod tests {
         assert_eq!(template.schema_version(), SchemaVersion::CURRENT);
         assert_eq!(template.page().size(), PageSize::A4);
         assert_eq!(template.page().orientation(), Orientation::Portrait);
-        assert_eq!(template.text().font_families().len(), 3);
+        assert_eq!(template.text().body().font_families().len(), 3);
+        assert_eq!(template.text().title().size().points(), 18.0);
     }
 }

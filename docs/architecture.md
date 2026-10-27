@@ -41,7 +41,7 @@ The library is the pure core. File reading, the environment and the terminal liv
 
 ## Consistency
 
-Every format shares the semantic template. The current schema defines page size, orientation, margins, font families, text size, leading, alignment and the letterhead image. Colors, heading styles and header and footer content are pending schema work.
+Every format shares the semantic template. The current schema defines page size, orientation, margins, body and title font families and sizes, leading, paragraph spacing, header spacing, alignment and the letterhead image. Colors, per-level heading styles beyond level 1, and running header and footer content are pending schema work.
 
 The promise is consistency of presentation, not identical content distribution. Pagination differs between paged formats, such as PDF, and reflowable formats, such as ODT, DOCX and EPUB. The project does not try to force the same distribution. Widows and orphans must be avoided where the engine allows it.
 
@@ -95,13 +95,13 @@ The crate is Apache-2.0, compatible with the project license.
 
 ### The current backend
 
-`src/pdf` turns the model into Typst source and compiles it with the same Typst 0.15.1 library the spike used. The template sets the page dimensions, orientation, margins, letterhead, font families, size, leading and alignment; the frontmatter supplies the title, author and language. The document date is fixed to 2026-01-01 UTC and the world reports the same date, so the same input produces the same bytes.
+`src/pdf` turns the model into Typst source and compiles it with the same Typst 0.15.1 library the spike used. The template sets the page dimensions, orientation, margins, letterhead, body and title styles, leading, paragraph spacing, header spacing and alignment; the title style applies to level-1 headings. The frontmatter supplies the title, author and language. The document date is fixed to 2026-01-01 UTC and the world reports the same date, so the same input produces the same bytes.
 
 User text is escaped for Typst markup (`\`, `#`, `$`, `*`, `_`, `` ` ``, brackets, angle brackets, `@`, `~`, `-`, `+`, `/`, `=`, `:`, `&`, braces and periods; the period keeps `1.` from becoming an enum marker). Strings passed to Typst functions are escaped for Typst string literals. Local images are read at the edge, stored under a synthetic project path and served by the world; remote images are rejected. The letterhead resolves against the template file and the images resolve against the Markdown file.
 
 Embedded fonts are loaded before system fonts, so Libertinus Serif is always available as the last family in the default list. This keeps the binary self-contained, while a template can still prefer system fonts.
 
-Header and footer content, heading page breaks and configurable table styling are not part of the schema yet. The backend therefore uses Typst's default heading and list styles, a neutral table grid and no header or footer.
+Running header and footer content, per-level heading styles beyond level 1, heading page breaks and configurable table styling are not part of the schema yet. The backend styles level-1 headings from the title style, leaves levels 2 to 6 at Typst's defaults, uses Typst's default list styles and a neutral table grid, and adds no running header or footer.
 
 ### Spike results
 
@@ -135,7 +135,7 @@ The fixtures are in `assets/examples/`: `Contrato.md` with `Contrato.pdf`, and `
 ## Open decisions
 
 - Explicit page breaks and the Markdown syntax that requests them.
-- Header and footer content, heading styles, heading page breaks and table styling in the template schema.
+- Running header and footer content, per-level heading styles beyond level 1, heading page breaks and table styling in the template schema.
 - ODT implementation: a native ODF writer or another path.
 - DOCX library choice and the shared document model for reflowable formats.
 - Secret file format and permission checks.

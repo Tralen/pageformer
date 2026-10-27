@@ -186,7 +186,7 @@ The `table` section styles every table in the document:
 
 ## Page breaks
 
-A paragraph that contains only `\pagebreak` starts a new page. The marker becomes a page break in the document model, so every paged backend reads the same block. Any other occurrence, such as `\pagebreak` inside a sentence, stays literal text.
+A paragraph that contains only `{pagebreak}` starts a new page. The marker becomes a page break in the document model, so every paged backend reads the same block. Braces are ordinary text to CommonMark, so the Zed preview shows the marker and no raw HTML is involved. Any other occurrence, such as `{pagebreak}` inside a sentence, stays literal text. The backslash form `\pagebreak` is no longer special and stays literal text.
 
 ## Weights and styles
 

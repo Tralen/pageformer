@@ -528,9 +528,9 @@ impl<'source> DocumentParser<'source> {
     }
 }
 
-/// A standalone `\pagebreak` paragraph is an explicit page break. CommonMark
-/// keeps the backslash as text, so the marker survives the parser and the Zed
-/// preview without raw HTML.
+/// A standalone `{pagebreak}` paragraph is an explicit page break. Braces are
+/// ordinary text to CommonMark and to the Zed preview, so the marker survives
+/// the parser without raw HTML or a backslash escape.
 fn paragraph_blocks(content: Vec<Inline>) -> Vec<Block> {
     if is_page_break(&content) {
         vec![Block::PageBreak]
@@ -540,7 +540,7 @@ fn paragraph_blocks(content: Vec<Inline>) -> Vec<Block> {
 }
 
 fn is_page_break(content: &[Inline]) -> bool {
-    matches!(content, [Inline::Text(text)] if text == "\\pagebreak")
+    matches!(content, [Inline::Text(text)] if text == "{pagebreak}")
 }
 
 /// A loose ordered list whose items are one paragraph each is a sequence of
@@ -787,7 +787,7 @@ mod tests {
 
     #[test]
     fn a_standalone_pagebreak_paragraph_is_a_page_break() {
-        let document = parse("Antes.\n\n\\pagebreak\n\nDepois.\n").expect("a page break");
+        let document = parse("Antes.\n\n{pagebreak}\n\nDepois.\n").expect("a page break");
         assert_eq!(
             document.blocks(),
             &[
@@ -800,7 +800,13 @@ mod tests {
 
     #[test]
     fn a_pagebreak_inside_a_paragraph_stays_text() {
-        let document = parse("Texto \\pagebreak aqui.\n").expect("inline text");
+        let document = parse("Texto {pagebreak} aqui.\n").expect("inline text");
+        assert!(matches!(first_block(&document), Block::Paragraph(_)));
+    }
+
+    #[test]
+    fn the_backslash_pagebreak_is_ordinary_text() {
+        let document = parse("\\pagebreak\n").expect("ordinary text");
         assert!(matches!(first_block(&document), Block::Paragraph(_)));
     }
 

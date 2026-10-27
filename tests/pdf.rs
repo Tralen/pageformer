@@ -107,7 +107,7 @@ fn the_shared_example_template_uses_its_letterhead() {
 
 #[test]
 fn running_content_tables_and_page_breaks_render() {
-    let source = "---\ntitle: Contrato\nauthor: Pageformer\ndate: 2026-03-05\nsubject: Teste\nkeywords:\n  - legal\n---\n\n# Título\n\n| A | B |\n|---|---|\n| 1 | 2 |\n\n\\pagebreak\n\nDepois.\n";
+    let source = "---\ntitle: Contrato\nauthor: Pageformer\ndate: 2026-03-05\nsubject: Teste\nkeywords:\n  - legal\n---\n\n# Título\n\n| A | B |\n|---|---|\n| 1 | 2 |\n\n{pagebreak}\n\nDepois.\n";
     let document = markdown::parse(source).expect("the document must parse");
     let template = Template::from_yaml(
         r##"

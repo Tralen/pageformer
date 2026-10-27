@@ -27,7 +27,7 @@ The template is parsed and validated separately into a typed structure. An inval
 
 The Markdown subset is CommonMark plus the extensions the Zed preview renders: tables, task lists, strikethrough, footnotes, alert block quotes and YAML frontmatter. Fenced code blocks are preserved. Raw HTML is not part of the contract, so the parser rejects it instead of dropping it silently.
 
-A paragraph that contains only `\pagebreak` becomes `Block::PageBreak`. The marker is ordinary text to CommonMark, so the parser and the Zed preview keep it, and every paged backend reads the same block instead of a backend-specific string. Any other occurrence stays literal text.
+A paragraph that contains only `{pagebreak}` becomes `Block::PageBreak`. Braces are ordinary text to CommonMark, so the parser and the Zed preview keep the marker, and every paged backend reads the same block instead of a backend-specific string. Any other occurrence stays literal text, as does the old backslash form.
 
 A loose ordered list whose items are one paragraph each becomes a sequence of numbered paragraphs. This keeps legal numbering such as `1.` as written, without a backslash, and without renumbering it as a list. A tight ordered list remains a list. Zed's preview still shows the loose source as a list; the document model and the generated PDF treat it as numbered paragraphs.
 
@@ -71,7 +71,7 @@ Results go to stdout; warnings and errors go to stderr. When the stream is a ter
 
 Placeholders use the form `{NAME}` in the document body, with an uppercase name such as `{NOME_COMPLETO}`. Single braces are literal text in CommonMark, so both the parser and the Zed preview keep them intact. The angle-bracket form is rejected because `<NAME>` is parsed as inline HTML.
 
-Every token that matches `{[A-Z][A-Z0-9_]*}` is reserved for a secret. An unknown placeholder is a fatal error, never text left in the final document. The pattern does not apply inside code spans, code blocks or URLs, where the text is reproduced literally. A lowercase or spaced brace, such as `{nome}`, is ordinary text.
+Every token that matches `{[A-Z][A-Z0-9_]*}` is reserved for a secret. An unknown placeholder is a fatal error, never text left in the final document. The pattern does not apply inside code spans, code blocks or URLs, where the text is reproduced literally. A lowercase or spaced brace, such as `{nome}`, is ordinary text; the only exception is `{pagebreak}` alone in a paragraph, which is a page break.
 
 Placeholders are resolved only in body content. One found in frontmatter metadata is an error, because secret values must never reach the PDF XMP package, the DOCX core properties or the ODT metadata.
 

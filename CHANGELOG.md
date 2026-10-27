@@ -4,6 +4,11 @@
 
 *Major updates and feature releases.*
 
+### 0.11.0
+
+- Breaking: the explicit page-break marker is `{pagebreak}` instead of `\pagebreak`. The backslash form is now ordinary text.
+- The contract and technical-report fixtures use the new marker; regenerated their PDFs.
+
 ### 0.10.1
 
 - The shared example template now sets a running header with `{page} de {pages}` in the right slot, clear of the letterhead.

@@ -9,5 +9,4 @@ COMPLIANCE.md
 .handoff/
 target/
 SKETCH.md
-.examples/
 .ruff_cache

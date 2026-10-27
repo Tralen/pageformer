@@ -58,3 +58,7 @@
 ## Revision History
 
 *Patches, bug fixes, and minor updates.*
+
+### 0.5.1
+
+- Removed the stale `.examples/` entry from `.gitignore`.

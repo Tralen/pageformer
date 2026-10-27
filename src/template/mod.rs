@@ -15,12 +15,12 @@ use serde::de::{self, Deserializer, MapAccess, Unexpected, Visitor};
 const MM_TO_POINTS: f64 = 72.0 / 25.4;
 
 /// The current schema version. A template for another version is rejected.
-pub const CURRENT_SCHEMA_VERSION: u16 = 3;
+pub const CURRENT_SCHEMA_VERSION: u16 = 4;
 
 const DEFAULT_MARGIN: Length = Length(20.0 * MM_TO_POINTS);
 const DEFAULT_FONT_SIZE: Length = Length(12.0);
 const DEFAULT_TITLE_SIZE: Length = Length(18.0);
-const DEFAULT_LEADING: Leading = Leading(0.65);
+const DEFAULT_LEADING: Length = Length(7.8);
 
 const A4_DIMENSIONS: PageDimensions = PageDimensions {
     width: Length(210.0 * MM_TO_POINTS),
@@ -487,7 +487,7 @@ impl FontStyle {
 pub struct TextStyle {
     body: FontStyle,
     title: FontStyle,
-    leading: Leading,
+    leading: Length,
     paragraph_spacing: Option<Length>,
     header_spacing: Option<Length>,
     alignment: ParagraphAlignment,
@@ -497,7 +497,7 @@ impl TextStyle {
     pub fn new(
         body: FontStyle,
         title: FontStyle,
-        leading: Leading,
+        leading: Length,
         paragraph_spacing: Option<Length>,
         header_spacing: Option<Length>,
         alignment: ParagraphAlignment,
@@ -520,7 +520,7 @@ impl TextStyle {
         &self.title
     }
 
-    pub fn leading(&self) -> Leading {
+    pub fn leading(&self) -> Length {
         self.leading
     }
 
@@ -554,26 +554,6 @@ impl FontFamily {
 
     pub fn as_str(&self) -> &str {
         &self.0
-    }
-}
-
-/// Extra space between lines, in multiples of the font size.
-#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
-pub struct Leading(f64);
-
-impl Leading {
-    pub fn new(value: f64) -> Result<Self, ValueError> {
-        if !value.is_finite() {
-            Err(ValueError::NonFinite)
-        } else if value < 0.0 {
-            Err(ValueError::Negative)
-        } else {
-            Ok(Self(value))
-        }
-    }
-
-    pub fn get(self) -> f64 {
-        self.0
     }
 }
 
@@ -623,7 +603,7 @@ struct RawMargins {
 struct RawText {
     body: Option<RawFontStyle>,
     title: Option<RawFontStyle>,
-    leading: Option<f64>,
+    leading: Option<String>,
     paragraph_spacing: Option<String>,
     header_spacing: Option<String>,
     alignment: Option<ParagraphAlignment>,
@@ -690,13 +670,16 @@ fn convert_text(raw: RawText) -> Result<TextStyle, TemplateError> {
         default_font_families(),
         DEFAULT_TITLE_SIZE,
     )?;
-    let leading = match raw.leading {
-        Some(value) => Leading::new(value).map_err(|problem| TemplateError::Value {
-            field: "text.leading",
-            problem,
-        })?,
-        None => DEFAULT_LEADING,
-    };
+    let leading = raw
+        .leading
+        .map(|text| {
+            Length::parse(&text).map_err(|problem| TemplateError::Value {
+                field: "text.leading",
+                problem,
+            })
+        })
+        .transpose()?
+        .unwrap_or(DEFAULT_LEADING);
     let paragraph_spacing = raw
         .paragraph_spacing
         .map(|text| {
@@ -864,9 +847,10 @@ mod tests {
 
     #[test]
     fn title_and_header_defaults_are_distinct_from_the_body() {
-        let template = Template::from_yaml("version: 3\n").expect("the default template");
+        let template = Template::from_yaml("version: 4\n").expect("the default template");
         assert_eq!(template.text().body().size().points(), 12.0);
         assert_eq!(template.text().title().size().points(), 18.0);
+        assert_eq!(template.text().leading().points(), 7.8);
         assert_eq!(template.text().header_spacing(), None);
     }
 

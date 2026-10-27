@@ -2,8 +2,8 @@
 #
 # A local `.pageformer.yaml` replaces this file entirely: there is no merge.
 # The schema version is an integer and must be the one this build supports.
-# Lengths without a unit are points; `leading` is a multiplier of the font size.
-version: 3
+# Lengths accept mm, cm, in or pt; a number without a unit is points.
+version: 4
 
 page:
   size: a4
@@ -27,5 +27,5 @@ text:
       - DejaVu Sans
       - Libertinus Serif
     size: 18
-  leading: 0.65
+  leading: 7.8pt
   alignment: justified

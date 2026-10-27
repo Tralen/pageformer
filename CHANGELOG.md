@@ -4,6 +4,10 @@
 
 *Major updates and feature releases.*
 
+### 0.8.0
+
+- Breaking: template schema 4 makes `leading` a length in points, like the other spacing fields. A multiplier such as `0.65` is no longer accepted; use `7.8pt` for the same line spacing at 12pt.
+
 ### 0.7.0
 
 - Breaking: template schema 3 replaces `text.font_families` and `text.size` with `text.body` and `text.title`, each with its own font families and size. Version 2 templates are rejected.

@@ -2,18 +2,18 @@
 #
 # The nearest `.pageformer.yaml` wins entirely; there is no merge across
 # directories. This file applies to Contrato.md and Embargos.md.
-# Lengths without a unit are points; `leading` is a multiplier of the font size.
+# Lengths accept mm, cm, in or pt; a number without a unit is points.
 
-version: 3
+version: 4
 
 page:
   size: a4
   orientation: portrait
   margins:
-    top: 85
-    bottom: 85
-    left: 85
-    right: 57
+    top: 30mm
+    bottom: 30mm
+    left: 30mm
+    right: 25mm
   # A letterhead resolves relative to this file.
   letterhead: Timbre.png
 
@@ -22,15 +22,15 @@ text:
     font_families:
       - Liberation Serif
       - DejaVu Serif
-      - Libertinus Serif
+      - Linux Libertine O
     size: 12
   title:
     font_families:
       - Liberation Sans
       - DejaVu Sans
-      - Libertinus Serif
+      - Linux Biolinum O
     size: 18
-  leading: 0.65
+  leading: 7.8pt
   paragraph_spacing: 24
   header_spacing: 18
   alignment: justified

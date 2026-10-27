@@ -113,8 +113,8 @@ impl<'a> SourceBuilder<'a> {
         let justify = matches!(template.text().alignment(), ParagraphAlignment::Justified);
         let _ = write!(
             self.output,
-            "#set par(justify: {justify}, leading: {:.3}em",
-            template.text().leading().get()
+            "#set par(justify: {justify}, leading: {}",
+            typst_length(template.text().leading())
         );
         if let Some(spacing) = template.text().paragraph_spacing() {
             let _ = write!(self.output, ", spacing: {}", typst_length(spacing));
@@ -491,7 +491,7 @@ mod tests {
     use crate::template::Template;
 
     fn template() -> Template {
-        Template::from_yaml("version: 3\n").expect("the default template")
+        Template::from_yaml("version: 4\n").expect("the default template")
     }
 
     fn paragraph(text: &str) -> Document {
@@ -561,7 +561,7 @@ mod tests {
     #[test]
     fn the_page_uses_the_template_dimensions_and_margins() {
         let template = Template::from_yaml(
-            "version: 3\npage:\n  size: a5\n  orientation: landscape\n  margins:\n    top: 10mm\n    bottom: 20mm\n    left: 30mm\n    right: 40mm\n",
+            "version: 4\npage:\n  size: a5\n  orientation: landscape\n  margins:\n    top: 10mm\n    bottom: 20mm\n    left: 30mm\n    right: 40mm\n",
         )
         .expect("the template");
         let document = Document::new(Metadata::default(), Vec::new());
@@ -763,7 +763,7 @@ mod tests {
 
     #[test]
     fn paragraph_spacing_is_emitted_when_configured() {
-        let template = Template::from_yaml("version: 3\ntext:\n  paragraph_spacing: 6pt\n")
+        let template = Template::from_yaml("version: 4\ntext:\n  paragraph_spacing: 6pt\n")
             .expect("the template");
         let document = Document::new(
             Metadata::default(),
@@ -783,9 +783,18 @@ mod tests {
     }
 
     #[test]
+    fn leading_is_emitted_in_points() {
+        let template =
+            Template::from_yaml("version: 4\ntext:\n  leading: 9pt\n").expect("the template");
+        let document = Document::new(Metadata::default(), Vec::new());
+        let source = typst_source(&document, &template, &AssetMap::new()).expect("the source");
+        assert!(source.contains("leading: 9.000pt"), "{source}");
+    }
+
+    #[test]
     fn level_one_headings_use_the_title_style_and_header_spacing() {
         let template = Template::from_yaml(
-            "version: 3\ntext:\n  header_spacing: 18pt\n  title:\n    font_families:\n      - Liberation Sans\n    size: 20pt\n",
+            "version: 4\ntext:\n  header_spacing: 18pt\n  title:\n    font_families:\n      - Liberation Sans\n    size: 20pt\n",
         )
         .expect("the template");
         let document = Document::new(

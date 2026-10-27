@@ -19,7 +19,7 @@ Paths written in the template, such as the letterhead image, resolve relative to
 ## Schema
 
 ```yaml
-version: 3
+version: 4
 
 page:
   size: a4
@@ -44,7 +44,7 @@ text:
       - DejaVu Sans
       - Libertinus Serif
     size: 18
-  leading: 0.65
+  leading: 7.8pt
   paragraph_spacing: 24
   header_spacing: 18
   alignment: justified
@@ -54,7 +54,7 @@ Every section and every key is optional except `version`. Missing keys take the 
 
 ### `version`
 
-The schema version, an integer. This build accepts `3` and rejects every other value. Version 3 replaced `text.font_families` and `text.size` with `text.body` and `text.title`, made a bare number mean points and added `text.header_spacing`. Version 2 had removed the `document` section: document metadata belongs to the Markdown.
+The schema version, an integer. This build accepts `4` and rejects every other value. Version 4 made `leading` a length. Version 3 replaced `text.font_families` and `text.size` with `text.body` and `text.title`, made a bare number mean points and added `text.header_spacing`. Version 2 had removed the `document` section: document metadata belongs to the Markdown.
 
 ### Document metadata
 
@@ -85,7 +85,7 @@ The default size is A4 in portrait orientation.
 
 - `body`: a map with `font_families` and `size` for body text. The default families are `Liberation Serif`, `DejaVu Serif` and `Libertinus Serif`; the default size is `12pt`.
 - `title`: a map with `font_families` and `size` for level-1 headings. The default families are the same as the body, and the default size is `18pt`.
-- `leading`: extra space between lines, in multiples of the font size. It must be finite and not negative; the default is `0.65`.
+- `leading`: extra space between lines, as a length. It must be finite and not negative; the default is `7.8pt`.
 - `paragraph_spacing`: space between paragraphs. When omitted, Typst's default spacing applies (`1.2em`).
 - `header_spacing`: space above a level-1 heading. When omitted, Typst's default heading spacing applies.
 - `alignment`: `justified` or `left`. The default is `justified`.
@@ -95,8 +95,6 @@ Both `body` and `title` are optional maps. A present map may omit `font_families
 ## Lengths
 
 A length is a number optionally followed by `mm`, `cm`, `in` or `pt`. A number without a unit is in points, so `30` and `30pt` are the same length. Negative values are rejected, and the font size must be greater than zero.
-
-`leading` is the exception: it is a multiplier of the font size, not a length.
 
 ## Images
 

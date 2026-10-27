@@ -85,7 +85,7 @@ A phase is closed only when all of the following hold:
 
 **Current state.** PDF/A-2b through Typst 0.15.1, page size, orientation, margins, letterhead, body and title styles, leading, paragraph spacing, header spacing, alignment, local images, headings, lists, tables, quotes, code, footnotes, embedded fonts and a fixed document date.
 
-**Status.** Started in 0.7.0: template schema 3, body and title styles for level-1 headings, header spacing and point defaults. The rest of the list below remains.
+**Status.** Started in 0.7.0: template schema 4, body and title styles for level-1 headings, header spacing, point defaults and a length-based leading. The rest of the list below remains.
 
 **Work.**
 
@@ -226,10 +226,10 @@ A phase is closed only when all of the following hold:
 
 | Area | Keys | Phase | Notes |
 |---|---|---|---|
-| Version | `version` | 0.7.0 | Exact match; schema 3 is current. |
+| Version | `version` | 0.8.0 | Exact match; schema 4 is current. |
 | Page | `page.size`, `page.orientation`, `page.margins`, `page.letterhead` | 0.5.0 | Shared by every paged format. |
 | Body and title | `text.body`, `text.title` | 0.7.0 | Font families and sizes; the title style applies to level-1 headings. |
-| Text spacing | `text.leading`, `text.paragraph_spacing`, `text.header_spacing`, `text.alignment` | 0.7.0 | `header_spacing` is above a level-1 heading; `leading` is a multiplier. |
+| Text spacing | `text.leading`, `text.paragraph_spacing`, `text.header_spacing`, `text.alignment` | 0.7.0 | `header_spacing` is above a level-1 heading; every spacing is a length, and `leading` is a length since 0.8.0. |
 | Header and footer | `page.header`, `page.footer` | 2 | Running header and footer; not `text.header_spacing`, which is heading spacing. |
 | Headings | `text.heading` | 2 | Per-level overrides; level 1 currently uses `text.title`. |
 | Tables | `table` | 2 | Borders, header fill, cell padding. |

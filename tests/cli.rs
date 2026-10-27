@@ -264,7 +264,7 @@ fn colors_can_be_forced_and_disabled() {
 fn an_invalid_explicit_template_fails_with_a_diagnostic() {
     let project = TempDir::new().expect("a temporary project");
     let template = project.path().join("broken.yaml");
-    fs::write(&template, "version: 4\n").expect("the broken template must be written");
+    fs::write(&template, "version: 5\n").expect("the broken template must be written");
 
     let output = run(&[
         OsStr::new("--check"),
@@ -274,7 +274,7 @@ fn an_invalid_explicit_template_fails_with_a_diagnostic() {
     ]);
     assert!(!output.status.success());
     assert!(
-        stderr(&output).contains("unsupported template schema version 4"),
+        stderr(&output).contains("unsupported template schema version 5"),
         "{}",
         stderr(&output)
     );

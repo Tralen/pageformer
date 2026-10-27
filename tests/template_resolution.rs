@@ -7,9 +7,9 @@ use pageformer::template::PageSize;
 use pageformer::template::loader::{self, TemplateOrigin};
 use tempfile::TempDir;
 
-const A4_TEMPLATE: &str = "version: 3\npage:\n  size: a4\n";
-const LETTER_TEMPLATE: &str = "version: 3\npage:\n  size: letter\n";
-const LEGAL_TEMPLATE: &str = "version: 3\npage:\n  size: legal\n";
+const A4_TEMPLATE: &str = "version: 4\npage:\n  size: a4\n";
+const LETTER_TEMPLATE: &str = "version: 4\npage:\n  size: letter\n";
+const LEGAL_TEMPLATE: &str = "version: 4\npage:\n  size: legal\n";
 
 fn write(path: &Path, contents: &str) {
     if let Some(parent) = path.parent() {
@@ -55,12 +55,12 @@ fn an_invalid_nearest_template_never_falls_back() {
     write(&local_template(project.path()), LEGAL_TEMPLATE);
     let docs = project.path().join("docs");
     let broken = local_template(&docs);
-    write(&broken, "version: 4\n");
+    write(&broken, "version: 5\n");
 
     let error = loader::resolve(&docs, None).expect_err("the broken template must fail");
     let message = error.to_string();
     assert!(
-        message.contains("unsupported template schema version 4"),
+        message.contains("unsupported template schema version 5"),
         "{message}"
     );
     assert!(

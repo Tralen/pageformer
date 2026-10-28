@@ -76,13 +76,13 @@ The configuration disables only rules that conflict with legal documents: line l
 PDF/A conformance and structure:
 
 ```sh
-verapdf --format text -f 2b assets/examples/Contrato.pdf
-verapdf --format text -f 2b assets/examples/Embargos.pdf
+verapdf --format text -f 2b assets/examples/publicacao/Contrato.pdf
+verapdf --format text -f 2b assets/examples/publicacao/Embargos.pdf
 verapdf --format text -f 2b assets/examples/tecnico/Relatorio.pdf
 
-pdfinfo assets/examples/Contrato.pdf
-pdffonts assets/examples/Embargos.pdf
-pdftotext assets/examples/Contrato.pdf -
+pdfinfo assets/examples/publicacao/Contrato.pdf
+pdffonts assets/examples/publicacao/Embargos.pdf
+pdftotext assets/examples/publicacao/Contrato.pdf -
 ```
 
 A passing PDF/A run prints `PASS <path> 2b`. The tests also assert the PDF header, the PDF/A markers and that two renders produce identical bytes.

@@ -15,6 +15,7 @@ fn fixture(name: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("assets")
         .join("examples")
+        .join("escritorio")
         .join(name)
 }
 
@@ -81,6 +82,16 @@ fn confidential_project() -> (TempDir, TempDir, PathBuf) {
     (project, source, values)
 }
 
+fn example_confidential_file() -> (TempDir, PathBuf) {
+    let directory = TempDir::new().expect("a temporary directory");
+    let path = directory.path().join("embargos.env");
+    write_private(
+        &path,
+        include_str!("../assets/examples/confidencial/embargos.env"),
+    );
+    (directory, path)
+}
+
 #[test]
 fn a_confidential_check_lists_names_only() {
     let (project, source, values) = confidential_project();
@@ -100,6 +111,34 @@ fn a_confidential_check_lists_names_only() {
     );
     assert!(!report.contains("Fulano"), "{report}");
     assert!(!stderr(&output).contains("Fulano"), "{}", stderr(&output));
+}
+
+#[test]
+fn the_example_embargos_renders_with_its_confidential_file() {
+    let (_values_directory, values) = example_confidential_file();
+    let output = TempDir::new().expect("a temporary output");
+    let result = run(&[
+        OsStr::new("--color=never"),
+        OsStr::new("--confidential-file"),
+        values.as_os_str(),
+        OsStr::new("--output"),
+        output.path().as_os_str(),
+        fixture("Embargos.md").as_os_str(),
+    ]);
+    assert!(result.status.success(), "{}", stderr(&result));
+    let pdf = output.path().join("Embargos.pdf");
+    let bytes = fs::read(&pdf).expect("the PDF must exist");
+    assert!(bytes.starts_with(b"%PDF-"));
+    assert!(
+        !stdout(&result).contains("55.444.333"),
+        "{}",
+        stdout(&result)
+    );
+    assert!(
+        !stderr(&result).contains("55.444.333"),
+        "{}",
+        stderr(&result)
+    );
 }
 
 #[test]
@@ -314,8 +353,11 @@ fn the_contract_fixture_passes_the_pipeline_check() {
 
 #[test]
 fn every_input_is_reported() {
+    let (_values_directory, values) = example_confidential_file();
     let output = run(&[
         OsStr::new("--check"),
+        OsStr::new("--confidential-file"),
+        values.as_os_str(),
         fixture("Contrato.md").as_os_str(),
         fixture("Embargos.md").as_os_str(),
     ]);
@@ -325,6 +367,11 @@ fn every_input_is_reported() {
     assert!(report.contains("Embargos.md"), "{report}");
     assert!(report.contains("7 headings"), "{report}");
     assert!(report.contains("2 files checked"), "{report}");
+    assert!(
+        report.contains("confidential fields:"),
+        "the embargos check lists fields: {report}"
+    );
+    assert!(!report.contains("55.444.333"), "{report}");
 }
 
 #[test]

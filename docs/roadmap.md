@@ -102,7 +102,7 @@ A phase is closed only when all of the following hold:
 
 **Goal.** Resolve placeholders once, in the model, before any backend, and make a leak impossible by construction.
 
-**Status.** Done in 0.13.0. The design is described in [`architecture.md`](architecture.md#confidentiality) and the implementation lives in `src/confidential.rs` and `src/confidential/loader.rs`.
+**Status.** Done in 0.13.0. The design is described in [`architecture.md`](architecture.md#confidentiality) and the implementation lives in `src/confidential.rs` and `src/confidential/loader.rs`. The example workflow lives in `escritorio/`, `confidencial/` and `publicacao/`: `Embargos.md` uses fields for the fictional names, documents, addresses, court, process number, lawyers and case identifiers, and `embargos.env` supplies the values.
 
 **Work.**
 

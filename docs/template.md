@@ -213,13 +213,13 @@ The PDF backend applies the paragraph face, leading, spacing and alignment. It e
 
 ## Example
 
-`assets/examples/.pageformer.yaml` is a commented template shared by the two legal fixtures. It uses the fictional `Timbre.png` letterhead from the same directory and applies automatically because it is the nearest `.pageformer.yaml`:
+`assets/examples/escritorio/.pageformer.yaml` is a commented template shared by the two office fixtures. It uses the fictional `Timbre.png` letterhead from the same directory and applies automatically because it is the nearest `.pageformer.yaml`:
 
 ```sh
-pageformer assets/examples/Contrato.md assets/examples/Embargos.md
+pageformer --confidential-file assets/examples/confidencial/embargos.env --output assets/examples/publicacao assets/examples/escritorio/
 ```
 
-`assets/examples/tecnico/.pageformer.yaml` is a second example, in a nested directory. It replaces the shared template for `Relatorio.md`, has no letterhead and demonstrates every running slot, the footer, the table style and a page break:
+The embargos declares confidential fields, so the command names the fictional values file and writes outside the source tree. `assets/examples/tecnico/.pageformer.yaml` is a second example, in a nested directory. It replaces the shared template for `Relatorio.md`, has no letterhead and demonstrates every running slot, the footer, the table style and a page break:
 
 ```sh
 pageformer assets/examples/tecnico/Relatorio.md

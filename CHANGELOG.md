@@ -4,6 +4,13 @@
 
 *Major updates and feature releases.*
 
+### 0.13.1
+
+- Moved the office examples to `assets/examples/escritorio/`, their fictional confidential values to `assets/examples/confidencial/embargos.env`, and the generated PDFs to `assets/examples/publicacao/`.
+- Applied confidential fields to `Embargos.md` for the fictional company names, CNPJ, address, partner name, RG, CPF, court, process number, lawyers and case identifiers.
+- Regenerated the office PDFs; both still pass veraPDF as PDF/A-2b.
+- Documented that the committed values file is fictional and needs `chmod 600` after a checkout.
+
 ### 0.13.0
 
 - Renamed the secrets phase to confidentiality and implemented it. A `{NAME}` in the body is a confidential field.

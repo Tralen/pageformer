@@ -3,6 +3,8 @@
 use std::fs;
 use std::path::Path;
 
+use pageformer::confidential::loader as confidential_loader;
+use pageformer::confidential::{self, ConfidentialStore};
 use pageformer::document::{Block, Destination, Document, Inline, Metadata};
 use pageformer::markdown;
 use pageformer::pdf::{self, AssetMap, Assets};
@@ -10,12 +12,32 @@ use pageformer::template::Template;
 use pageformer::template::loader;
 use tempfile::TempDir;
 
-const CONTRACT: &str = include_str!("../assets/examples/Contrato.md");
-const EMBARGOS: &str = include_str!("../assets/examples/Embargos.md");
+const CONTRACT: &str = include_str!("../assets/examples/escritorio/Contrato.md");
+const EMBARGOS: &str = include_str!("../assets/examples/escritorio/Embargos.md");
+const EMBARGOS_VALUES: &str = include_str!("../assets/examples/confidencial/embargos.env");
 
 fn embedded() -> Template {
     Template::embedded().expect("the embedded template must be valid")
 }
+
+fn example_store() -> ConfidentialStore {
+    let directory = TempDir::new().expect("a temporary directory");
+    let path = directory.path().join("embargos.env");
+    fs::write(&path, EMBARGOS_VALUES).expect("the values must be written");
+    make_private(&path);
+    confidential_loader::load(Some(&path), &[]).expect("the example values must load")
+}
+
+#[cfg(unix)]
+fn make_private(path: &Path) {
+    use std::os::unix::fs::PermissionsExt;
+
+    fs::set_permissions(path, fs::Permissions::from_mode(0o600))
+        .expect("the permissions must change");
+}
+
+#[cfg(not(unix))]
+fn make_private(_path: &Path) {}
 
 fn contains(haystack: &[u8], needle: &[u8]) -> bool {
     haystack
@@ -67,7 +89,13 @@ fn the_contract_is_rendered_as_pdf_a_and_stays_deterministic() {
 #[test]
 fn the_embargos_fixture_is_rendered() {
     let document = markdown::parse(EMBARGOS).expect("the embargos fixture must parse");
-    let output = pdf::render(&document, &embedded(), &Assets::default())
+    let resolution = confidential::resolve(&document, &example_store())
+        .expect("the example values must resolve the fixture");
+    assert!(
+        !resolution.names().is_empty(),
+        "the fixture declares fields"
+    );
+    let output = pdf::render(resolution.document(), &embedded(), &Assets::default())
         .expect("the embargos fixture must render");
     assert!(output.bytes().starts_with(b"%PDF-"));
     assert!(output.bytes().len() > 10_000);
@@ -82,7 +110,8 @@ fn the_embargos_fixture_is_rendered() {
 fn the_shared_example_template_uses_its_letterhead() {
     let examples = Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("assets")
-        .join("examples");
+        .join("examples")
+        .join("escritorio");
     let resolved = loader::resolve(&examples, None).expect("the example template must resolve");
     assert_eq!(resolved.base_directory(), Some(examples.as_path()));
     let template = resolved.template();
@@ -92,16 +121,34 @@ fn the_shared_example_template_uses_its_letterhead() {
     );
 
     let document = markdown::parse(EMBARGOS).expect("the embargos fixture must parse");
-    let assets = pdf::load_assets(&document, template, &examples, resolved.base_directory())
-        .expect("the letterhead must load");
+    let resolution = confidential::resolve(&document, &example_store())
+        .expect("the example values must resolve the fixture");
+    let assets = pdf::load_assets(
+        resolution.document(),
+        template,
+        &examples,
+        resolved.base_directory(),
+    )
+    .expect("the letterhead must load");
     assert_eq!(assets.map().letterhead(), Some("assets/letterhead.png"));
 
-    let output = pdf::render(&document, template, &assets).expect("the example must render");
+    let output =
+        pdf::render(resolution.document(), template, &assets).expect("the example must render");
     assert!(output.bytes().starts_with(b"%PDF-"));
     assert!(
         output.warnings().is_empty(),
         "the example produced warnings: {:?}",
         output.warnings()
+    );
+    let text = String::from_utf8_lossy(output.bytes());
+    let metadata = text
+        .split_once("<x:xmpmeta")
+        .and_then(|(_, rest)| rest.split_once("</x:xmpmeta>"))
+        .map(|(packet, _)| packet)
+        .unwrap_or_default();
+    assert!(
+        !metadata.contains("55.444.333"),
+        "a confidential value reached the XMP metadata"
     );
 }
 
@@ -185,6 +232,7 @@ fn every_inline_construct_renders() {
         Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("assets")
             .join("examples")
+            .join("escritorio")
             .join("Timbre.png"),
         project.path().join("logo.png"),
     )

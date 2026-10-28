@@ -5,8 +5,8 @@ use pageformer::document::{
 };
 use pageformer::markdown;
 
-const CONTRACT: &str = include_str!("../assets/examples/Contrato.md");
-const EMBARGOS: &str = include_str!("../assets/examples/Embargos.md");
+const CONTRACT: &str = include_str!("../assets/examples/escritorio/Contrato.md");
+const EMBARGOS: &str = include_str!("../assets/examples/escritorio/Embargos.md");
 const REPORT: &str = include_str!("../assets/examples/tecnico/Relatorio.md");
 
 fn plain_text(inlines: &[Inline]) -> String {
@@ -104,6 +104,26 @@ fn the_report_uses_the_new_template_features() {
             .any(|block| matches!(block, Block::Table(_))),
         "the report has a table"
     );
+}
+
+#[test]
+fn the_embargos_fixture_uses_confidential_fields() {
+    for field in [
+        "{JUIZO}",
+        "{PROCESSO}",
+        "{EMBARGANTE_RAZAO}",
+        "{EMBARGANTE_CNPJ}",
+        "{EMBARGANTE_ENDERECO}",
+        "{SOCIO_CPF}",
+        "{RECLAMADA_CNPJ}",
+        "{ADVOGADO_1}",
+        "{VALOR_CAUSA}",
+    ] {
+        assert!(EMBARGOS.contains(field), "the fixture is missing {field}");
+    }
+    for datum in ["55.444.333/0001-22", "SSS 999", "999.555.444-0"] {
+        assert!(!EMBARGOS.contains(datum), "the fixture still has {datum}");
+    }
 }
 
 #[test]
@@ -304,7 +324,12 @@ fn embargos_final_table_has_two_columns() {
             .header()
             .first()
             .map(|cell| plain_text(cell.content())),
-        Some("Advogado do Escritório 1".to_owned())
+        Some("{ADVOGADO_1}".to_owned())
+    );
+    let row = table.rows().first().expect("a signature row");
+    assert_eq!(
+        row.first().map(|cell| plain_text(cell.content())),
+        Some("{OAB_1}".to_owned())
     );
     assert_eq!(table.rows().len(), 1);
 }

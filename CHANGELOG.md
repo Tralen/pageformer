@@ -4,6 +4,11 @@
 
 *Major updates and feature releases.*
 
+### 0.13.2
+
+- Shrank the development build: the dev profile keeps line tables only, dependencies carry no debug info and incremental compilation is off, so the main test binary dropped from about 540 MB to 155 MB and the debug tree from 88 GB to about 1.7 GB.
+- Documented the build cache and its cleanup in the README.
+
 ### 0.13.1
 
 - Moved the office examples to `assets/examples/escritorio/`, their fictional confidential values to `assets/examples/confidencial/embargos.env`, and the generated PDFs to `assets/examples/publicacao/`.

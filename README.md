@@ -8,6 +8,10 @@ Generates documents from Markdown content and a single generic YAML template. On
 
 Rust with egui for the graphical interface. The main workflow runs in the terminal; the interface is a minimal window launched by argument. PDF rendering uses Typst as an internal library, and users never write Typst.
 
+## Build
+
+The development profile keeps line tables for this crate and no debug info for dependencies, because every test binary links Typst and would otherwise weigh hundreds of megabytes; incremental compilation is off because its state reached several gigabytes for little gain in a crate this small. `cargo clean` reclaims the cache when it grows, at the cost of a full rebuild.
+
 ## Versioning
 
 SemVer; source: `Cargo.toml` (`[package].version`).

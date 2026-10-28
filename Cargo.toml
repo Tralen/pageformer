@@ -1,6 +1,6 @@
 [package]
 name = "pageformer"
-version = "0.13.1"
+version = "0.13.2"
 edition = "2024"
 license = "BSD-3-Clause"
 description = "Generates documents from Markdown and a YAML template."
@@ -20,6 +20,17 @@ typst-pdf = "0.15.1"
 [dev-dependencies]
 proptest = "1.12.0"
 tempfile = "3.27.0"
+
+[profile.dev]
+# Line tables keep backtraces useful without the full debug bloat.
+debug = 1
+# Each test run links a large binary that includes Typst; the incremental
+# state adds gigabytes and little benefit in a crate this size.
+incremental = false
+
+[profile.dev.package."*"]
+# Dependencies, chiefly Typst, carry no debug info; they are not debugged here.
+debug = false
 
 [profile.release]
 lto = "thin"

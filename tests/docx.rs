@@ -128,8 +128,24 @@ fn the_package_has_the_required_parts_and_every_xml_parses() {
     assert!(content.contains("<w:tbl>"), "tables must survive");
     assert!(content.contains("<w:tblHeader/>"), "the header row repeats");
     assert!(content.contains("<w:numPr>"), "lists use numbering");
+    assert!(content.contains("w:header=\"530\""), "the header sits high");
+    assert!(
+        content.contains("<w:spacing w:after=\"0\" w:line="),
+        "cells do not inherit the paragraph spacing"
+    );
     let header = entry(&mut archive, "word/header1.xml");
     assert!(header.contains("behindDoc=\"1\""), "the letterhead floats");
+    let settings = entry(&mut archive, "word/settings.xml");
+    assert!(
+        !settings.contains("autoHyphenation"),
+        "hyphenation stays with the editor"
+    );
+    let styles = entry(&mut archive, "word/styles.xml");
+    assert!(
+        styles.contains("w:lineRule=\"atLeast\""),
+        "a tight line does not clip the title"
+    );
+    assert!(!styles.contains("w:lineRule=\"exact\""), "{styles}");
 }
 
 #[test]

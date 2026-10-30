@@ -4,6 +4,13 @@
 
 *Major updates and feature releases.*
 
+### 0.17.1
+
+- Removed automatic hyphenation from the DOCX settings: LibreOffice asked for a dictionary even when the system package was installed. The document language stays in the styles, so the editor can enable hyphenation itself.
+- Moved the DOCX header band up so the page number clears the letterhead rule, and switched line spacing to "at least" so a tight heading line no longer clips the top of the title.
+- Table cell paragraphs now reset the paragraph spacing and the line, so rows no longer come out at double height.
+- Regenerated the DOCX examples.
+
 ### 0.17.0
 
 - Added `--format docx` and the DOCX backend: an Office Open XML package with the template's page layout, fonts, headings, lists, tables, letterhead, running header and footer, footnotes, hyperlinks, images and properties.

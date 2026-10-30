@@ -51,7 +51,7 @@ pub(crate) fn styles_xml(document: &Document, template: &Template) -> String {
         xml::push_fmt(
             &mut output,
             format_args!(
-                "<w:style w:type=\"paragraph\" w:styleId=\"Heading{level}\"><w:name w:val=\"heading {level}\"/><w:basedOn w:val=\"Normal\"/><w:next w:val=\"Normal\"/><w:qFormat/><w:pPr><w:keepNext/>{page_break}<w:spacing w:before=\"{before}\" w:after=\"{after}\" w:line=\"{line}\" w:lineRule=\"exact\"/><w:outlineLvl w:val=\"{outline}\"/></w:pPr><w:rPr>{fonts}{bold}{italic}<w:sz w:val=\"{size}\"/><w:szCs w:val=\"{size}\"/></w:rPr></w:style>\n",
+                "<w:style w:type=\"paragraph\" w:styleId=\"Heading{level}\"><w:name w:val=\"heading {level}\"/><w:basedOn w:val=\"Normal\"/><w:next w:val=\"Normal\"/><w:qFormat/><w:pPr><w:keepNext/>{page_break}<w:spacing w:before=\"{before}\" w:after=\"{after}\" w:line=\"{line}\" w:lineRule=\"atLeast\"/><w:outlineLvl w:val=\"{outline}\"/></w:pPr><w:rPr>{fonts}{bold}{italic}<w:sz w:val=\"{size}\"/><w:szCs w:val=\"{size}\"/></w:rPr></w:style>\n",
                 page_break = if heading.page_break_before() {
                     "<w:pageBreakBefore/>"
                 } else {
@@ -113,7 +113,7 @@ fn language_attribute(document: &Document) -> String {
 
 fn spacing(line: f64, after: f64) -> String {
     format!(
-        "<w:spacing w:after=\"{}\" w:line=\"{}\" w:lineRule=\"exact\"/>",
+        "<w:spacing w:after=\"{}\" w:line=\"{}\" w:lineRule=\"atLeast\"/>",
         metrics::twips(after),
         metrics::twips(line)
     )

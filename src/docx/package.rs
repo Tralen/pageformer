@@ -276,7 +276,6 @@ pub(crate) fn settings_xml() -> String {
     concat!(
         "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n",
         "<w:settings xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\">\n",
-        "<w:autoHyphenation w:val=\"true\"/>\n",
         "<w:updateFields w:val=\"true\"/>\n",
         "<w:compat/>\n",
         "</w:settings>\n"

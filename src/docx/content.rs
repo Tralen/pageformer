@@ -501,9 +501,14 @@ impl<'a> Builder<'a> {
             ColumnAlignment::Center => "center",
             ColumnAlignment::Right => "right",
         };
+        let paragraph = self.template.formatting().paragraph();
+        let line = metrics::line_advance(paragraph.face().size(), paragraph.leading());
         xml::push_fmt(
             output,
-            format_args!("<w:p><w:pPr><w:jc w:val=\"{justify}\"/></w:pPr>{runs}</w:p>"),
+            format_args!(
+                "<w:p><w:pPr><w:spacing w:after=\"0\" w:line=\"{}\" w:lineRule=\"atLeast\"/><w:jc w:val=\"{justify}\"/></w:pPr>{runs}</w:p>",
+                metrics::twips(line)
+            ),
         );
         xml::push(output, "</w:tc>");
     }
@@ -576,7 +581,7 @@ impl<'a> Builder<'a> {
             ""
         };
         format!(
-            "<w:sectPr>{header}{footer}<w:pgSz w:w=\"{width}\" w:h=\"{height}\"/><w:pgMar w:top=\"{top}\" w:right=\"{right}\" w:bottom=\"{bottom}\" w:left=\"{left}\" w:header=\"850\" w:footer=\"567\" w:gutter=\"0\"/></w:sectPr>\n",
+            "<w:sectPr>{header}{footer}<w:pgSz w:w=\"{width}\" w:h=\"{height}\"/><w:pgMar w:top=\"{top}\" w:right=\"{right}\" w:bottom=\"{bottom}\" w:left=\"{left}\" w:header=\"530\" w:footer=\"567\" w:gutter=\"0\"/></w:sectPr>\n",
             width = metrics::twips(dimensions.width().points()),
             height = metrics::twips(dimensions.height().points()),
             top = metrics::twips(margins.top().points()),

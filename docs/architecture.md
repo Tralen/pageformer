@@ -121,7 +121,7 @@ DOCX uses an internal OOXML writer that reuses the deterministic ZIP and the sha
 
 Every list gets its own numbering instance, and an ordered list that does not start at one carries a start override, so legal numbering restarts where the source says. Table header rows repeat through `w:tblHeader`, the template supplies the borders, the header fill and the cell padding, and the Markdown alignment sets the cell alignment. The running header and footer use tab stops for the three slots, `PAGE` and `NUMPAGES` fields for the page tokens, and the letterhead as a floating image anchored to the page behind the text. Footnotes are inline note references with collected bodies. Metadata carries the title, author, subject, keywords and language, and never a body value.
 
-Word hyphenates through `w:autoHyphenation` and the document language, so the line breaks stay close to Typst. Pagination can still differ between an editor and the PDF, because Word and LibreOffice lay out lines with their own engines; the DOCX target is a faithful, repairable package, not a page-count match.
+Word hyphenates only when the reader enables it: automatic hyphenation is left out of the package, because enabling it in the settings made LibreOffice ask for a dictionary even when the system package was installed. The document language is still written in the styles, so the editor uses the right spelling and can turn hyphenation on. Line breaks can therefore differ slightly from the PDF.
 
 ## PDF engine
 

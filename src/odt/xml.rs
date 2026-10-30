@@ -53,6 +53,23 @@ pub fn points_value(points: f64) -> String {
     format!("{:.2}pt", points)
 }
 
+/// The ratio of a font's cap height to its size, the line box Typst uses by
+/// default.
+pub const CAP_HEIGHT_RATIO: f64 = 0.657;
+
+/// The line advance Typst produces: the leading plus the cap height.
+pub fn line_advance(size: Length, leading: Length) -> f64 {
+    leading.points() + size.points() * CAP_HEIGHT_RATIO
+}
+
+/// Formats a line advance in points.
+pub fn line_advance_attribute(size: Length, leading: Length) -> String {
+    format!(
+        "fo:line-height=\"{}\" ",
+        points_value(line_advance(size, leading))
+    )
+}
+
 /// Formats a length in centimetres, such as `21.000cm`.
 pub fn centimetres(length: Length) -> String {
     centimetres_points(length.points())
@@ -61,11 +78,6 @@ pub fn centimetres(length: Length) -> String {
 /// Formats a length given in points as centimetres, such as `21.000cm`.
 pub fn centimetres_points(points: f64) -> String {
     format!("{:.3}cm", points / 72.0 * 2.54)
-}
-
-/// Whether a value is exactly zero points.
-pub fn is_zero(length: Length) -> bool {
-    length.points() == 0.0
 }
 
 /// Writes a string without failing, because writing to a `String` cannot fail.

@@ -4,6 +4,13 @@
 
 *Major updates and feature releases.*
 
+### 0.16.1
+
+- Matched the ODT spacing to the PDF: the ODF line height is the leading plus the cap height Typst uses, paragraph spacing subtracts the leading, heading margins account for the Writer line box, and tight list items carry no paragraph margin.
+- Table cells no longer inherit paragraph spacing, and the leading is absorbed into the vertical padding, so rows have the same height as the PDF.
+- A running header or footer reserves its band from the page margin, so the text area keeps the template margins and the header sits over the letterhead instead of pushing the body.
+- The three ODT examples now match the PDF page counts (4, 4 and 3) and were regenerated.
+
 ### 0.16.0
 
 - Added `--format odt` and the ODT backend: an OpenDocument text package with the template's page layout, fonts, headings, lists, tables, letterhead background, running header and footer, footnotes, links, images and metadata.

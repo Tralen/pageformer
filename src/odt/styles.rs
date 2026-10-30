@@ -46,8 +46,8 @@ pub fn styles_xml(document: &Document, template: &Template, assets: &Assets) -> 
         &mut output,
         format_args!(
             "<style:style style:name=\"Standard\" style:family=\"paragraph\" style:class=\"text\"><style:paragraph-properties {line_height}{margin_bottom}fo:text-align=\"{align}\"/><style:text-properties style:font-name=\"{family}\" fo:font-size=\"{size}\" fo:font-weight=\"{weight}\" fo:font-style=\"{slant}\"/></style:style>\n",
-            line_height = line_height(paragraph.leading(), face.size()),
-            margin_bottom = margin_bottom(paragraph.spacing()),
+            line_height = xml::line_advance_attribute(face.size(), paragraph.leading()),
+            margin_bottom = margin_bottom(paragraph.spacing(), paragraph.leading()),
             align = alignment(paragraph.alignment()),
             family = xml::escape_attribute(first_family(face)),
             size = xml::points(face.size()),
@@ -72,9 +72,14 @@ pub fn styles_xml(document: &Document, template: &Template, assets: &Assets) -> 
         xml::push_fmt(
             &mut output,
             format_args!(
-                "<style:style style:name=\"Heading{level}\" style:family=\"paragraph\" style:parent-style-name=\"Standard\" style:next-style-name=\"Standard\"><style:paragraph-properties fo:margin-top=\"{before}\" fo:margin-bottom=\"{after}\" fo:keep-with-next=\"always\" style:default-outline-level=\"{level}\"{page_break}/><style:text-properties style:font-name=\"{family}\" fo:font-size=\"{size}\" fo:font-weight=\"{weight}\" fo:font-style=\"{slant}\"/></style:style>\n",
-                before = xml::points(heading.spacing_before()),
-                after = xml::points(heading.spacing_after()),
+                "<style:style style:name=\"Heading{level}\" style:family=\"paragraph\" style:parent-style-name=\"Standard\" style:next-style-name=\"Standard\"><style:paragraph-properties {line_height}fo:margin-top=\"{before}\" fo:margin-bottom=\"{after}\" fo:keep-with-next=\"always\" style:default-outline-level=\"{level}\"{page_break}/><style:text-properties style:font-name=\"{family}\" fo:font-size=\"{size}\" fo:font-weight=\"{weight}\" fo:font-style=\"{slant}\"/></style:style>\n",
+                line_height = xml::line_advance_attribute(face.size(), paragraph.leading()),
+                before = xml::points_value(heading_margin(
+                    heading.spacing_before(),
+                    paragraph.leading(),
+                    paragraph.spacing()
+                )),
+                after = xml::points_value(heading_after(heading.spacing_after())),
                 page_break = if heading.page_break_before() {
                     " fo:break-before=\"page\""
                 } else {
@@ -158,24 +163,42 @@ fn alignment(alignment: ParagraphAlignment) -> &'static str {
     }
 }
 
-fn line_height(leading: crate::template::Length, size: crate::template::Length) -> String {
-    if xml::is_zero(leading) {
-        String::new()
-    } else {
-        format!(
-            "fo:line-height=\"{}\" ",
-            xml::points_value(size.points() + leading.points())
-        )
+fn margin_bottom(
+    spacing: Option<crate::template::Length>,
+    leading: crate::template::Length,
+) -> String {
+    match spacing {
+        Some(spacing) => {
+            let value = spacing.points() - leading.points();
+            if value > 0.0 {
+                format!("fo:margin-bottom=\"{}\" ", xml::points_value(value))
+            } else {
+                String::new()
+            }
+        }
+        None => String::new(),
     }
 }
 
-fn margin_bottom(spacing: Option<crate::template::Length>) -> String {
-    match spacing {
-        Some(spacing) if !xml::is_zero(spacing) => {
-            format!("fo:margin-bottom=\"{}\" ", xml::points(spacing))
-        }
-        _ => String::new(),
-    }
+/// Writer adds the space below a paragraph to the space above the next block,
+/// while Typst uses the heading spacing alone, so the paragraph margin is
+/// subtracted from the heading margin.
+fn heading_margin(
+    spacing: crate::template::Length,
+    leading: crate::template::Length,
+    paragraph_spacing: Option<crate::template::Length>,
+) -> f64 {
+    let paragraph = match paragraph_spacing {
+        Some(value) => (value.points() - leading.points()).max(0.0),
+        None => 0.0,
+    };
+    (spacing.points() - paragraph - HEADING_TOP_TRIM).max(0.0)
+}
+
+/// Writer places the heading line box before the space below it, so the
+/// heading margin is trimmed by the line box the Typst heading does not add.
+fn heading_after(spacing: crate::template::Length) -> f64 {
+    (spacing.points() - HEADING_BOTTOM_TRIM).max(0.0)
 }
 
 fn list_styles(output: &mut String) {
@@ -206,6 +229,15 @@ fn list_styles(output: &mut String) {
     }
 }
 
+/// The minimum height reserved for a running header or footer.
+const RUNNING_MIN_HEIGHT: f64 = 0.8 * 72.0 / 2.54;
+/// The gap between a running header or footer and the text area.
+const RUNNING_SPACING: f64 = 0.3 * 72.0 / 2.54;
+/// How much of the heading space above Writer already counts in the line box.
+const HEADING_TOP_TRIM: f64 = 6.0;
+/// How much of the heading space below Writer already counts in the line box.
+const HEADING_BOTTOM_TRIM: f64 = 10.0;
+
 fn page_layout(output: &mut String, template: &Template, assets: &Assets) {
     let page = template.page();
     let dimensions = page.dimensions();
@@ -214,6 +246,21 @@ fn page_layout(output: &mut String, template: &Template, assets: &Assets) {
         Orientation::Portrait => "portrait",
         Orientation::Landscape => "landscape",
     };
+    // Writer adds the header and the footer to the page margins, so the
+    // margins are reduced by the reserved band to keep the text area where the
+    // template puts it.
+    let header_reserve = if page.header().is_some() {
+        RUNNING_MIN_HEIGHT + RUNNING_SPACING
+    } else {
+        0.0
+    };
+    let footer_reserve = if page.footer().is_some() {
+        RUNNING_MIN_HEIGHT + RUNNING_SPACING
+    } else {
+        0.0
+    };
+    let top = (margins.top().points() - header_reserve).max(0.0);
+    let bottom = (margins.bottom().points() - footer_reserve).max(0.0);
     xml::push(output, "<style:page-layout style:name=\"PageLayout\">\n");
     xml::push_fmt(
         output,
@@ -221,8 +268,8 @@ fn page_layout(output: &mut String, template: &Template, assets: &Assets) {
             "<style:page-layout-properties fo:page-width=\"{width}\" fo:page-height=\"{height}\" style:print-orientation=\"{orientation}\" fo:margin-top=\"{top}\" fo:margin-bottom=\"{bottom}\" fo:margin-left=\"{left}\" fo:margin-right=\"{right}\" style:writing-mode=\"lr-tb\">\n",
             width = xml::centimetres(dimensions.width()),
             height = xml::centimetres(dimensions.height()),
-            top = xml::centimetres(margins.top()),
-            bottom = xml::centimetres(margins.bottom()),
+            top = xml::centimetres_points(top),
+            bottom = xml::centimetres_points(bottom),
             left = xml::centimetres(margins.left()),
             right = xml::centimetres(margins.right()),
         ),
@@ -238,15 +285,23 @@ fn page_layout(output: &mut String, template: &Template, assets: &Assets) {
     }
     xml::push(output, "</style:page-layout-properties>\n");
     if page.header().is_some() {
-        xml::push(
+        xml::push_fmt(
             output,
-            "<style:header-style><style:header-footer-properties fo:min-height=\"0.8cm\" fo:margin-bottom=\"0.3cm\"/></style:header-style>\n",
+            format_args!(
+                "<style:header-style><style:header-footer-properties fo:min-height=\"{}\" fo:margin-bottom=\"{}\"/></style:header-style>\n",
+                xml::centimetres_points(RUNNING_MIN_HEIGHT),
+                xml::centimetres_points(RUNNING_SPACING),
+            ),
         );
     }
     if page.footer().is_some() {
-        xml::push(
+        xml::push_fmt(
             output,
-            "<style:footer-style><style:header-footer-properties fo:min-height=\"0.8cm\" fo:margin-top=\"0.3cm\"/></style:footer-style>\n",
+            format_args!(
+                "<style:footer-style><style:header-footer-properties fo:min-height=\"{}\" fo:margin-top=\"{}\"/></style:footer-style>\n",
+                xml::centimetres_points(RUNNING_MIN_HEIGHT),
+                xml::centimetres_points(RUNNING_SPACING),
+            ),
         );
     }
     xml::push(output, "</style:page-layout>\n");

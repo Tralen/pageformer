@@ -182,7 +182,7 @@ table:
 
     assert!(styles.contains("fo:font-size=\"13.00pt\""), "{styles}");
     assert!(styles.contains("fo:font-size=\"27.00pt\""), "{styles}");
-    assert!(styles.contains("fo:line-height=\"17.00pt\""), "{styles}");
+    assert!(styles.contains("fo:line-height=\"12.54pt\""), "{styles}");
     assert!(content.contains("#123456"), "{content}");
     assert!(content.contains("2.00pt"), "{content}");
 }
@@ -240,6 +240,61 @@ fn footnotes_alerts_and_page_breaks_are_mapped() {
         content.contains("text:style-name=\"PageBreak\""),
         "{content}"
     );
+}
+
+#[test]
+fn the_line_spacing_follows_the_typst_leading_model() {
+    let template = Template::from_yaml(
+        "version: \"0.5\"\nformatting:\n  paragraph:\n    size: 12\n    leading: 8\n    spacing: 24\n",
+    )
+    .expect("the template must be valid");
+    let document = Document::new(Metadata::default(), Vec::new());
+    let bytes = odt::render(&document, &template, &Assets::default()).expect("the package");
+    let mut archive = ZipArchive::new(Cursor::new(bytes)).expect("the package must be a ZIP");
+    let styles = entry(&mut archive, "styles.xml");
+
+    assert!(styles.contains("fo:line-height=\"15.88pt\""), "{styles}");
+    assert!(styles.contains("fo:margin-bottom=\"16.00pt\""), "{styles}");
+}
+
+#[test]
+fn table_cells_absorb_the_leading_and_do_not_inherit_paragraph_spacing() {
+    let template = Template::from_yaml(
+        "version: \"0.5\"\nformatting:\n  paragraph:\n    size: 12\n    leading: 8\ntable:\n  cell_padding: 6pt\n",
+    )
+    .expect("the template must be valid");
+    let document = Document::new(
+        Metadata::default(),
+        vec![Block::Table(
+            Table::new(
+                vec![ColumnAlignment::Default],
+                vec![TableCell::new(vec![Inline::Text("H".to_owned())])],
+                vec![],
+            )
+            .expect("a table"),
+        )],
+    );
+    let bytes = odt::render(&document, &template, &Assets::default()).expect("the package");
+    let mut archive = ZipArchive::new(Cursor::new(bytes)).expect("the package must be a ZIP");
+    let content = entry(&mut archive, "content.xml");
+
+    assert!(content.contains("fo:padding-top=\"2.00pt\""), "{content}");
+    assert!(content.contains("fo:margin-bottom=\"0cm\""), "{content}");
+}
+
+#[test]
+fn a_running_header_reserves_its_band_from_the_page_margin() {
+    let template = Template::from_yaml(
+        "version: \"0.5\"\npage:\n  margins:\n    top: 30mm\n  header:\n    right: \"{page}\"\n",
+    )
+    .expect("the template must be valid");
+    let document = Document::new(Metadata::default(), Vec::new());
+    let bytes = odt::render(&document, &template, &Assets::default()).expect("the package");
+    let mut archive = ZipArchive::new(Cursor::new(bytes)).expect("the package must be a ZIP");
+    let styles = entry(&mut archive, "styles.xml");
+
+    assert!(styles.contains("fo:margin-top=\"1.900cm\""), "{styles}");
+    assert!(styles.contains("<style:header>"), "{styles}");
 }
 
 fn minimal_png() -> Vec<u8> {

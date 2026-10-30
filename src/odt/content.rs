@@ -25,11 +25,8 @@ const PREFIX: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
 <style:style style:name="Code" style:family="paragraph" style:parent-style-name="Standard"><style:text-properties fo:font-family="'Liberation Mono', monospace"/></style:style>
 <style:style style:name="CodeBreak" style:family="paragraph" style:parent-style-name="Code"><style:paragraph-properties fo:break-before="page"/></style:style>
 <style:style style:name="QuoteParagraph" style:family="paragraph" style:parent-style-name="Standard"><style:paragraph-properties fo:margin-left="1cm" fo:margin-right="1cm"/></style:style>
+<style:style style:name="ListItem" style:family="paragraph" style:parent-style-name="Standard"><style:paragraph-properties fo:margin-bottom="0cm"/></style:style>
 <style:style style:name="HorizontalLine" style:family="paragraph" style:parent-style-name="Standard"><style:paragraph-properties fo:border-bottom="0.75pt solid #000000" fo:padding-bottom="0.1cm"/></style:style>
-<style:style style:name="CellDefault" style:family="paragraph"><style:paragraph-properties fo:text-align="start"/></style:style>
-<style:style style:name="CellLeft" style:family="paragraph"><style:paragraph-properties fo:text-align="left"/></style:style>
-<style:style style:name="CellCenter" style:family="paragraph"><style:paragraph-properties fo:text-align="center"/></style:style>
-<style:style style:name="CellRight" style:family="paragraph"><style:paragraph-properties fo:text-align="right"/></style:style>
 "#;
 
 /// Generates the content part.
@@ -40,6 +37,7 @@ pub fn content_xml(document: &Document, template: &Template, assets: &Assets) ->
 
     let mut output = String::new();
     xml::push(&mut output, PREFIX);
+    cell_paragraph_styles(&mut output, template);
     xml::push(&mut output, &builder.generated);
     xml::push(
         &mut output,
@@ -217,14 +215,16 @@ impl<'a> Builder<'a> {
             } else {
                 xml::push(&mut self.body, "<text:list-item>\n");
             }
-            self.item(item);
+            let last = index.saturating_add(1) == list.items().len();
+            self.item(item, list.is_tight() && !last);
             xml::push(&mut self.body, "</text:list-item>\n");
             number = number.saturating_add(1);
         }
         xml::push(&mut self.body, "</text:list>\n");
     }
 
-    fn item(&mut self, item: &ListItem) {
+    fn item(&mut self, item: &ListItem, tight: bool) {
+        let base = if tight { "ListItem" } else { "Standard" };
         let marker = match item.task() {
             Some(TaskState::Done) => "[x] ",
             Some(TaskState::Todo) => "[ ] ",
@@ -232,7 +232,11 @@ impl<'a> Builder<'a> {
         };
         match item.blocks().first() {
             Some(Block::Paragraph(inlines)) => {
-                let style = self.style_with_break("Standard");
+                let style = if self.pending_break {
+                    self.style_with_break("Standard")
+                } else {
+                    base.to_owned()
+                };
                 self.open_paragraph(&style);
                 self.text(marker);
                 self.inlines(inlines);
@@ -243,7 +247,11 @@ impl<'a> Builder<'a> {
             }
             _ => {
                 if !marker.is_empty() {
-                    let style = self.style_with_break("Standard");
+                    let style = if self.pending_break {
+                        self.style_with_break("Standard")
+                    } else {
+                        base.to_owned()
+                    };
                     self.paragraph_with(&style, &[Inline::Text(marker.trim_end().to_owned())]);
                 }
                 self.blocks(item.blocks());
@@ -260,22 +268,29 @@ impl<'a> Builder<'a> {
         let style = self.template.table();
         let border = xml::points(style.border());
         let color = style.border_color().hex();
-        let padding = xml::points(style.cell_padding());
+        let paragraph = self.template.formatting().paragraph();
+        let horizontal = style.cell_padding().points();
+        let vertical =
+            (style.cell_padding().points() - paragraph.leading().points() / 2.0).max(0.0);
 
         xml::push_fmt(
             &mut self.generated,
             format_args!(
                 "<style:style style:name=\"{name}\" style:family=\"table\"><style:table-properties style:width=\"100%\" table:align=\"margins\" table:border-model=\"collapsing\" fo:border=\"{border} solid {color}\"/></style:style>\n\
                  <style:style style:name=\"{name}.Column\" style:family=\"table-column\"><style:table-column-properties style:column-width=\"{width}\"/></style:style>\n\
-                 <style:style style:name=\"{name}.Cell\" style:family=\"table-cell\"><style:table-cell-properties fo:padding=\"{padding}\" fo:border=\"{border} solid {color}\"/></style:style>\n",
+                 <style:style style:name=\"{name}.Cell\" style:family=\"table-cell\"><style:table-cell-properties fo:padding-left=\"{left}\" fo:padding-right=\"{left}\" fo:padding-top=\"{top}\" fo:padding-bottom=\"{top}\" fo:border=\"{border} solid {color}\"/></style:style>\n",
                 width = xml::centimetres_points(column_width),
+                left = xml::points_value(horizontal),
+                top = xml::points_value(vertical),
             ),
         );
         if let Some(fill) = style.header_fill() {
             xml::push_fmt(
                 &mut self.generated,
                 format_args!(
-                    "<style:style style:name=\"{name}.Header\" style:family=\"table-cell\"><style:table-cell-properties fo:padding=\"{padding}\" fo:border=\"{border} solid {color}\" fo:background-color=\"{fill}\"/></style:style>\n",
+                    "<style:style style:name=\"{name}.Header\" style:family=\"table-cell\"><style:table-cell-properties fo:padding-left=\"{left}\" fo:padding-right=\"{left}\" fo:padding-top=\"{top}\" fo:padding-bottom=\"{top}\" fo:border=\"{border} solid {color}\" fo:background-color=\"{fill}\"/></style:style>\n",
+                    left = xml::points_value(horizontal),
+                    top = xml::points_value(vertical),
                     fill = fill.hex(),
                 ),
             );
@@ -505,6 +520,25 @@ impl<'a> Builder<'a> {
         self.blocks(definition.blocks());
         self.active.pop();
         xml::push(&mut self.body, "</text:note-body></text:note>");
+    }
+}
+
+fn cell_paragraph_styles(output: &mut String, template: &Template) {
+    let paragraph = template.formatting().paragraph();
+    let line = xml::line_advance(paragraph.face().size(), paragraph.leading());
+    for (name, alignment) in [
+        ("CellDefault", "start"),
+        ("CellLeft", "left"),
+        ("CellCenter", "center"),
+        ("CellRight", "right"),
+    ] {
+        xml::push_fmt(
+            output,
+            format_args!(
+                "<style:style style:name=\"{name}\" style:family=\"paragraph\"><style:paragraph-properties fo:line-height=\"{line}\" fo:margin-bottom=\"0cm\" fo:text-align=\"{alignment}\"/></style:style>\n",
+                line = xml::points_value(line),
+            ),
+        );
     }
 }
 

@@ -4,6 +4,13 @@
 
 *Major updates and feature releases.*
 
+### 0.31.3
+
+- Moved the Confidential file into the Advanced section of `pageformer-publisher`, next to the manual Markdown path.
+- Added explanatory tooltips to the labels, fields, buttons and status elements; the tooltip opens on the field name and on the field itself. The tooltips use a light-gray background with black text, and the `(?)` marker is gone.
+- Added a Choose button to Output, matching Confidential; it picks a folder instead of a file.
+- Regenerates the ODT examples for the version in `meta:generator`.
+
 ### 0.31.2
 
 - Moved the confidential-output rule in `pageformer-publisher` to a tooltip on the Output label: "A document with confidential fields must be exported to a folder outside its source tree." The permanent hint line is gone, and the window is closer to the sketch.

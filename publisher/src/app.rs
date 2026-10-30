@@ -164,7 +164,11 @@ pub struct Publisher {
 }
 
 impl Publisher {
-    pub fn new() -> Self {
+    pub fn new(context: &eframe::CreationContext<'_>) -> Self {
+        context.egui_ctx.all_styles_mut(|style| {
+            style.visuals.window_fill = egui::Color32::from_gray(220);
+            style.visuals.window_stroke = egui::Stroke::new(1.0, egui::Color32::from_gray(120));
+        });
         Self {
             session: Session::new(),
             input_field: String::new(),
@@ -275,17 +279,37 @@ impl Publisher {
         }
     }
 
+    fn choose_output(&mut self) {
+        if let Some(path) = open::choose_folder("Choose the output folder") {
+            self.session.output_directory = path.display().to_string();
+        }
+    }
+
     fn render(&mut self, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
-            ui.label("Template:");
-            ui.label(egui::RichText::new(&self.template_label).small());
+            with_tooltip(
+                ui.label("Template:"),
+                "The template resolved for the selected Markdown: the nearest local file, then the global file, then the embedded fallback.",
+            );
+            with_tooltip(
+                ui.label(egui::RichText::new(&self.template_label).small()),
+                "The resolved template path, or embedded when the binary fallback is used.",
+            );
             if let Some(path) = self.template_path.clone() {
-                if ui.small_button("Edit").clicked() {
+                let edit = with_tooltip(
+                    ui.small_button("Edit"),
+                    "Open the template in the default editor.",
+                );
+                if edit.clicked() {
                     self.open(&path);
                 }
                 if let Some(folder) = path.parent() {
                     let folder = folder.to_path_buf();
-                    if ui.small_button("Folder").clicked() {
+                    let open_folder = with_tooltip(
+                        ui.small_button("Folder"),
+                        "Open the folder that contains the template.",
+                    );
+                    if open_folder.clicked() {
                         self.open(&folder);
                     }
                 }
@@ -336,6 +360,10 @@ impl Publisher {
                 font,
                 color,
             );
+            let response = with_tooltip(
+                response,
+                "Drop a Markdown file here, or click to choose one. On i3, zzzFM may not deliver the drop; use the picker.",
+            );
             if !working && response.clicked() {
                 self.choose_markdown();
             }
@@ -347,7 +375,14 @@ impl Publisher {
                 for format in Format::ALL {
                     let button = egui::Button::new(format.name().to_uppercase())
                         .min_size(egui::vec2(button_width, 36.0));
-                    if ui.add_enabled(enabled, button).clicked() {
+                    let response = with_tooltip(
+                        ui.add_enabled(enabled, button),
+                        &format!(
+                            "Render the selected document as {}.",
+                            format.name().to_uppercase()
+                        ),
+                    );
+                    if response.clicked() {
                         self.start(format);
                     }
                 }
@@ -356,79 +391,148 @@ impl Publisher {
 
         if let Some(input) = self.session.input.clone() {
             ui.add_space(4.0);
-            ui.label(format!("Selected: {}", input.display()));
+            with_tooltip(
+                ui.label(format!("Selected: {}", input.display())),
+                "The Markdown file that will be rendered.",
+            );
         }
 
         ui.add_space(8.0);
         ui.horizontal(|ui| {
-            ui.label("Output (?)").on_hover_text(
-                "A document with confidential fields must be exported to a folder outside its source tree.",
+            with_tooltip(
+                ui.label("Output:"),
+                "Folder for the generated file. It is prefilled with the Markdown folder; a document with confidential fields needs a folder outside its source tree.",
             );
-            ui.add(
+            let width = (ui.available_width() - 90.0).max(120.0);
+            let field = ui.add(
                 egui::TextEdit::singleline(&mut self.session.output_directory)
-                    .desired_width(f32::INFINITY),
+                    .desired_width(width),
             );
-        });
-        ui.horizontal(|ui| {
-            ui.label("Confidential:");
-            ui.add(
-                egui::TextEdit::singleline(&mut self.session.confidential_file)
-                    .desired_width(320.0),
+            with_tooltip(
+                field,
+                "Folder for the generated file. It is prefilled with the Markdown folder; a document with confidential fields needs a folder outside its source tree.",
             );
-            if ui.button("Choose").clicked() {
-                self.choose_confidential();
+            let choose = with_tooltip(
+                ui.button("Choose"),
+                "Choose the output folder with the platform dialog.",
+            );
+            if choose.clicked() {
+                self.choose_output();
             }
         });
 
-        egui::CollapsingHeader::new("Advanced").show(ui, |ui| {
+        let advanced = egui::CollapsingHeader::new("Advanced").show(ui, |ui| {
             ui.horizontal(|ui| {
-                ui.label("Markdown path:");
-                ui.text_edit_singleline(&mut self.input_field);
-                if ui.button("Use path").clicked() {
+                with_tooltip(
+                    ui.label("Markdown path:"),
+                    "Type or paste a Markdown path when dropping or choosing a file is not available.",
+                );
+                let field = ui.text_edit_singleline(&mut self.input_field);
+                with_tooltip(
+                    field,
+                    "Type or paste a Markdown path when dropping or choosing a file is not available.",
+                );
+                let use_path = with_tooltip(
+                    ui.button("Use path"),
+                    "Use the typed Markdown path.",
+                );
+                if use_path.clicked() {
                     self.accept_input_field();
                 }
             });
+            ui.horizontal(|ui| {
+                with_tooltip(
+                    ui.label("Confidential:"),
+                    "INI file with the confidential {NAME} values. It must be outside the source tree, with mode 600.",
+                );
+                let field = ui.add(
+                    egui::TextEdit::singleline(&mut self.session.confidential_file)
+                        .desired_width(320.0),
+                );
+                with_tooltip(
+                    field,
+                    "INI file with the confidential {NAME} values. It must be outside the source tree, with mode 600.",
+                );
+                let choose = with_tooltip(
+                    ui.button("Choose"),
+                    "Choose the confidential INI file with the platform dialog.",
+                );
+                if choose.clicked() {
+                    self.choose_confidential();
+                }
+            });
         });
+        with_tooltip(
+            advanced.header_response,
+            "Manual Markdown path and confidential values.",
+        );
 
         ui.add_space(8.0);
         match self.session.state.clone() {
             State::Idle => {
-                ui.label("Drop a Markdown file or click the box to choose.");
+                with_tooltip(
+                    ui.label("Drop a Markdown file or click the box to choose."),
+                    "Choose a Markdown file to enable the format buttons.",
+                );
             }
             State::Working { format } => {
                 ui.horizontal(|ui| {
-                    ui.spinner();
-                    ui.label(format!("Rendering {}...", format.name()));
+                    let spinner = ui.spinner();
+                    with_tooltip(
+                        spinner,
+                        "The export runs on a worker thread; the window stays responsive.",
+                    );
+                    with_tooltip(
+                        ui.label(format!("Rendering {}...", format.name())),
+                        "The export runs on a worker thread; the window stays responsive.",
+                    );
                 });
             }
             State::Succeeded { output, warnings } => {
-                ui.colored_label(
-                    egui::Color32::from_rgb(0x2e, 0x7d, 0x32),
-                    format!("Wrote {}", output.display()),
+                with_tooltip(
+                    ui.colored_label(
+                        egui::Color32::from_rgb(0x2e, 0x7d, 0x32),
+                        format!("Wrote {}", output.display()),
+                    ),
+                    "The generated file.",
                 );
                 ui.horizontal(|ui| {
-                    if ui.button("Open").clicked() {
+                    let open = with_tooltip(
+                        ui.button("Open"),
+                        "Open the generated file in the default application.",
+                    );
+                    if open.clicked() {
                         self.open(&output);
                     }
                     if let Some(folder) = output.parent() {
                         let folder = folder.to_path_buf();
-                        if ui.button("Folder").clicked() {
+                        let open_folder = with_tooltip(
+                            ui.button("Folder"),
+                            "Open the folder that contains the generated file.",
+                        );
+                        if open_folder.clicked() {
                             self.open(&folder);
                         }
                     }
                 });
                 for warning in warnings {
-                    ui.label(warning);
+                    with_tooltip(ui.label(warning), "A warning from the renderer.");
                 }
             }
             State::Failed { message } => {
-                ui.colored_label(egui::Color32::from_rgb(0xb0, 0x2a, 0x2a), message);
+                with_tooltip(
+                    ui.colored_label(egui::Color32::from_rgb(0xb0, 0x2a, 0x2a), message),
+                    "The export failed; correct the input, template or output folder and try again.",
+                );
             }
         }
 
         if let Some(message) = &self.message {
             ui.add_space(4.0);
-            ui.colored_label(egui::Color32::from_rgb(0xb0, 0x2a, 0x2a), message);
+            with_tooltip(
+                ui.colored_label(egui::Color32::from_rgb(0xb0, 0x2a, 0x2a), message),
+                "A message about the file picker or the desktop action.",
+            );
         }
     }
 }
@@ -444,6 +548,17 @@ impl eframe::App for Publisher {
             self.render(ui);
         });
     }
+}
+
+fn with_tooltip(response: egui::Response, text: &str) -> egui::Response {
+    response
+        .on_hover_ui(|ui| show_tooltip(ui, text))
+        .on_disabled_hover_ui(|ui| show_tooltip(ui, text))
+}
+
+fn show_tooltip(ui: &mut egui::Ui, text: &str) {
+    ui.set_max_width(320.0);
+    ui.label(egui::RichText::new(text).color(egui::Color32::BLACK));
 }
 
 fn run_export(request: ExportRequest) -> Result<Completed, String> {

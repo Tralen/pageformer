@@ -15,6 +15,6 @@ fn main() -> eframe::Result {
     eframe::run_native(
         "Pageformer Publisher",
         options,
-        Box::new(|_context| Ok(Box::new(app::Publisher::new()))),
+        Box::new(|context| Ok(Box::new(app::Publisher::new(context)))),
     )
 }

@@ -50,3 +50,25 @@ pub fn choose_file(title: &str, filter_name: &str, extension: &str) -> Option<Pa
         .add_filter(filter_name, &[extension])
         .pick_file()
 }
+
+/// Chooses a folder with the platform dialog.
+#[cfg(target_os = "linux")]
+pub fn choose_folder(title: &str) -> Option<PathBuf> {
+    let output = Command::new("zenity")
+        .arg("--file-selection")
+        .arg("--directory")
+        .arg(format!("--title={title}"))
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let path = String::from_utf8_lossy(&output.stdout).trim().to_owned();
+    (!path.is_empty()).then(|| PathBuf::from(path))
+}
+
+/// Chooses a folder with the native platform dialog.
+#[cfg(not(target_os = "linux"))]
+pub fn choose_folder(title: &str) -> Option<PathBuf> {
+    rfd::FileDialog::new().set_title(title).pick_folder()
+}

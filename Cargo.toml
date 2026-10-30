@@ -1,6 +1,6 @@
 [package]
 name = "pageformer"
-version = "0.21.0"
+version = "0.22.0"
 edition = "2024"
 license = "BSD-3-Clause"
 description = "Generates documents from Markdown and a YAML template."

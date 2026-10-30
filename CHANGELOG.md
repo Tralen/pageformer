@@ -4,6 +4,11 @@
 
 *Major updates and feature releases.*
 
+### 0.22.0
+
+- Every color field now accepts the 148 CSS named colors and the `#rgb` short form, besides `#rrggbb`, in any case: `foreground: navy`, `border_color: "#123"`. Names resolve to an RGB triple when the template loads, so no backend changed. `transparent` is rejected because the model has no alpha; `none` stays the way to clear an inherited value.
+- The invalid-color error now names the accepted forms.
+
 ### 0.21.0
 
 - Added `foreground`, a text color written as `#rrggbb`, to `formatting.paragraph`, to the `emphasis` and `strong` overrides and to `formatting.heading` and `h1` to `h6`. Headings inherit it from the base map and clear it with `none`, like `background` and `rule`; an inline span keeps the paragraph color unless it declares its own.

@@ -482,9 +482,9 @@ table:
 fn an_invalid_color_is_rejected() {
     for yaml in [
         "version: \"0.5\"\ntable:\n  border_color: bbbbbb\n",
-        "version: \"0.5\"\ntable:\n  border_color: \"#bbb\"\n",
+        "version: \"0.5\"\ntable:\n  border_color: \"#bbbb\"\n",
         "version: \"0.5\"\ntable:\n  border_color: \"#gggggg\"\n",
-        "version: \"0.5\"\ntable:\n  header_fill: \"red\"\n",
+        "version: \"0.5\"\ntable:\n  header_fill: \"notacolor\"\n",
     ] {
         let error = Template::from_yaml(yaml).expect_err("an invalid color");
         assert!(matches!(error, TemplateError::Value { .. }), "{yaml}");
@@ -558,8 +558,9 @@ fn an_invalid_rule_value_is_rejected_with_its_field() {
         "{zero}"
     );
 
-    let color = Template::from_yaml("version: \"0.5\"\nformatting:\n  rule:\n    color: red\n")
-        .expect_err("an invalid color");
+    let color =
+        Template::from_yaml("version: \"0.5\"\nformatting:\n  rule:\n    color: notacolor\n")
+            .expect_err("an invalid color");
     assert!(
         value_error_is(&color, "formatting.rule.color", ValueError::InvalidColor),
         "{color}"
@@ -600,7 +601,7 @@ fn a_heading_background_is_inherited_and_overridden_per_level() {
 #[test]
 fn an_invalid_heading_background_names_its_level() {
     let error = Template::from_yaml(
-        "version: \"0.5\"\nformatting:\n  heading:\n    h3:\n      background: grey\n",
+        "version: \"0.5\"\nformatting:\n  heading:\n    h3:\n      background: notacolor\n",
     )
     .expect_err("an invalid color");
     assert!(
@@ -733,7 +734,7 @@ fn an_invalid_heading_rule_names_its_level() {
     );
 
     let color = Template::from_yaml(
-        "version: \"0.5\"\nformatting:\n  heading:\n    h3:\n      rule:\n        color: red\n",
+        "version: \"0.5\"\nformatting:\n  heading:\n    h3:\n      rule:\n        color: notacolor\n",
     )
     .expect_err("an invalid color");
     assert!(
@@ -810,15 +811,15 @@ formatting:
 fn an_invalid_foreground_names_its_field() {
     for (yaml, field) in [
         (
-            "version: \"0.5\"\nformatting:\n  paragraph:\n    foreground: grey\n",
+            "version: \"0.5\"\nformatting:\n  paragraph:\n    foreground: notacolor\n",
             "formatting.paragraph.foreground",
         ),
         (
-            "version: \"0.5\"\nformatting:\n  paragraph:\n    strong:\n      foreground: grey\n",
+            "version: \"0.5\"\nformatting:\n  paragraph:\n    strong:\n      foreground: notacolor\n",
             "formatting.paragraph.strong.foreground",
         ),
         (
-            "version: \"0.5\"\nformatting:\n  heading:\n    h2:\n      foreground: grey\n",
+            "version: \"0.5\"\nformatting:\n  heading:\n    h2:\n      foreground: notacolor\n",
             "formatting.heading.h2.foreground",
         ),
     ] {

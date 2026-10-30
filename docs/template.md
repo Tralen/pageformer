@@ -167,7 +167,7 @@ The header and footer use the paragraph face. Their content sits inside the top 
 - `size`: a positive length. The default is `12pt`.
 - `weight`: `thin`, `extralight`, `light`, `normal`, `medium`, `semibold`, `bold`, `extrabold` or `black`, or a number from 100 to 900. The default is `normal`.
 - `style`: `normal` or `italic`. The default is `normal`.
-- `foreground`: the text color, as `#rrggbb`. When omitted, the text is black.
+- `foreground`: the text color, as a [color](#colors). When omitted, the text is black.
 - `leading`: extra space between lines, as a length. The default is `7.8pt`.
 - `spacing`: space between paragraphs. When omitted, Typst's default spacing applies (`1.2em`).
 - `alignment`: `justified` or `left`. The default is `justified`.
@@ -184,10 +184,10 @@ The `heading` map is the base for every heading level:
 - `size`: a positive length. It applies to every level that does not override it.
 - `weight`: the base weight. The default is `bold`.
 - `style`: `normal` or `italic`. The default is `normal`.
-- `foreground`: the heading text color, as `#rrggbb`. It is inherited from the base map and cleared by a level with `none`. When neither the level nor the base declares one, the heading keeps the paragraph color, and a colored heading also colors the inline spans inside it that declare no color of their own.
+- `foreground`: the heading text color, as a [color](#colors). It is inherited from the base map and cleared by a level with `none`. When neither the level nor the base declares one, the heading keeps the paragraph color, and a colored heading also colors the inline spans inside it that declare no color of their own.
 - `spacing_before` and `spacing_after`: lengths around the heading. They apply to every level that does not override them.
 - `page_break_before`: `true` starts the level on a new page. The break is weak: a heading already at the top of a page does not create a blank page. The default is `false`.
-- `background`: a solid fill behind the heading text, as `#rrggbb`. The fill spans the full text width with no horizontal margins, and the spacing stays outside it. When omitted, the heading has no fill, or keeps the one inherited from the base map; `none` clears an inherited fill.
+- `background`: a solid fill behind the heading text, as a [color](#colors). The fill spans the full text width with no horizontal margins, and the spacing stays outside it. When omitted, the heading has no fill, or keeps the one inherited from the base map; `none` clears an inherited fill.
 
 The height of a fill follows the font's natural line box in the PDF and in ODT. In DOCX it follows `w:line` with "at least" spacing, which is the paragraph leading plus the cap height: with the current leading values that stays below the natural box, so the three formats agree, but a template with a very large `formatting.paragraph.leading` makes the DOCX fill taller than the other two. That is a known divergence, not a defect to fix by guesswork.
 
@@ -206,7 +206,7 @@ The template sets explicit values for each level. There is no hidden multiplier 
 The thematic break, written as `---`, `***` or `___` in the Markdown body, is drawn as a horizontal rule across the text width. The same keys declare the rule under a heading level, in `formatting.heading.h1` to `h6`, and every format reads them the same way:
 
 - `thickness`: the line thickness, as a length greater than zero. The default is `0.5pt`.
-- `color`: the line color, as `#rrggbb`. The default is `#000000`.
+- `color`: the line color, as a [color](#colors). The default is `#000000`.
 - `spacing_before` and `spacing_after`: lengths around the line. For the thematic break, when omitted, each format keeps its own spacing for that side.
 
 Under `formatting.heading.h1` to `h6`, the same map declares the rule below a heading, and it also accepts `none` to clear a rule inherited from the base heading map.
@@ -216,13 +216,23 @@ Under `formatting.heading.h1` to `h6`, the same map declares the rule below a he
 The `table` section styles every table in the document:
 
 - `border`: the border thickness as a length. The default is `0.5pt`; `0` removes the borders.
-- `border_color`: a color written as `#rrggbb`. The default is `#bbbbbb`.
-- `header_fill`: the background of the header row, as `#rrggbb`. When omitted, the header has no fill.
+- `border_color`: a color, as written below. The default is `#bbbbbb`.
+- `header_fill`: the background of the header row, as a [color](#colors). When omitted, the header has no fill.
 - `cell_padding`: the inset of every cell as a length. The default is `6pt`.
 
 ## Page breaks
 
 A paragraph that contains only `{pagebreak}` starts a new page. The marker becomes a page break in the document model, so every paged backend reads the same block. Braces are ordinary text to CommonMark, so the Zed preview shows the marker and no raw HTML is involved. Any other occurrence, such as `{pagebreak}` inside a sentence, stays literal text. The backslash form `\pagebreak` is no longer special and stays literal text.
+
+## Colors
+
+A color is written in one of these forms, in any case and with the surrounding whitespace ignored:
+
+- `#rrggbb`, such as `#112233`;
+- `#rgb`, the short form, such as `#123`, which is `#112233`;
+- one of the 148 CSS named colors, such as `navy`, `rebeccapurple` or `lightgoldenrodyellow`. The list is the one in the CSS Color Module Level 4, with the synonym pairs such as `gray` and `grey`.
+
+An unknown name is an error that names the field, never a silent black. `transparent` is not accepted, because the model has no alpha channel and the template uses `none` to clear an inherited value; use an opaque color instead. A template can mix the forms freely, such as `foreground: navy` next to `border_color: "#bbbbbb"`.
 
 ## Weights and styles
 

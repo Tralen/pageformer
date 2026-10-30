@@ -576,32 +576,24 @@ fn show_tooltip(ui: &mut egui::Ui, text: &str) {
     ui.label(
         egui::RichText::new(text)
             .color(egui::Color32::BLACK)
-            .size(14.0)
-            .family(egui::FontFamily::Name("Tooltip".into())),
+            .size(14.0),
     );
 }
 
-/// Registers a regular-weight system sans as the `Tooltip` family, so black
-/// text on the light tooltip keeps crisp stems; the embedded proportional font
-/// remains the fallback when no system font is found.
+/// Registers the embedded Liberation Sans Regular as the first proportional
+/// font, so the whole interface shares one regular-weight face; the embedded
+/// Ubuntu-Light and the emoji fonts stay as fallbacks.
 fn install_fonts(context: &egui::Context) {
     let mut definitions = egui::FontDefinitions::default();
-    let fallback = definitions
-        .families
-        .get(&egui::FontFamily::Proportional)
-        .cloned()
-        .unwrap_or_default();
-    let mut family = fallback;
-    if let Some(bytes) = crate::fonts::tooltip_font() {
-        definitions.font_data.insert(
-            "tooltip".to_owned(),
-            std::sync::Arc::new(egui::FontData::from_owned(bytes)),
-        );
-        family.insert(0, "tooltip".to_owned());
-    }
+    definitions.font_data.insert(
+        "ui".to_owned(),
+        std::sync::Arc::new(egui::FontData::from_static(crate::fonts::UI_FONT)),
+    );
     definitions
         .families
-        .insert(egui::FontFamily::Name("Tooltip".into()), family);
+        .entry(egui::FontFamily::Proportional)
+        .or_default()
+        .insert(0, "ui".to_owned());
     context.set_fonts(definitions);
 }
 

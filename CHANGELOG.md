@@ -4,6 +4,11 @@
 
 *Major updates and feature releases.*
 
+### 0.32.3
+
+- `pageformer-publisher` now embeds Liberation Sans Regular and registers it as the first proportional font, so every label, button, drop-box line and tooltip uses one regular-weight face on every platform. The system font probe is gone; the font is licensed under the SIL Open Font License 1.1, with the notice in `publisher/assets/fonts/OFL.txt`.
+- Regenerates the ODT examples for the version in `meta:generator`.
+
 ### 0.32.2
 
 - The `pageformer-publisher` tooltip text now uses a regular-weight system sans: Liberation Sans, DejaVu Sans, Noto Sans or FreeSans on Linux, Segoe UI or Arial on Windows, and Arial on macOS, with the embedded proportional font as the fallback. Black text on the light tooltip keeps crisp stems at 14 points.

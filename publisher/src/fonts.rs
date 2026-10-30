@@ -1,52 +1,16 @@
-//! The tooltip font: a regular-weight system sans, so black text on a light
-//! background keeps crisp stems at small sizes.
+//! The embedded UI font: Liberation Sans Regular, so every proportional label,
+//! button and tooltip uses the same regular-weight face on every platform.
 
-/// Candidate regular sans fonts on Linux, in preference order. Liberation Sans
-/// is metrically close to Arial, so the tooltip keeps its line breaks.
-const LINUX_FONTS: &[&str] = &[
-    "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
-    "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-    "/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf",
-    "/usr/share/fonts/TTF/DejaVuSans.ttf",
-    "/usr/share/fonts/truetype/freefont/FreeSans.ttf",
-];
-
-/// Candidate regular sans fonts on Windows.
-const WINDOWS_FONTS: &[&str] = &[
-    "C:\\Windows\\Fonts\\segoeui.ttf",
-    "C:\\Windows\\Fonts\\arial.ttf",
-];
-
-/// Candidate regular sans fonts on macOS.
-const MACOS_FONTS: &[&str] = &[
-    "/System/Library/Fonts/Supplemental/Arial.ttf",
-    "/Library/Fonts/Arial.ttf",
-];
-
-/// Reads the first available system sans font, or `None` when none of the
-/// known paths exists.
-pub fn tooltip_font() -> Option<Vec<u8>> {
-    candidates()
-        .iter()
-        .find_map(|path| std::fs::read(path).ok())
-}
-
-fn candidates() -> &'static [&'static str] {
-    if cfg!(target_os = "windows") {
-        WINDOWS_FONTS
-    } else if cfg!(target_os = "macos") {
-        MACOS_FONTS
-    } else {
-        LINUX_FONTS
-    }
-}
+/// Liberation Sans Regular, licensed under the SIL Open Font License 1.1; the
+/// notice and the license text are in `publisher/assets/fonts/OFL.txt`.
+pub const UI_FONT: &[u8] = include_bytes!("../assets/fonts/LiberationSans-Regular.ttf");
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn the_candidates_are_not_empty() {
-        assert!(!candidates().is_empty());
+    fn the_embedded_font_is_a_true_type_file() {
+        assert!(UI_FONT.starts_with(&[0x00, 0x01, 0x00, 0x00]));
     }
 }

@@ -42,10 +42,17 @@ formatting:
       spacing_before: 0
       spacing_after: 12
       page_break_before: true
+      # A solid bar across the text width, in the table header color.
+      background: "#e8eef5"
     h2:
       size: 14
       spacing_before: 16
       spacing_after: 6
+      # A rule drawn below the heading text.
+      rule:
+        thickness: 0.75pt
+        color: "#336699"
+        spacing_before: 3
     h3:
       size: 12
       spacing_before: 12

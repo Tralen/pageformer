@@ -4,6 +4,12 @@
 
 *Major updates and feature releases.*
 
+### 0.19.0
+
+- Added `rule` to each heading level `h1` to `h6`: a line drawn below the heading text, styled with `thickness`, `color`, `spacing_before` (the gap above the line) and `spacing_after`. A rule is not inherited from the base heading map.
+- The technical example draws a solid bar behind its level-one headings and a rule below its level-two headings. The regenerated PDF, ODT and DOCX keep three pages; the TXT golden and the shared examples are unchanged.
+- The DOCX gap of a heading rule is clamped to the OOXML range of 0 to 31 points.
+
 ### 0.18.0
 
 - Added the `formatting.rule` section to the template: `thickness`, `color`, `spacing_before` and `spacing_after` style the thematic break in every format. The defaults are `0.5pt`, `#000000` and each format's own spacing.

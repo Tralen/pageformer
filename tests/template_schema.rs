@@ -614,6 +614,80 @@ fn an_invalid_heading_background_names_its_level() {
 }
 
 #[test]
+fn a_heading_rule_is_declared_per_level_and_not_inherited() {
+    let template = parse(
+        r##"
+version: "0.5"
+formatting:
+  heading:
+    h2:
+      rule:
+        thickness: 1.5pt
+        color: "#112233"
+        spacing_before: 3
+        spacing_after: 9
+    h4:
+      rule: {}
+"##,
+    );
+    let levels = template.formatting().heading().levels();
+    assert!(levels[0].rule().is_none());
+    assert!(levels[2].rule().is_none());
+
+    let rule = levels[1].rule().expect("h2 declares a rule");
+    assert_eq!(rule.thickness().points(), 1.5);
+    assert_eq!(rule.color().hex(), "#112233");
+    assert_eq!(rule.spacing_before().map(Length::points), Some(3.0));
+    assert_eq!(rule.spacing_after().map(Length::points), Some(9.0));
+
+    let empty = levels[3]
+        .rule()
+        .expect("an empty h4 rule keeps the defaults");
+    assert_eq!(empty.thickness().points(), 0.5);
+    assert_eq!(empty.color().hex(), "#000000");
+    assert_eq!(empty.spacing_before(), None);
+    assert_eq!(empty.spacing_after(), None);
+}
+
+#[test]
+fn a_rule_in_the_base_heading_is_rejected() {
+    let error = Template::from_yaml(
+        "version: \"0.5\"\nformatting:\n  heading:\n    rule:\n      thickness: 1pt\n",
+    )
+    .expect_err("rules are declared per level");
+    assert!(matches!(error, TemplateError::Yaml { .. }), "{error}");
+}
+
+#[test]
+fn an_invalid_heading_rule_names_its_level() {
+    let zero = Template::from_yaml(
+        "version: \"0.5\"\nformatting:\n  heading:\n    h3:\n      rule:\n        thickness: 0\n",
+    )
+    .expect_err("a zero thickness");
+    assert!(
+        value_error_is(
+            &zero,
+            "formatting.heading.h3.rule.thickness",
+            ValueError::Zero
+        ),
+        "{zero}"
+    );
+
+    let color = Template::from_yaml(
+        "version: \"0.5\"\nformatting:\n  heading:\n    h3:\n      rule:\n        color: red\n",
+    )
+    .expect_err("an invalid color");
+    assert!(
+        value_error_is(
+            &color,
+            "formatting.heading.h3.rule.color",
+            ValueError::InvalidColor
+        ),
+        "{color}"
+    );
+}
+
+#[test]
 fn the_embedded_template_matches_the_project_defaults() {
     let template = Template::embedded().expect("the embedded template must be valid");
     assert_eq!(template.schema_version(), CURRENT_SCHEMA_VERSION);

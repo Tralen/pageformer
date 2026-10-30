@@ -910,6 +910,7 @@ pub struct HeadingStyle {
     spacing_after: Length,
     page_break_before: bool,
     background: Option<Color>,
+    rule: Option<RuleStyle>,
 }
 
 impl HeadingStyle {
@@ -919,6 +920,7 @@ impl HeadingStyle {
         spacing_after: Length,
         page_break_before: bool,
         background: Option<Color>,
+        rule: Option<RuleStyle>,
     ) -> Self {
         Self {
             face,
@@ -926,6 +928,7 @@ impl HeadingStyle {
             spacing_after,
             page_break_before,
             background,
+            rule,
         }
     }
 
@@ -949,6 +952,11 @@ impl HeadingStyle {
     pub fn background(&self) -> Option<Color> {
         self.background
     }
+
+    /// The line drawn below the heading text, when this level declares one.
+    pub fn rule(&self) -> Option<&RuleStyle> {
+        self.rule.as_ref()
+    }
 }
 
 /// The six resolved heading levels.
@@ -967,7 +975,8 @@ impl HeadingStyles {
     }
 }
 
-/// The thematic break, written as a horizontal rule across the text width.
+/// A horizontal rule across the text width: the thematic break, or the line below
+/// a heading level.
 ///
 /// The spacing is optional: when a side is omitted, each backend keeps its own
 /// default spacing for that side.
@@ -1179,6 +1188,7 @@ struct RawHeadingLevel {
     spacing_after: Option<String>,
     page_break_before: Option<bool>,
     background: Option<String>,
+    rule: Option<RawRule>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -1288,34 +1298,37 @@ fn convert_formatting(raw: RawFormatting) -> Result<Formatting, TemplateError> {
     Ok(Formatting::new(
         convert_paragraph(raw.paragraph.unwrap_or_default())?,
         convert_headings(raw.heading.unwrap_or_default())?,
-        convert_rule(raw.rule.unwrap_or_default())?,
+        convert_rule(raw.rule.unwrap_or_default(), "formatting.rule")?,
     ))
 }
 
-fn convert_rule(raw: RawRule) -> Result<RuleStyle, TemplateError> {
+fn convert_rule(raw: RawRule, prefix: &str) -> Result<RuleStyle, TemplateError> {
     let defaults = RuleStyle::default();
     let thickness = parse_size_field(
         raw.thickness,
-        "formatting.rule.thickness",
+        &format!("{prefix}.thickness"),
         defaults.thickness(),
     )?;
     if thickness.points() <= 0.0 {
-        return Err(value_error("formatting.rule.thickness", ValueError::Zero));
+        return Err(value_error(format!("{prefix}.thickness"), ValueError::Zero));
     }
     let color = raw
         .color
         .map(|text| Color::parse(&text))
         .transpose()
-        .map_err(|problem| value_error("formatting.rule.color", problem))?
+        .map_err(|problem| value_error(format!("{prefix}.color"), problem))?
         .unwrap_or(defaults.color());
     Ok(RuleStyle {
         thickness,
         color,
         spacing_before: parse_optional_length(
             raw.spacing_before,
-            "formatting.rule.spacing_before",
+            &format!("{prefix}.spacing_before"),
         )?,
-        spacing_after: parse_optional_length(raw.spacing_after, "formatting.rule.spacing_after")?,
+        spacing_after: parse_optional_length(
+            raw.spacing_after,
+            &format!("{prefix}.spacing_after"),
+        )?,
     })
 }
 
@@ -1422,9 +1435,14 @@ fn convert_headings(raw: RawHeading) -> Result<HeadingStyles, TemplateError> {
     )?;
     let raw_levels = [h1, h2, h3, h4, h5, h6];
     let mut overrides: [Option<HeadingOverrides>; 6] = Default::default();
+    let mut rules: [Option<RuleStyle>; 6] = Default::default();
     for (index, raw_level) in raw_levels.into_iter().enumerate() {
         if let Some(raw_level) = raw_level {
             let prefix = format!("formatting.heading.h{}", index + 1);
+            rules[index] = raw_level
+                .rule
+                .map(|raw| convert_rule(raw, &format!("{prefix}.rule")))
+                .transpose()?;
             overrides[index] = Some(HeadingOverrides::parse(
                 RawHeadingOverrides {
                     font_families: raw_level.font_families,
@@ -1446,6 +1464,7 @@ fn convert_headings(raw: RawHeading) -> Result<HeadingStyles, TemplateError> {
         if let Some(overrides) = &overrides[index] {
             overrides.apply(&mut style);
         }
+        style.rule = rules[index].clone();
         style
     });
     Ok(HeadingStyles::new(levels))
@@ -1640,6 +1659,7 @@ fn default_heading_style(level: usize) -> HeadingStyle {
         Length(HEADING_SPACING_BEFORE[index]),
         Length(HEADING_SPACING_AFTER[index]),
         false,
+        None,
         None,
     )
 }

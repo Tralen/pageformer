@@ -281,6 +281,36 @@ formatting:
 }
 
 #[test]
+fn a_heading_rule_is_a_bottom_border_of_its_level() {
+    let document = markdown::parse("## Escopo\n\nTexto.\n").expect("the document must parse");
+    let template = Template::from_yaml(
+        r##"
+version: "0.5"
+formatting:
+  heading:
+    h2:
+      rule:
+        thickness: 1.5pt
+        color: "#112233"
+        spacing_before: 3
+        spacing_after: 24
+"##,
+    )
+    .expect("the template must be valid");
+
+    let bytes = odt::render(&document, &template, &Assets::default()).expect("the package");
+    let mut archive = ZipArchive::new(Cursor::new(bytes)).expect("the package must be a ZIP");
+    let styles = entry(&mut archive, "styles.xml");
+
+    assert!(
+        styles.contains("fo:padding-bottom=\"3.00pt\" fo:border-bottom=\"1.50pt solid #112233\""),
+        "{styles}"
+    );
+    assert!(styles.contains("fo:margin-bottom=\"14.00pt\""), "{styles}");
+    assert_eq!(styles.matches("fo:border-bottom").count(), 1, "{styles}");
+}
+
+#[test]
 fn the_line_spacing_follows_the_typst_leading_model() {
     let template = Template::from_yaml(
         "version: \"0.5\"\nformatting:\n  paragraph:\n    size: 12\n    leading: 8\n    spacing: 24\n",

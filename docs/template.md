@@ -66,6 +66,10 @@ formatting:
       size: 14
       spacing_before: 12
       spacing_after: 4
+      rule:
+        thickness: 0.5pt
+        color: "#888888"
+        spacing_before: 3
     h3:
       size: 12
       spacing_before: 10
@@ -183,15 +187,17 @@ The `heading` map is the base for every heading level:
 
 The `h1` to `h6` maps are optional overrides with the same keys. Only declared keys replace the base values. The default sizes are `18pt` for `h1`, `14pt` for `h2` and `12pt` for `h3` to `h6`; the default spacing is 18/6 for `h1`, 12/4 for `h2`, 10/4 for `h3` and 8/2 for `h4` to `h6`.
 
+A level may declare `rule`, a line drawn below its text, with the keys of [`formatting.rule`](#formattingrule). A rule is not inherited from the base heading map: each level that needs one declares it, and a level without `rule` draws none. Below a heading, `spacing_before` is the gap between the text and the line, which defaults to zero, and the line takes the heading's `spacing_after` below it, unless the rule declares its own `spacing_after`.
+
 The template sets explicit values for each level. There is no hidden multiplier per level: what the YAML declares is what the PDF uses.
 
 ### `formatting.rule`
 
-The thematic break, written as `---`, `***` or `___` in the Markdown body, is drawn as a horizontal rule across the text width. Its keys are the same in every format:
+The thematic break, written as `---`, `***` or `___` in the Markdown body, is drawn as a horizontal rule across the text width. The same keys declare the rule under a heading level, in `formatting.heading.h1` to `h6`, and every format reads them the same way:
 
 - `thickness`: the line thickness, as a length greater than zero. The default is `0.5pt`.
 - `color`: the line color, as `#rrggbb`. The default is `#000000`.
-- `spacing_before` and `spacing_after`: lengths around the rule. When omitted, each format keeps its own spacing for that side.
+- `spacing_before` and `spacing_after`: lengths around the line. For the thematic break, when omitted, each format keeps its own spacing for that side.
 
 ### `table`
 
@@ -224,7 +230,7 @@ Images in the Markdown body resolve relative to the Markdown file, not to the te
 
 ## Current backend
 
-The PDF backend applies the paragraph face, leading, spacing and alignment. It emits one show rule per heading level with the resolved font, size, weight, style and spacing, and show rules for `emph` and `strong` from the inline overrides. A level with `page_break_before` also gets a weak page-break show rule. The backend draws the running header and footer, expands their tokens, applies the table style and explicit page breaks, and writes the frontmatter title, author, subject, keywords, language and date into the PDF metadata. The thematic break follows `formatting.rule`, and a heading background is drawn as a block across the text width.
+The PDF backend applies the paragraph face, leading, spacing and alignment. It emits one show rule per heading level with the resolved font, size, weight, style and spacing, and show rules for `emph` and `strong` from the inline overrides. A level with `page_break_before` also gets a weak page-break show rule. The backend draws the running header and footer, expands their tokens, applies the table style and explicit page breaks, and writes the frontmatter title, author, subject, keywords, language and date into the PDF metadata. The thematic break follows `formatting.rule`. A heading background and a heading rule are drawn as one block: the fill wraps the text across the full width, and the rule sits below it.
 
 ## Example
 
@@ -234,7 +240,7 @@ The PDF backend applies the paragraph face, leading, spacing and alignment. It e
 pageformer --confidential-file assets/examples/confidencial/embargos.ini --output assets/examples/publicacao assets/examples/escritorio/
 ```
 
-The embargos declares confidential fields, so the command names the fictional values file and writes outside the source tree. `assets/examples/tecnico/.pageformer.yaml` is a second example, in a nested directory. It replaces the shared template for `Relatorio.md`, has no letterhead and demonstrates every running slot, the footer, the table style and a page break:
+The embargos declares confidential fields, so the command names the fictional values file and writes outside the source tree. `assets/examples/tecnico/.pageformer.yaml` is a second example, in a nested directory. It replaces the shared template for `Relatorio.md`, has no letterhead and demonstrates every running slot, the footer, the table style, a page break, a solid bar behind the level-one headings and a rule below the level-two headings:
 
 ```sh
 pageformer assets/examples/tecnico/Relatorio.md

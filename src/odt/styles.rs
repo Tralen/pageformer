@@ -5,7 +5,7 @@ use std::collections::BTreeSet;
 use crate::assets::Assets;
 use crate::document::Document;
 use crate::template::{
-    FontSlant, Orientation, ParagraphAlignment, RunningText, Template, TextFace,
+    FontSlant, Length, Orientation, ParagraphAlignment, RuleStyle, RunningText, Template, TextFace,
 };
 
 use super::picture_name;
@@ -77,17 +77,30 @@ pub fn styles_xml(document: &Document, template: &Template, assets: &Assets) -> 
         xml::push_fmt(
             &mut output,
             format_args!(
-                "<style:style style:name=\"Heading{level}\" style:family=\"paragraph\" style:parent-style-name=\"Standard\" style:next-style-name=\"Standard\"><style:paragraph-properties {line_height}fo:margin-top=\"{before}\" fo:margin-bottom=\"{after}\" fo:keep-with-next=\"always\" fo:hyphenate=\"true\" style:default-outline-level=\"{level}\"{page_break}{background}/><style:text-properties style:font-name=\"{family}\" fo:font-size=\"{size}\" fo:font-weight=\"{weight}\" fo:font-style=\"{slant}\"/></style:style>\n",
+                "<style:style style:name=\"Heading{level}\" style:family=\"paragraph\" style:parent-style-name=\"Standard\" style:next-style-name=\"Standard\"><style:paragraph-properties {line_height}fo:margin-top=\"{before}\" fo:margin-bottom=\"{after}\" fo:keep-with-next=\"always\" fo:hyphenate=\"true\" style:default-outline-level=\"{level}\"{page_break}{background}{rule}/><style:text-properties style:font-name=\"{family}\" fo:font-size=\"{size}\" fo:font-weight=\"{weight}\" fo:font-style=\"{slant}\"/></style:style>\n",
                 line_height = line_height_attribute(face.size(), paragraph.leading()),
                 background = heading.background().map_or_else(String::new, |color| {
                     format!(" fo:background-color=\"{}\"", color.hex())
+                }),
+                rule = heading.rule().map_or_else(String::new, |rule| {
+                    format!(
+                        " fo:padding-bottom=\"{}\" fo:border-bottom=\"{} solid {}\"",
+                        xml::points_value(rule.spacing_before().map_or(0.0, Length::points)),
+                        xml::points(rule.thickness()),
+                        rule.color().hex()
+                    )
                 }),
                 before = xml::points_value(crate::metrics::heading_before(
                     heading.spacing_before(),
                     paragraph.leading(),
                     paragraph.spacing()
                 )),
-                after = xml::points_value(crate::metrics::heading_after(heading.spacing_after())),
+                after = xml::points_value(crate::metrics::heading_after(
+                    heading
+                        .rule()
+                        .and_then(RuleStyle::spacing_after)
+                        .unwrap_or(heading.spacing_after())
+                )),
                 page_break = if heading.page_break_before() {
                     " fo:break-before=\"page\""
                 } else {

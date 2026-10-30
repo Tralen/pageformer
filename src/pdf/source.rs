@@ -12,8 +12,8 @@ use crate::document::{
     TaskState,
 };
 use crate::template::{
-    Length, ParagraphAlignment, RuleStyle, RunningText, TableStyle, Template, TextFace,
-    is_lowercase_token,
+    HeadingStyle, Length, ParagraphAlignment, RuleStyle, RunningText, TableStyle, Template,
+    TextFace, is_lowercase_token,
 };
 
 use super::assets::AssetMap;
@@ -283,30 +283,31 @@ impl<'a> SourceBuilder<'a> {
                 face.weight().get(),
                 typst_string(face.slant().as_str())
             );
-            match style.background() {
-                Some(background) => {
-                    // The fill wraps the text only, so the spacing moves to the wrapper
-                    // outside it and the text block keeps no spacing of its own.
-                    let _ = writeln!(
-                        self.output,
-                        "#show heading.where(level: {level}): set block(above: 0pt, below: 0pt)"
-                    );
-                    let _ = writeln!(
-                        self.output,
-                        "#show heading.where(level: {level}): it => block(width: 100%, fill: rgb(\"{}\"), inset: 0pt, above: {}, below: {}, sticky: true)[#it]",
-                        background.hex(),
-                        typst_length(style.spacing_before()),
-                        typst_length(style.spacing_after())
-                    );
-                }
-                None => {
-                    let _ = writeln!(
-                        self.output,
-                        "#show heading.where(level: {level}): set block(above: {}, below: {})",
-                        typst_length(style.spacing_before()),
-                        typst_length(style.spacing_after())
-                    );
-                }
+            if style.background().is_some() || style.rule().is_some() {
+                // The wrapper carries the heading spacing, so the text inside it keeps none.
+                // The rule's own spacing_after, when declared, replaces the heading's below.
+                let below = style
+                    .rule()
+                    .and_then(RuleStyle::spacing_after)
+                    .unwrap_or(style.spacing_after());
+                let _ = writeln!(
+                    self.output,
+                    "#show heading.where(level: {level}): set block(above: 0pt, below: 0pt)"
+                );
+                let _ = writeln!(
+                    self.output,
+                    "#show heading.where(level: {level}): it => block(width: 100%, above: {}, below: {}, sticky: true)[\n{}\n]",
+                    typst_length(style.spacing_before()),
+                    typst_length(below),
+                    heading_content(style)
+                );
+            } else {
+                let _ = writeln!(
+                    self.output,
+                    "#show heading.where(level: {level}): set block(above: {}, below: {})",
+                    typst_length(style.spacing_before()),
+                    typst_length(style.spacing_after())
+                );
             }
             if style.page_break_before() {
                 let _ = writeln!(
@@ -540,11 +541,7 @@ impl<'a> SourceBuilder<'a> {
 
     fn thematic_break(&mut self) {
         let rule = self.rule;
-        let line = format!(
-            "#line(length: 100%, stroke: {} + rgb(\"{}\"))",
-            typst_length(rule.thickness()),
-            rule.color().hex()
-        );
+        let line = rule_line(rule);
         if rule.spacing_before().is_none() && rule.spacing_after().is_none() {
             self.output.push_str(&line);
         } else {
@@ -642,6 +639,34 @@ fn typst_length(length: Length) -> String {
 
 fn optional_length(length: Option<Length>) -> String {
     length.map_or_else(|| "auto".to_owned(), typst_length)
+}
+
+fn rule_line(rule: &RuleStyle) -> String {
+    format!(
+        "#line(length: 100%, stroke: {} + rgb(\"{}\"))",
+        typst_length(rule.thickness()),
+        rule.color().hex()
+    )
+}
+
+/// The text of a styled heading, with its fill and the rule drawn below it.
+fn heading_content(style: &HeadingStyle) -> String {
+    let text = match style.background() {
+        Some(background) => format!(
+            "#block(width: 100%, fill: rgb(\"{}\"), inset: 0pt)[#it]",
+            background.hex()
+        ),
+        None => "#it".to_owned(),
+    };
+    match style.rule() {
+        Some(rule) => format!(
+            "{text}\n#block(width: 100%, above: {}, below: 0pt)[{}]",
+            rule.spacing_before()
+                .map_or_else(|| "0pt".to_owned(), typst_length),
+            rule_line(rule)
+        ),
+        None => text,
+    }
 }
 
 fn escape_markup(text: &str) -> String {
@@ -1228,11 +1253,60 @@ mod tests {
         let source = typst_source(&document, &template, &AssetMap::new()).expect("the source");
         assert!(
             source.contains(
-                "#show heading.where(level: 1): set block(above: 0pt, below: 0pt)\n#show heading.where(level: 1): it => block(width: 100%, fill: rgb(\"#eeeeee\"), inset: 0pt, above: 18.000pt, below: 6.000pt, sticky: true)[#it]\n#show heading.where(level: 1): it => {\n  pagebreak(weak: true)\n  it\n}"
+                "#show heading.where(level: 1): set block(above: 0pt, below: 0pt)\n#show heading.where(level: 1): it => block(width: 100%, above: 18.000pt, below: 6.000pt, sticky: true)[\n#block(width: 100%, fill: rgb(\"#eeeeee\"), inset: 0pt)[#it]\n]\n#show heading.where(level: 1): it => {\n  pagebreak(weak: true)\n  it\n}"
             ),
             "{source}"
         );
         assert_eq!(source.matches("fill: rgb(").count(), 1, "{source}");
+    }
+
+    #[test]
+    fn a_heading_rule_is_a_line_below_its_own_level() {
+        let template = Template::from_yaml(
+            "version: \"0.5\"\nformatting:\n  heading:\n    spacing_before: 16\n    spacing_after: 6\n    h2:\n      rule:\n        thickness: 1pt\n        color: \"#112233\"\n        spacing_before: 3\n        spacing_after: 9\n",
+        )
+        .expect("the template");
+        let document = Document::new(
+            Metadata::default(),
+            vec![Block::Heading(Heading::new(
+                HeadingLevel::new(2).expect("a level"),
+                vec![Inline::Text("Escopo".to_owned())],
+            ))],
+        );
+        let source = typst_source(&document, &template, &AssetMap::new()).expect("the source");
+        assert!(
+            source.contains(
+                "#show heading.where(level: 2): set block(above: 0pt, below: 0pt)\n#show heading.where(level: 2): it => block(width: 100%, above: 16.000pt, below: 9.000pt, sticky: true)[\n#it\n#block(width: 100%, above: 3.000pt, below: 0pt)[#line(length: 100%, stroke: 1.000pt + rgb(\"#112233\"))]\n]"
+            ),
+            "{source}"
+        );
+        assert!(!source.contains("fill: rgb("), "{source}");
+        assert!(
+            !source.contains("#show heading.where(level: 1): it =>"),
+            "{source}"
+        );
+    }
+
+    #[test]
+    fn a_heading_rule_without_spacing_keeps_the_heading_spacing_below() {
+        let template = Template::from_yaml(
+            "version: \"0.5\"\nformatting:\n  heading:\n    spacing_after: 6\n    h1:\n      rule: {}\n",
+        )
+        .expect("the template");
+        let document = Document::new(
+            Metadata::default(),
+            vec![Block::Heading(Heading::new(
+                HeadingLevel::new(1).expect("a level"),
+                vec![Inline::Text("Contrato".to_owned())],
+            ))],
+        );
+        let source = typst_source(&document, &template, &AssetMap::new()).expect("the source");
+        assert!(
+            source.contains(
+                "it => block(width: 100%, above: 18.000pt, below: 6.000pt, sticky: true)[\n#it\n#block(width: 100%, above: 0pt, below: 0pt)[#line(length: 100%, stroke: 0.500pt + rgb(\"#000000\"))]\n]"
+            ),
+            "{source}"
+        );
     }
 
     #[test]

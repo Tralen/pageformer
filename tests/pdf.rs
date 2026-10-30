@@ -195,13 +195,18 @@ formatting:
 #[test]
 fn rules_and_heading_backgrounds_render_deterministically() {
     let document =
-        markdown::parse("# Título\n\nTexto.\n\n---\n\nDepois.\n").expect("the document must parse");
+        markdown::parse("# Título\n\nTexto.\n\n---\n\nDepois.\n\n## Seção\n\nTexto da seção.\n")
+            .expect("the document must parse");
     let template = Template::from_yaml(
         r##"
 version: "0.5"
 formatting:
   heading:
     background: "#eeeeee"
+    h2:
+      rule:
+        thickness: 0.5pt
+        spacing_before: 2
   rule:
     thickness: 1pt
     color: "#112233"

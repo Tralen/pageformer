@@ -59,6 +59,13 @@ pub(crate) fn eighths(points: f64) -> String {
     format!("{:.0}", (points * 8.0).round().clamp(2.0, 96.0))
 }
 
+/// A point value for the gap between a border and its paragraph, for `w:space`.
+///
+/// OOXML accepts gaps from 0 to 31 points.
+pub(crate) fn border_space(points: f64) -> String {
+    format!("{:.0}", points.round().clamp(0.0, 31.0))
+}
+
 /// A point value in English Metric Units, for DrawingML.
 pub(crate) fn emu(points: f64) -> String {
     format!("{:.0}", (points * 12_700.0).round())
@@ -91,6 +98,8 @@ mod tests {
         assert_eq!(eighths(0.5), "4");
         assert_eq!(eighths(0.1), "2");
         assert_eq!(eighths(30.0), "96");
+        assert_eq!(border_space(3.0), "3");
+        assert_eq!(border_space(40.0), "31");
         assert_eq!(emu(72.0), "914400");
     }
 }

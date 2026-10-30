@@ -244,6 +244,38 @@ formatting:
 }
 
 #[test]
+fn a_heading_rule_is_a_bottom_border_of_its_level() {
+    let document = markdown::parse("## Escopo\n\nTexto.\n").expect("the document must parse");
+    let template = Template::from_yaml(
+        r##"
+version: "0.5"
+formatting:
+  heading:
+    h2:
+      rule:
+        thickness: 1.5pt
+        color: "#112233"
+        spacing_before: 3
+        spacing_after: 24
+"##,
+    )
+    .expect("the template must be valid");
+
+    let bytes = docx::render(&document, &template, &Assets::default()).expect("the package");
+    let mut archive = ZipArchive::new(Cursor::new(bytes)).expect("the package must be a ZIP");
+    let styles = entry(&mut archive, "word/styles.xml");
+
+    assert!(
+        styles.contains(
+            "<w:pBdr><w:bottom w:val=\"single\" w:sz=\"12\" w:space=\"3\" w:color=\"112233\"/></w:pBdr>"
+        ),
+        "{styles}"
+    );
+    assert!(styles.contains("w:after=\"280\""), "{styles}");
+    assert_eq!(styles.matches("<w:pBdr>").count(), 1, "{styles}");
+}
+
+#[test]
 fn two_lists_get_their_own_numbering_and_a_restart() {
     let source = "- a\n- b\n\n3. c\n4. d\n";
     let document = markdown::parse(source).expect("the document must parse");

@@ -2,7 +2,7 @@
 
 use crate::document::Document;
 use crate::metrics;
-use crate::template::{FontSlant, ParagraphAlignment, Template, TextFace};
+use crate::template::{FontSlant, Length, ParagraphAlignment, RuleStyle, Template, TextFace};
 use crate::xml;
 
 /// Generates the styles part.
@@ -47,16 +47,30 @@ pub(crate) fn styles_xml(document: &Document, template: &Template) -> String {
             paragraph.leading(),
             paragraph.spacing(),
         );
-        let after = metrics::heading_after(heading.spacing_after());
+        let after = metrics::heading_after(
+            heading
+                .rule()
+                .and_then(RuleStyle::spacing_after)
+                .unwrap_or(heading.spacing_after()),
+        );
+        let border = heading.rule().map_or_else(String::new, |rule| {
+            format!(
+                "<w:pBdr><w:bottom w:val=\"single\" w:sz=\"{}\" w:space=\"{}\" w:color=\"{}\"/></w:pBdr>",
+                metrics::eighths(rule.thickness().points()),
+                metrics::border_space(rule.spacing_before().map_or(0.0, Length::points)),
+                rule.color().hex().trim_start_matches('#')
+            )
+        });
         xml::push_fmt(
             &mut output,
             format_args!(
-                "<w:style w:type=\"paragraph\" w:styleId=\"Heading{level}\"><w:name w:val=\"heading {level}\"/><w:basedOn w:val=\"Normal\"/><w:next w:val=\"Normal\"/><w:qFormat/><w:pPr><w:keepNext/>{page_break}{shading}<w:spacing w:before=\"{before}\" w:after=\"{after}\" w:line=\"{line}\" w:lineRule=\"atLeast\"/><w:outlineLvl w:val=\"{outline}\"/></w:pPr><w:rPr>{fonts}{bold}{italic}<w:sz w:val=\"{size}\"/><w:szCs w:val=\"{size}\"/></w:rPr></w:style>\n",
+                "<w:style w:type=\"paragraph\" w:styleId=\"Heading{level}\"><w:name w:val=\"heading {level}\"/><w:basedOn w:val=\"Normal\"/><w:next w:val=\"Normal\"/><w:qFormat/><w:pPr><w:keepNext/>{page_break}{border}{shading}<w:spacing w:before=\"{before}\" w:after=\"{after}\" w:line=\"{line}\" w:lineRule=\"atLeast\"/><w:outlineLvl w:val=\"{outline}\"/></w:pPr><w:rPr>{fonts}{bold}{italic}<w:sz w:val=\"{size}\"/><w:szCs w:val=\"{size}\"/></w:rPr></w:style>\n",
                 page_break = if heading.page_break_before() {
                     "<w:pageBreakBefore/>"
                 } else {
                     ""
                 },
+                border = border,
                 shading = heading.background().map_or_else(String::new, |color| {
                     format!(
                         "<w:shd w:val=\"clear\" w:color=\"auto\" w:fill=\"{}\"/>",

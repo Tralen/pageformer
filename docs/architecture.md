@@ -55,7 +55,9 @@ The library is the pure core. File reading, the environment and the terminal liv
 
 Colors accept `#rrggbb`, `#rgb` and the 148 CSS named colors, resolved to an RGB triple when the template loads, so every backend reads the same numeric value and never a name.
 
-Every format shares the semantic template. The current schema defines page size, orientation, margins, running header and footer content, paragraph and heading styles, a body fill, heading backgrounds and rules that the base map can carry and a level can clear with `none`, the thematic break, weight, style, text color, leading, spacing, inline emphasis, strong, code and strikethrough overrides, quote and code block styles, alignment, the letterhead image and table borders, header fill and cell padding.
+Every format shares the semantic template. The current schema defines page size, orientation, margins, running header and footer content, paragraph and heading styles, a body fill, heading backgrounds and rules that the base map can carry and a level can clear with `none`, the thematic break, weight, style, text color, leading, spacing, inline emphasis, strong, code and strikethrough overrides, quote and code block styles with alignment and per-side borders, alignment, the letterhead image and table borders, header fill and cell padding.
+
+Blocks are left aligned by default, because justified quotes and code read worse; `alignment: justified` restores the body behaviour. A block border declares each side separately and puts the padding only on the sides that have a rule.
 
 A body fill belongs to body paragraphs only. Each format applies it through a body paragraph style, so a quote, a list item or a table cell keeps the background its own style declares, and an inline background fills the span itself.
 

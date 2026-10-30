@@ -891,15 +891,17 @@ formatting:
     );
     assert_eq!(strike.size(), None, "an undeclared key changes nothing");
 
-    let quote = template.formatting().quote().expect("quote");
+    let quote = template.formatting().quote();
     assert_eq!(
-        quote.background().map(|color| color.hex()),
+        quote.text().background().map(|color| color.hex()),
         Some("#f0f0f0".to_owned())
     );
-    let block = template.formatting().code_block().expect("code block");
-    assert_eq!(block.size().map(Length::points), Some(9.0));
+    assert_eq!(quote.alignment(), ParagraphAlignment::Left, "the default");
+    assert!(quote.border().is_empty());
+    let block = template.formatting().code_block();
+    assert_eq!(block.text().size().map(Length::points), Some(9.0));
     assert_eq!(
-        block.background().map(|color| color.hex()),
+        block.text().background().map(|color| color.hex()),
         Some("#111111".to_owned())
     );
 }
@@ -911,8 +913,15 @@ fn the_new_styles_are_absent_by_default() {
     assert_eq!(paragraph.background(), None);
     assert!(paragraph.code().is_none());
     assert!(paragraph.strikethrough().is_none());
-    assert!(template.formatting().quote().is_none());
-    assert!(template.formatting().code_block().is_none());
+    for block in [
+        template.formatting().quote(),
+        template.formatting().code_block(),
+    ] {
+        assert_eq!(block.alignment(), ParagraphAlignment::Left);
+        assert!(block.border().is_empty());
+        assert_eq!(block.text().foreground(), None);
+        assert_eq!(block.text().background(), None);
+    }
     assert_eq!(paragraph.emphasis().background(), None);
 }
 

@@ -340,12 +340,18 @@ formatting:
   paragraph:
     background: "#fafafa"
     code:
+      font_families:
+        - DejaVu Sans Mono
       foreground: navy
       background: "#eeeeee"
     strikethrough:
       foreground: crimson
   quote:
     background: "#f0f0f0"
+    border:
+      left: 3pt
+      color: "#cccccc"
+      padding: 8
   code_block:
     background: "#111111"
     foreground: "#eeeeee"
@@ -377,6 +383,10 @@ formatting:
         code_inline.contains("fo:background-color=\"#eeeeee\""),
         "{styles}"
     );
+    assert!(
+        code_inline.contains("style:font-name=\"DejaVu Sans Mono\""),
+        "an inline style changes its own font: {styles}"
+    );
     let strike = styles
         .split("style:name=\"Strikethrough\"")
         .nth(1)
@@ -386,6 +396,19 @@ formatting:
         content.contains("style:name=\"QuoteParagraph\"")
             && content.contains("fo:background-color=\"#f0f0f0\""),
         "the quote paragraph carries the fill: {content}"
+    );
+    assert!(
+        content.contains("fo:border-left=\"3.00pt solid #cccccc\""),
+        "the quote carries its left border: {content}"
+    );
+    assert!(
+        content.contains("fo:padding-left=\"8.00pt\""),
+        "the border padding applies to the bordered side: {content}"
+    );
+    assert!(
+        content.contains("style:name=\"QuoteParagraph\"")
+            && content.contains("fo:text-align=\"left\""),
+        "blocks are left aligned by default: {content}"
     );
     assert!(
         content.contains("style:name=\"Code\"")

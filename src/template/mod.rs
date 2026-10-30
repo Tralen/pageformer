@@ -1171,6 +1171,95 @@ impl PartialTextStyle {
     }
 }
 
+/// A border around a block: each side optional, one color, one padding.
+///
+/// The padding applies to the sides that declare a border, so a left rule does
+/// not add space above or below the block.
+#[derive(Debug, Clone, PartialEq)]
+pub struct BlockBorder {
+    left: Option<Length>,
+    right: Option<Length>,
+    top: Option<Length>,
+    bottom: Option<Length>,
+    color: Color,
+    padding: Length,
+}
+
+impl BlockBorder {
+    pub fn left(&self) -> Option<Length> {
+        self.left
+    }
+
+    pub fn right(&self) -> Option<Length> {
+        self.right
+    }
+
+    pub fn top(&self) -> Option<Length> {
+        self.top
+    }
+
+    pub fn bottom(&self) -> Option<Length> {
+        self.bottom
+    }
+
+    pub fn color(&self) -> Color {
+        self.color
+    }
+
+    pub fn padding(&self) -> Length {
+        self.padding
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.left.is_none() && self.right.is_none() && self.top.is_none() && self.bottom.is_none()
+    }
+}
+
+impl Default for BlockBorder {
+    fn default() -> Self {
+        Self {
+            left: None,
+            right: None,
+            top: None,
+            bottom: None,
+            color: DEFAULT_RULE_COLOR,
+            padding: Length(0.0),
+        }
+    }
+}
+
+/// The style of a block element, such as a quote or a fenced code block.
+#[derive(Debug, Clone, PartialEq)]
+pub struct BlockStyle {
+    text: PartialTextStyle,
+    alignment: ParagraphAlignment,
+    border: BlockBorder,
+}
+
+impl BlockStyle {
+    pub fn text(&self) -> &PartialTextStyle {
+        &self.text
+    }
+
+    pub fn alignment(&self) -> ParagraphAlignment {
+        self.alignment
+    }
+
+    pub fn border(&self) -> &BlockBorder {
+        &self.border
+    }
+}
+
+impl Default for BlockStyle {
+    fn default() -> Self {
+        Self {
+            text: PartialTextStyle::default(),
+            alignment: ParagraphAlignment::Left,
+            border: BlockBorder::default(),
+        }
+    }
+}
+
 /// The style of one heading level.
 #[derive(Debug, Clone, PartialEq)]
 pub struct HeadingStyle {
@@ -1292,8 +1381,8 @@ pub struct Formatting {
     paragraph: ParagraphStyle,
     heading: HeadingStyles,
     rule: RuleStyle,
-    quote: Option<PartialTextStyle>,
-    code_block: Option<PartialTextStyle>,
+    quote: BlockStyle,
+    code_block: BlockStyle,
 }
 
 impl Formatting {
@@ -1301,8 +1390,8 @@ impl Formatting {
         paragraph: ParagraphStyle,
         heading: HeadingStyles,
         rule: RuleStyle,
-        quote: Option<PartialTextStyle>,
-        code_block: Option<PartialTextStyle>,
+        quote: BlockStyle,
+        code_block: BlockStyle,
     ) -> Self {
         Self {
             paragraph,
@@ -1313,14 +1402,14 @@ impl Formatting {
         }
     }
 
-    /// The block quote style, when the template declares one.
-    pub fn quote(&self) -> Option<&PartialTextStyle> {
-        self.quote.as_ref()
+    /// The block quote style; undeclared keys change nothing.
+    pub fn quote(&self) -> &BlockStyle {
+        &self.quote
     }
 
-    /// The fenced code block style, when the template declares one.
-    pub fn code_block(&self) -> Option<&PartialTextStyle> {
-        self.code_block.as_ref()
+    /// The fenced code block style; undeclared keys change nothing.
+    pub fn code_block(&self) -> &BlockStyle {
+        &self.code_block
     }
 
     pub fn paragraph(&self) -> &ParagraphStyle {
@@ -1469,8 +1558,32 @@ struct RawFormatting {
     paragraph: Option<RawParagraph>,
     heading: Option<RawHeading>,
     rule: Option<RawRule>,
-    quote: Option<RawInlineStyle>,
-    code_block: Option<RawInlineStyle>,
+    quote: Option<RawBlockStyle>,
+    code_block: Option<RawBlockStyle>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawBlockStyle {
+    font_families: Option<Vec<String>>,
+    size: Option<String>,
+    weight: Option<String>,
+    style: Option<FontSlant>,
+    foreground: Option<String>,
+    background: Option<String>,
+    alignment: Option<ParagraphAlignment>,
+    border: Option<RawBorder>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawBorder {
+    left: Option<String>,
+    right: Option<String>,
+    top: Option<String>,
+    bottom: Option<String>,
+    color: Option<String>,
+    padding: Option<String>,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -1655,13 +1768,67 @@ fn convert_formatting(raw: RawFormatting) -> Result<Formatting, TemplateError> {
         convert_paragraph(raw.paragraph.unwrap_or_default())?,
         convert_headings(raw.heading.unwrap_or_default())?,
         convert_rule(raw.rule.unwrap_or_default(), "formatting.rule")?,
-        raw.quote
-            .map(|raw| convert_partial(raw, "formatting.quote"))
-            .transpose()?,
-        raw.code_block
-            .map(|raw| convert_partial(raw, "formatting.code_block"))
-            .transpose()?,
+        convert_block(raw.quote, "formatting.quote")?,
+        convert_block(raw.code_block, "formatting.code_block")?,
     ))
+}
+
+fn convert_block(raw: Option<RawBlockStyle>, prefix: &str) -> Result<BlockStyle, TemplateError> {
+    let Some(raw) = raw else {
+        return Ok(BlockStyle::default());
+    };
+    let text = convert_partial(
+        RawInlineStyle {
+            font_families: raw.font_families,
+            size: raw.size,
+            weight: raw.weight,
+            style: raw.style,
+            foreground: raw.foreground,
+            background: raw.background,
+        },
+        prefix,
+    )?;
+    Ok(BlockStyle {
+        text,
+        alignment: raw.alignment.unwrap_or(ParagraphAlignment::Left),
+        border: convert_border(raw.border, &format!("{prefix}.border"))?,
+    })
+}
+
+fn convert_border(raw: Option<RawBorder>, prefix: &str) -> Result<BlockBorder, TemplateError> {
+    let defaults = BlockBorder::default();
+    let Some(raw) = raw else {
+        return Ok(defaults);
+    };
+    Ok(BlockBorder {
+        left: border_side(raw.left, &format!("{prefix}.left"))?,
+        right: border_side(raw.right, &format!("{prefix}.right"))?,
+        top: border_side(raw.top, &format!("{prefix}.top"))?,
+        bottom: border_side(raw.bottom, &format!("{prefix}.bottom"))?,
+        color: parse_optional_color(raw.color, &format!("{prefix}.color"))?
+            .unwrap_or(defaults.color()),
+        padding: parse_size_field(
+            raw.padding,
+            &format!("{prefix}.padding"),
+            defaults.padding(),
+        )?,
+    })
+}
+
+/// A border side: a length greater than zero, or `none` to leave the side open.
+fn border_side(value: Option<String>, field: &str) -> Result<Option<Length>, TemplateError> {
+    match value {
+        None => Ok(None),
+        Some(text) if text.trim().eq_ignore_ascii_case("none") => Ok(None),
+        Some(text) => {
+            let length = parse_length_field(&text, field)?;
+            Ok(if length.points() > 0.0 {
+                Some(length)
+            } else {
+                None
+            })
+        }
+    }
 }
 
 fn convert_partial(raw: RawInlineStyle, prefix: &str) -> Result<PartialTextStyle, TemplateError> {

@@ -302,12 +302,18 @@ formatting:
   paragraph:
     background: "#fafafa"
     code:
+      font_families:
+        - DejaVu Sans Mono
       foreground: navy
       background: "#eeeeee"
     strikethrough:
       foreground: crimson
   quote:
     background: "#f0f0f0"
+    border:
+      left: 3pt
+      color: "#cccccc"
+      padding: 8
   code_block:
     background: "#111111"
     foreground: "#eeeeee"
@@ -338,6 +344,10 @@ formatting:
         code_char.contains("<w:shd w:val=\"clear\" w:color=\"auto\" w:fill=\"eeeeee\"/>"),
         "{styles}"
     );
+    assert!(
+        code_char.contains("w:ascii=\"DejaVu Sans Mono\""),
+        "an inline style changes its own font: {styles}"
+    );
     let quote = styles
         .split("w:styleId=\"Quote\"")
         .nth(1)
@@ -345,6 +355,11 @@ formatting:
     assert!(
         quote.contains("<w:shd w:val=\"clear\" w:color=\"auto\" w:fill=\"f0f0f0\"/>"),
         "{styles}"
+    );
+    assert!(
+        quote.contains("<w:left w:val=\"single\" w:sz=\"24\" w:space=\"8\" w:color=\"cccccc\"/>")
+            && quote.contains("<w:jc w:val=\"left\"/>"),
+        "the quote carries its left border and left alignment: {styles}"
     );
     let code = styles
         .split("w:styleId=\"Code\"")

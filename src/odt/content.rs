@@ -10,8 +10,7 @@ use crate::document::{
 use crate::template::Template;
 
 use super::picture_name;
-use super::styles::{background_attribute, partial_properties};
-use crate::template::PartialTextStyle;
+use super::styles::{alignment, background_attribute, border_attributes, partial_properties};
 use crate::xml;
 
 const PREFIX: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
@@ -565,14 +564,16 @@ fn block_styles(output: &mut String, template: &Template) {
     let formatting = template.formatting();
     let code_style = formatting.code_block();
     let code = partial_properties(
-        code_style,
+        Some(code_style.text()),
         Some("fo:font-family=\"'Liberation Mono', monospace\""),
     );
-    let code_background = background_attribute(code_style.and_then(PartialTextStyle::background));
+    let code_background = background_attribute(code_style.text().background());
     xml::push_fmt(
         output,
         format_args!(
-            "<style:style style:name=\"Code\" style:family=\"paragraph\" style:parent-style-name=\"Standard\"><style:paragraph-properties{code_background}/><style:text-properties {code}/></style:style>\n<style:style style:name=\"CodeBreak\" style:family=\"paragraph\" style:parent-style-name=\"Code\"><style:paragraph-properties fo:break-before=\"page\"/></style:style>\n"
+            "<style:style style:name=\"Code\" style:family=\"paragraph\" style:parent-style-name=\"Standard\"><style:paragraph-properties fo:text-align=\"{align}\"{border}{code_background}/><style:text-properties {code}/></style:style>\n<style:style style:name=\"CodeBreak\" style:family=\"paragraph\" style:parent-style-name=\"Code\"><style:paragraph-properties fo:break-before=\"page\"/></style:style>\n",
+            align = alignment(code_style.alignment()),
+            border = border_attributes(code_style.border())
         ),
     );
     if formatting.paragraph().background().is_some() {
@@ -582,8 +583,8 @@ fn block_styles(output: &mut String, template: &Template) {
         );
     }
     let quote_style = formatting.quote();
-    let quote = partial_properties(quote_style, None);
-    let quote_background = background_attribute(quote_style.and_then(PartialTextStyle::background));
+    let quote = partial_properties(Some(quote_style.text()), None);
+    let quote_background = background_attribute(quote_style.text().background());
     let text = if quote.is_empty() {
         String::new()
     } else {
@@ -592,7 +593,9 @@ fn block_styles(output: &mut String, template: &Template) {
     xml::push_fmt(
         output,
         format_args!(
-            "<style:style style:name=\"QuoteParagraph\" style:family=\"paragraph\" style:parent-style-name=\"Standard\"><style:paragraph-properties fo:margin-left=\"1cm\" fo:margin-right=\"1cm\"{quote_background}/>{text}</style:style>\n"
+            "<style:style style:name=\"QuoteParagraph\" style:family=\"paragraph\" style:parent-style-name=\"Standard\"><style:paragraph-properties fo:text-align=\"{align}\" fo:margin-left=\"1cm\" fo:margin-right=\"1cm\"{border}{quote_background}/>{text}</style:style>\n",
+            align = alignment(quote_style.alignment()),
+            border = border_attributes(quote_style.border())
         ),
     );
 }

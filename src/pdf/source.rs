@@ -12,16 +12,9 @@ use crate::document::{
     TaskState,
 };
 use crate::template::{
-    Color, HeadingStyle, InlineStyle, Length, ParagraphAlignment, PartialTextStyle, RuleStyle,
-    RunningText, TableStyle, Template, TextFace, is_lowercase_token,
+    BlockStyle, Color, HeadingStyle, InlineStyle, Length, ParagraphAlignment, PartialTextStyle,
+    RuleStyle, RunningText, TableStyle, Template, TextFace, is_lowercase_token,
 };
-
-/// Whether a styled element is a block or an inline span.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Element {
-    Block,
-    Inline,
-}
 
 use super::assets::AssetMap;
 use super::{FIXED_DAY, FIXED_MONTH, FIXED_YEAR, PdfError};
@@ -181,22 +174,74 @@ impl<'a> SourceBuilder<'a> {
         self.inline_style("strong", paragraph.strong());
 
         if let Some(style) = paragraph.code() {
-            self.partial_style("raw.where(block: false)", style, Element::Inline);
+            self.inline_partial("raw.where(block: false)", style);
         }
         if let Some(style) = paragraph.strikethrough() {
-            self.partial_style("strike", style, Element::Inline);
+            self.inline_partial("strike", style);
         }
-        if let Some(style) = template.formatting().quote() {
-            self.partial_style("quote.where(block: true)", style, Element::Block);
-        }
-        if let Some(style) = template.formatting().code_block() {
-            self.partial_style("raw.where(block: true)", style, Element::Block);
-        }
+        self.block_style("quote.where(block: true)", template.formatting().quote());
+        self.block_style("raw.where(block: true)", template.formatting().code_block());
         self.output.push('\n');
     }
 
-    /// Applies the declared keys of a partial style, leaving the rest untouched.
-    fn partial_style(&mut self, selector: &str, style: &PartialTextStyle, element: Element) {
+    /// Applies the declared keys of an inline style, leaving the rest untouched.
+    fn inline_partial(&mut self, selector: &str, style: &PartialTextStyle) {
+        self.text_partial(selector, style);
+        if let Some(background) = style.background() {
+            let _ = writeln!(
+                self.output,
+                "#show {selector}: it => box(fill: rgb(\"{}\"), inset: 0pt)[#it]",
+                background.hex()
+            );
+        }
+    }
+
+    /// Applies a block style: text, alignment, and a wrapper that carries the
+    /// fill, the border and the padding of the bordered sides.
+    fn block_style(&mut self, selector: &str, style: &BlockStyle) {
+        self.text_partial(selector, style.text());
+        let justify = matches!(style.alignment(), ParagraphAlignment::Justified);
+        let _ = writeln!(self.output, "#show {selector}: set par(justify: {justify})");
+        let border = style.border();
+        let mut arguments = Vec::new();
+        if let Some(background) = style.text().background() {
+            arguments.push(format!("fill: rgb(\"{}\")", background.hex()));
+        }
+        let mut strokes = Vec::new();
+        let mut insets = Vec::new();
+        for (side, thickness) in [
+            ("left", border.left()),
+            ("right", border.right()),
+            ("top", border.top()),
+            ("bottom", border.bottom()),
+        ] {
+            if let Some(thickness) = thickness {
+                strokes.push(format!(
+                    "{side}: {} + rgb(\"{}\")",
+                    typst_length(thickness),
+                    border.color().hex()
+                ));
+                if border.padding().points() > 0.0 {
+                    insets.push(format!("{side}: {}", typst_length(border.padding())));
+                }
+            }
+        }
+        if !strokes.is_empty() {
+            arguments.push(format!("stroke: ({})", strokes.join(", ")));
+        }
+        if !insets.is_empty() {
+            arguments.push(format!("inset: ({})", insets.join(", ")));
+        }
+        if !arguments.is_empty() {
+            let _ = writeln!(
+                self.output,
+                "#show {selector}: it => block(width: 100%, {})[#it]",
+                arguments.join(", ")
+            );
+        }
+    }
+
+    fn text_partial(&mut self, selector: &str, style: &PartialTextStyle) {
         let mut properties = Vec::new();
         if let Some(families) = style.font_families() {
             let mut list = String::from("(");
@@ -224,24 +269,6 @@ impl<'a> SourceBuilder<'a> {
                 "#show {selector}: set text({})",
                 properties.join(", ")
             );
-        }
-        if let Some(background) = style.background() {
-            match element {
-                Element::Block => {
-                    let _ = writeln!(
-                        self.output,
-                        "#show {selector}: set block(fill: rgb(\"{}\"), width: 100%)",
-                        background.hex()
-                    );
-                }
-                Element::Inline => {
-                    let _ = writeln!(
-                        self.output,
-                        "#show {selector}: it => box(fill: rgb(\"{}\"), inset: 0pt)[#it]",
-                        background.hex()
-                    );
-                }
-            }
         }
     }
 
@@ -1668,8 +1695,12 @@ mod tests {
         let source =
             typst_source(&paragraph("Texto"), &template, &AssetMap::new()).expect("the source");
         assert!(
+            source.contains("#show quote.where(block: true): set par(justify: false)"),
+            "a block is left aligned by default: {source}"
+        );
+        assert!(
             source.contains(
-                "#show quote.where(block: true): set block(fill: rgb(\"#f0f0f0\"), width: 100%)"
+                "#show quote.where(block: true): it => block(width: 100%, fill: rgb(\"#f0f0f0\"))[#it]"
             ),
             "{source}"
         );
@@ -1680,8 +1711,42 @@ mod tests {
         );
         assert!(
             source.contains(
-                "#show raw.where(block: true): set block(fill: rgb(\"#111111\"), width: 100%)"
+                "#show raw.where(block: true): it => block(width: 100%, fill: rgb(\"#111111\"))[#it]"
             ),
+            "{source}"
+        );
+    }
+
+    #[test]
+    fn a_block_border_emits_each_declared_side() {
+        let template = Template::from_yaml(
+            "version: \"0.5\"\nformatting:\n  quote:\n    border:\n      left: 3pt\n      bottom: 0.5pt\n      color: \"#cccccc\"\n      padding: 8\n",
+        )
+        .expect("the template");
+        let source =
+            typst_source(&paragraph("Texto"), &template, &AssetMap::new()).expect("the source");
+        assert!(
+            source.contains(
+                "#show quote.where(block: true): it => block(width: 100%, stroke: (left: 3.000pt + rgb(\"#cccccc\"), bottom: 0.500pt + rgb(\"#cccccc\")), inset: (left: 8.000pt, bottom: 8.000pt))[#it]"
+            ),
+            "{source}"
+        );
+        assert!(
+            !source.contains("raw.where(block: true): it => block"),
+            "a code block without a border has no wrapper: {source}"
+        );
+    }
+
+    #[test]
+    fn a_block_alignment_can_be_justified() {
+        let template = Template::from_yaml(
+            "version: \"0.5\"\nformatting:\n  code_block:\n    alignment: justified\n",
+        )
+        .expect("the template");
+        let source =
+            typst_source(&paragraph("Texto"), &template, &AssetMap::new()).expect("the source");
+        assert!(
+            source.contains("#show raw.where(block: true): set par(justify: true)"),
             "{source}"
         );
     }

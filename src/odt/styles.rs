@@ -5,8 +5,8 @@ use std::collections::BTreeSet;
 use crate::assets::Assets;
 use crate::document::Document;
 use crate::template::{
-    Color, FontSlant, InlineStyle, Length, Orientation, ParagraphAlignment, PartialTextStyle,
-    RuleStyle, RunningText, Template, TextFace,
+    BlockBorder, Color, FontSlant, InlineStyle, Length, Orientation, ParagraphAlignment,
+    PartialTextStyle, RuleStyle, RunningText, Template, TextFace,
 };
 
 use super::picture_name;
@@ -238,6 +238,32 @@ pub(crate) fn partial_properties(
     output.trim_end().to_owned()
 }
 
+/// The border and padding of the sides that declare a border.
+pub(crate) fn border_attributes(border: &BlockBorder) -> String {
+    let mut output = String::new();
+    for (side, thickness) in [
+        ("left", border.left()),
+        ("right", border.right()),
+        ("top", border.top()),
+        ("bottom", border.bottom()),
+    ] {
+        if let Some(thickness) = thickness {
+            output.push_str(&format!(
+                " fo:border-{side}=\"{} solid {}\"",
+                xml::points(thickness),
+                border.color().hex()
+            ));
+            if border.padding().points() > 0.0 {
+                output.push_str(&format!(
+                    " fo:padding-{side}=\"{}\"",
+                    xml::points(border.padding())
+                ));
+            }
+        }
+    }
+    output
+}
+
 pub(crate) fn background_attribute(background: Option<Color>) -> String {
     background.map_or_else(String::new, |color| {
         format!(" fo:background-color=\"{}\"", color.hex())
@@ -270,8 +296,8 @@ fn font_families(template: &Template) -> BTreeSet<String> {
     for style in [
         paragraph.code(),
         paragraph.strikethrough(),
-        template.formatting().quote(),
-        template.formatting().code_block(),
+        Some(template.formatting().quote().text()),
+        Some(template.formatting().code_block().text()),
     ]
     .into_iter()
     .flatten()
@@ -301,7 +327,7 @@ fn slant(slant: FontSlant) -> &'static str {
     }
 }
 
-fn alignment(alignment: ParagraphAlignment) -> &'static str {
+pub(crate) fn alignment(alignment: ParagraphAlignment) -> &'static str {
     match alignment {
         ParagraphAlignment::Justified => "justify",
         ParagraphAlignment::Left => "left",

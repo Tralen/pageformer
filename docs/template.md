@@ -61,8 +61,17 @@ formatting:
   quote:
     foreground: "#2a4d7a"
     background: "#eef4fb"
+    border:
+      left: 3pt
+      color: "#bbbbbb"
+      padding: 8
   code_block:
     background: "#f4f4f4"
+    border:
+      top: 0.5pt
+      bottom: 0.5pt
+      color: "#bbbbbb"
+      padding: 6
   heading:
     font_families:
       - Linux Biolinum O
@@ -188,7 +197,7 @@ The header and footer use the paragraph face. Their content sits inside the top 
 
 Inside `emphasis` and `strong`, the allowed keys are `font_families`, `size`, `weight`, `style`, `foreground` and `background`. Only the declared keys override the paragraph values, so an empty map is valid and changes nothing beyond the semantic default. Without its own `foreground`, an inline span keeps the surrounding color: the paragraph color in body text, and the heading color inside a heading. A `background` fills the span itself.
 
-`code` and `strikethrough` style inline code spans and strikethrough text. They accept the same keys and are optional: while a key stays undeclared, the renderer keeps what it already does, so a map with only `foreground` changes the color and leaves the monospace font alone. For `code`, the monospace family the office formats already use stays the default until `font_families` is declared.
+`code` and `strikethrough` style inline code spans and strikethrough text. They accept the same keys, including `font_families`, and are optional: while a key stays undeclared, the renderer keeps what it already does, so a map with only `foreground` changes the color and leaves the monospace font alone. For `code`, the monospace family the office formats already use stays the default until `font_families` is declared; `emphasis`, `strong` and `strikethrough` inherit the paragraph face instead.
 
 ### `formatting.heading`
 
@@ -217,7 +226,17 @@ The template sets explicit values for each level. There is no hidden multiplier 
 
 ### `formatting.quote` and `formatting.code_block`
 
-Block quotes and fenced code blocks are paragraphs with their own style, outside `paragraph`. Both accept `font_families`, `size`, `weight`, `style`, `foreground` and `background`, and both change nothing while undeclared. A quote keeps the body face and the one centimeter indent; a code block keeps its monospace face.
+Block quotes and fenced code blocks are paragraphs with their own style, outside `paragraph`. Both accept `font_families`, `size`, `weight`, `style`, `foreground`, `background`, `alignment` and `border`. Text keys change nothing while undeclared: a quote keeps the body face and the one centimeter indent, and a code block keeps its monospace face.
+
+`alignment` is `left` by default for both, because justified code and quotes read worse; set `justified` to follow the body.
+
+`border` draws a rule on the declared sides and takes these keys:
+
+- `left`, `right`, `top`, `bottom`: the thickness of that side. A side is off when omitted or written as `none`; a zero length is also off.
+- `color`: the color of every declared side. The default is `#000000`.
+- `padding`: the gap between the text and the border. It applies only to the sides that declare a border, so a left rule does not add space above or below the block. The default is `0`, which puts the text against the rule.
+
+The recipe for the usual vertical quote rule is `border: { left: 3pt, color: "#cccccc", padding: 8 }`.
 
 ### `formatting.rule`
 

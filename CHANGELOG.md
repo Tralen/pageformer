@@ -4,6 +4,13 @@
 
 *Major updates and feature releases.*
 
+### 0.24.0
+
+- Added `alignment` to `formatting.quote` and `formatting.code_block`. Both default to `left`, because justified quotes and code read worse; `justified` follows the body again.
+- Added `border` to `formatting.quote` and `formatting.code_block`, with `left`, `right`, `top` and `bottom` thicknesses, one `color` and a `padding` that applies to the bordered sides. A side is off when omitted, `none` or zero. The usual vertical quote rule is `border: { left: 3pt, color: "#cccccc", padding: 8 }`.
+- Every inline style, including `code` and `strikethrough`, accepts `font_families`; emphasis, strong and strikethrough inherit the paragraph face, while code keeps its monospace default until a family is declared.
+- Regenerates the office examples: blocks are left aligned now, and the ODT carries the version. The PDFs stay byte-identical and the page counts stay 4, 4 and 3.
+
 ### 0.23.0
 
 - Added `background` to `formatting.paragraph`, to `emphasis` and `strong`, and to the new `formatting.quote` and `formatting.code_block` sections, so every text format now takes a `foreground` and a `background`.

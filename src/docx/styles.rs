@@ -3,7 +3,8 @@
 use crate::document::Document;
 use crate::metrics;
 use crate::template::{
-    Color, FontSlant, Length, ParagraphAlignment, PartialTextStyle, RuleStyle, Template, TextFace,
+    BlockBorder, Color, FontSlant, Length, ParagraphAlignment, PartialTextStyle, RuleStyle,
+    Template, TextFace,
 };
 use crate::xml;
 
@@ -113,25 +114,29 @@ pub(crate) fn styles_xml(document: &Document, template: &Template) -> String {
     }
 
     let quote = template.formatting().quote();
-    let quote_shading = shading(quote.and_then(PartialTextStyle::background));
-    let quote_rpr = rpr(partial_properties(quote, None, false));
+    let quote_rpr = rpr(partial_properties(Some(quote.text()), None, false));
     xml::push_fmt(
         &mut output,
         format_args!(
-            "<w:style w:type=\"paragraph\" w:styleId=\"Quote\"><w:name w:val=\"Quote\"/><w:basedOn w:val=\"Normal\"/><w:pPr><w:ind w:left=\"567\" w:right=\"567\"/>{quote_shading}</w:pPr>{quote_rpr}</w:style>\n"
+            "<w:style w:type=\"paragraph\" w:styleId=\"Quote\"><w:name w:val=\"Quote\"/><w:basedOn w:val=\"Normal\"/><w:pPr>{border}{shading}<w:ind w:left=\"567\" w:right=\"567\"/><w:jc w:val=\"{align}\"/></w:pPr>{quote_rpr}</w:style>\n",
+            border = border_xml(quote.border()),
+            shading = shading(quote.text().background()),
+            align = alignment(quote.alignment())
         ),
     );
     let code_block = template.formatting().code_block();
-    let code_shading = shading(code_block.and_then(PartialTextStyle::background));
     let code_rpr = rpr(partial_properties(
-        code_block,
+        Some(code_block.text()),
         Some("<w:rFonts w:ascii=\"Consolas\" w:hAnsi=\"Consolas\" w:cs=\"Consolas\"/>"),
         false,
     ));
     xml::push_fmt(
         &mut output,
         format_args!(
-            "<w:style w:type=\"paragraph\" w:styleId=\"Code\"><w:name w:val=\"Code\"/><w:basedOn w:val=\"Normal\"/><w:pPr><w:suppressAutoHyphens/>{code_shading}</w:pPr>{code_rpr}</w:style>\n"
+            "<w:style w:type=\"paragraph\" w:styleId=\"Code\"><w:name w:val=\"Code\"/><w:basedOn w:val=\"Normal\"/><w:pPr>{border}{shading}<w:suppressAutoHyphens/><w:jc w:val=\"{align}\"/></w:pPr>{code_rpr}</w:style>\n",
+            border = border_xml(code_block.border()),
+            shading = shading(code_block.text().background()),
+            align = alignment(code_block.alignment())
         ),
     );
     xml::push(
@@ -151,6 +156,33 @@ pub(crate) fn styles_xml(document: &Document, template: &Template) -> String {
         ),
     );
     xml::push(&mut output, "</w:styles>\n");
+    output
+}
+
+/// The paragraph border of the declared sides, with the padding as the border
+/// space, which is how OOXML keeps the text away from the rule.
+fn border_xml(border: &BlockBorder) -> String {
+    if border.is_empty() {
+        return String::new();
+    }
+    let color = border.color().hex();
+    let color = color.trim_start_matches('#');
+    let space = metrics::border_space(border.padding().points());
+    let mut output = String::from("<w:pBdr>");
+    for (side, thickness) in [
+        ("top", border.top()),
+        ("left", border.left()),
+        ("bottom", border.bottom()),
+        ("right", border.right()),
+    ] {
+        if let Some(thickness) = thickness {
+            output.push_str(&format!(
+                "<w:{side} w:val=\"single\" w:sz=\"{}\" w:space=\"{space}\" w:color=\"{color}\"/>",
+                metrics::eighths(thickness.points())
+            ));
+        }
+    }
+    output.push_str("</w:pBdr>");
     output
 }
 

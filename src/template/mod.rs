@@ -800,13 +800,14 @@ impl FontSlant {
     }
 }
 
-/// The font families, size, weight and slant for one kind of text.
+/// The font families, size, weight, slant and color for one kind of text.
 #[derive(Debug, Clone, PartialEq)]
 pub struct TextFace {
     font_families: Vec<FontFamily>,
     size: Length,
     weight: FontWeight,
     slant: FontSlant,
+    foreground: Option<Color>,
 }
 
 impl TextFace {
@@ -827,7 +828,18 @@ impl TextFace {
             size,
             weight,
             slant,
+            foreground: None,
         })
+    }
+
+    pub fn with_foreground(mut self, foreground: Option<Color>) -> Self {
+        self.foreground = foreground;
+        self
+    }
+
+    /// The text color, or `None` to inherit the surrounding color.
+    pub fn foreground(&self) -> Option<Color> {
+        self.foreground
     }
 
     pub fn font_families(&self) -> &[FontFamily] {
@@ -1189,6 +1201,7 @@ struct RawParagraph {
     size: Option<String>,
     weight: Option<String>,
     style: Option<FontSlant>,
+    foreground: Option<String>,
     leading: Option<String>,
     spacing: Option<String>,
     alignment: Option<ParagraphAlignment>,
@@ -1203,6 +1216,7 @@ struct RawInlineStyle {
     size: Option<String>,
     weight: Option<String>,
     style: Option<FontSlant>,
+    foreground: Option<String>,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -1224,6 +1238,7 @@ struct RawHeading {
     spacing_before: Option<String>,
     spacing_after: Option<String>,
     page_break_before: Option<bool>,
+    foreground: Option<String>,
     background: Option<String>,
     rule: Option<RawRuleValue>,
     h1: Option<RawHeadingLevel>,
@@ -1244,6 +1259,7 @@ struct RawHeadingLevel {
     spacing_before: Option<String>,
     spacing_after: Option<String>,
     page_break_before: Option<bool>,
+    foreground: Option<String>,
     background: Option<String>,
     rule: Option<RawRuleValue>,
 }
@@ -1405,8 +1421,10 @@ fn convert_paragraph(raw: RawParagraph) -> Result<ParagraphStyle, TemplateError>
         FontWeight::NORMAL,
     )?;
     let slant = raw.style.unwrap_or(FontSlant::Normal);
+    let foreground = parse_optional_color(raw.foreground, "formatting.paragraph.foreground")?;
     let face = TextFace::new(families, size, weight, slant)
-        .map_err(|problem| value_error("formatting.paragraph", problem))?;
+        .map_err(|problem| value_error("formatting.paragraph", problem))?
+        .with_foreground(foreground);
     let leading = parse_size_field(raw.leading, "formatting.paragraph.leading", DEFAULT_LEADING)?;
     let spacing = parse_optional_length(raw.spacing, "formatting.paragraph.spacing")?;
     let alignment = raw.alignment.unwrap_or(ParagraphAlignment::Justified);
@@ -1440,6 +1458,9 @@ fn convert_inline(
     let mut size = base.size();
     let mut weight = semantic_weight.unwrap_or(base.weight());
     let mut slant = semantic_slant.unwrap_or(base.slant());
+    // Only a declared color is stored: without one, the span inherits the
+    // surrounding color, so emphasis inside a heading keeps the heading color.
+    let mut foreground = None;
     if let Some(raw) = raw {
         if let Some(values) = raw.font_families {
             families = parse_families(values, &format!("{prefix}.font_families"))?;
@@ -1453,11 +1474,29 @@ fn convert_inline(
         if let Some(value) = raw.style {
             slant = value;
         }
+        if let Some(text) = raw.foreground {
+            foreground = Some(
+                Color::parse(&text)
+                    .map_err(|problem| value_error(format!("{prefix}.foreground"), problem))?,
+            );
+        }
     }
     if size.points() <= 0.0 {
         return Err(value_error(format!("{prefix}.size"), ValueError::Zero));
     }
-    TextFace::new(families, size, weight, slant).map_err(|problem| value_error(prefix, problem))
+    TextFace::new(families, size, weight, slant)
+        .map_err(|problem| value_error(prefix, problem))
+        .map(|face| face.with_foreground(foreground))
+}
+
+fn parse_optional_color(
+    value: Option<String>,
+    field: &str,
+) -> Result<Option<Color>, TemplateError> {
+    value
+        .map(|text| Color::parse(&text))
+        .transpose()
+        .map_err(|problem| value_error(field, problem))
 }
 
 fn convert_headings(raw: RawHeading) -> Result<HeadingStyles, TemplateError> {
@@ -1469,6 +1508,7 @@ fn convert_headings(raw: RawHeading) -> Result<HeadingStyles, TemplateError> {
         spacing_before,
         spacing_after,
         page_break_before,
+        foreground,
         background,
         rule,
         h1,
@@ -1487,6 +1527,7 @@ fn convert_headings(raw: RawHeading) -> Result<HeadingStyles, TemplateError> {
             spacing_before,
             spacing_after,
             page_break_before,
+            foreground,
             background,
             rule,
         },
@@ -1506,6 +1547,7 @@ fn convert_headings(raw: RawHeading) -> Result<HeadingStyles, TemplateError> {
                     spacing_before: raw_level.spacing_before,
                     spacing_after: raw_level.spacing_after,
                     page_break_before: raw_level.page_break_before,
+                    foreground: raw_level.foreground,
                     background: raw_level.background,
                     rule: raw_level.rule,
                 },
@@ -1533,6 +1575,7 @@ struct RawHeadingOverrides {
     spacing_before: Option<String>,
     spacing_after: Option<String>,
     page_break_before: Option<bool>,
+    foreground: Option<String>,
     background: Option<String>,
     rule: Option<RawRuleValue>,
 }
@@ -1546,6 +1589,7 @@ struct HeadingOverrides {
     spacing_before: Option<Length>,
     spacing_after: Option<Length>,
     page_break_before: Option<bool>,
+    foreground: Inherited<Color>,
     background: Inherited<Color>,
     rule: Inherited<RuleStyle>,
 }
@@ -1560,6 +1604,7 @@ impl HeadingOverrides {
             spacing_before,
             spacing_after,
             page_break_before,
+            foreground,
             background,
             rule,
         } = raw;
@@ -1587,6 +1632,7 @@ impl HeadingOverrides {
                 .map(|text| parse_length_field(&text, &format!("{prefix}.spacing_after")))
                 .transpose()?,
             page_break_before,
+            foreground: inherited_color(foreground, &format!("{prefix}.foreground"))?,
             background: inherited_color(background, &format!("{prefix}.background"))?,
             rule: inherited_rule(rule, &format!("{prefix}.rule"))?,
         })
@@ -1613,6 +1659,11 @@ impl HeadingOverrides {
         }
         if let Some(page_break_before) = self.page_break_before {
             style.page_break_before = page_break_before;
+        }
+        match self.foreground {
+            Inherited::Undeclared => {}
+            Inherited::Cleared => style.face.foreground = None,
+            Inherited::Set(foreground) => style.face.foreground = Some(foreground),
         }
         match self.background {
             Inherited::Undeclared => {}
@@ -1743,6 +1794,7 @@ fn default_heading_style(level: usize) -> HeadingStyle {
             size: Length(HEADING_SIZES[index]),
             weight: FontWeight::BOLD,
             slant: FontSlant::Normal,
+            foreground: None,
         },
         Length(HEADING_SPACING_BEFORE[index]),
         Length(HEADING_SPACING_AFTER[index]),

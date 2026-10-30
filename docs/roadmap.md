@@ -233,9 +233,9 @@ A phase is closed only when all of the following hold:
 |---|---|---|---|
 | Version | `version` | 0.9.0 | Two-part string; schema `0.5` is current. |
 | Page | `page.size`, `page.orientation`, `page.margins`, `page.letterhead` | 0.5.0 | Shared by every paged format. |
-| Paragraph | `formatting.paragraph` | 0.9.0 | Font families, size, weight, style, leading, spacing, alignment and inline overrides. |
-| Inline spans | `formatting.paragraph.emphasis`, `formatting.paragraph.strong` | 0.9.0 | Inherit the paragraph face; style italic and weight bold are the semantic defaults. |
-| Headings | `formatting.heading`, `formatting.heading.h1` to `h6` | 0.12.0 | Base plus per-level overrides for fonts, size, weight, style, spacing, `page_break_before`, `background` and `rule`; since 0.20.0 the base map carries `background` and `rule`, and a level clears them with `none`. |
+| Paragraph | `formatting.paragraph` | 0.9.0 | Font families, size, weight, style, leading, spacing, alignment, `foreground` (0.21.0) and inline overrides. |
+| Inline spans | `formatting.paragraph.emphasis`, `formatting.paragraph.strong` | 0.9.0 | Inherit the paragraph face and its `foreground`; style italic and weight bold are the semantic defaults. |
+| Headings | `formatting.heading`, `formatting.heading.h1` to `h6` | 0.12.0 | Base plus per-level overrides for fonts, size, weight, style, spacing, `page_break_before`, `background` and `rule`; since 0.20.0 the base map carries `background` and `rule`, and a level clears them with `none`; `foreground` arrived in 0.21.0 and follows the same inheritance. |
 | Rule | `formatting.rule`, `formatting.heading.h1` to `h6` `rule` | 0.18.0 | Thematic break thickness, color and optional spacing, and a rule below each heading level, shared by every format; the level rule arrived in 0.19.0 and `none` in 0.20.0. |
 | Header and footer | `page.header`, `page.footer` | 0.10.0 | Running content in left, center and right slots; lowercase tokens only. |
 | Tables | `table` | 0.10.0 | Border, border color, header fill and cell padding. |

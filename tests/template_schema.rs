@@ -747,6 +747,90 @@ fn an_invalid_heading_rule_names_its_level() {
 }
 
 #[test]
+fn a_foreground_is_read_for_every_text_style() {
+    let template = parse(
+        r##"
+version: "0.5"
+formatting:
+  paragraph:
+    foreground: "#112233"
+    emphasis:
+      foreground: "#445566"
+    strong:
+      foreground: "#667788"
+  heading:
+    foreground: "#778899"
+"##,
+    );
+    let paragraph = template.formatting().paragraph();
+    let hex = |face: &pageformer::template::TextFace| face.foreground().map(|color| color.hex());
+    assert_eq!(hex(paragraph.face()), Some("#112233".to_owned()));
+    assert_eq!(hex(paragraph.emphasis()), Some("#445566".to_owned()));
+    assert_eq!(hex(paragraph.strong()), Some("#667788".to_owned()));
+    for level in template.formatting().heading().levels() {
+        assert_eq!(hex(level.face()), Some("#778899".to_owned()));
+    }
+
+    let plain = parse("version: \"0.5\"\n");
+    let paragraph = plain.formatting().paragraph();
+    assert_eq!(hex(paragraph.face()), None);
+    assert_eq!(hex(paragraph.strong()), None);
+    assert_eq!(hex(plain.formatting().heading().levels()[0].face()), None);
+
+    let inherited =
+        parse("version: \"0.5\"\nformatting:\n  paragraph:\n    foreground: \"#112233\"\n");
+    assert_eq!(
+        hex(inherited.formatting().paragraph().strong()),
+        None,
+        "an inline span inherits the color instead of copying it, so it keeps a heading color"
+    );
+}
+
+#[test]
+fn a_heading_foreground_can_be_cleared_per_level_with_none() {
+    let template = parse(
+        r##"
+version: "0.5"
+formatting:
+  heading:
+    foreground: "#778899"
+    h2:
+      foreground: none
+"##,
+    );
+    let levels = template.formatting().heading().levels();
+    assert_eq!(
+        levels[0].face().foreground().map(|color| color.hex()),
+        Some("#778899".to_owned())
+    );
+    assert_eq!(levels[1].face().foreground(), None);
+}
+
+#[test]
+fn an_invalid_foreground_names_its_field() {
+    for (yaml, field) in [
+        (
+            "version: \"0.5\"\nformatting:\n  paragraph:\n    foreground: grey\n",
+            "formatting.paragraph.foreground",
+        ),
+        (
+            "version: \"0.5\"\nformatting:\n  paragraph:\n    strong:\n      foreground: grey\n",
+            "formatting.paragraph.strong.foreground",
+        ),
+        (
+            "version: \"0.5\"\nformatting:\n  heading:\n    h2:\n      foreground: grey\n",
+            "formatting.heading.h2.foreground",
+        ),
+    ] {
+        let error = Template::from_yaml(yaml).expect_err("an invalid color");
+        assert!(
+            value_error_is(&error, field, ValueError::InvalidColor),
+            "{field}: {error}"
+        );
+    }
+}
+
+#[test]
 fn the_embedded_template_matches_the_project_defaults() {
     let template = Template::embedded().expect("the embedded template must be valid");
     assert_eq!(template.schema_version(), CURRENT_SCHEMA_VERSION);

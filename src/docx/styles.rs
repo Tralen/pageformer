@@ -21,8 +21,9 @@ pub(crate) fn styles_xml(document: &Document, template: &Template) -> String {
     xml::push_fmt(
         &mut output,
         format_args!(
-            "<w:docDefaults><w:rPrDefault><w:rPr>{fonts}<w:sz w:val=\"{size}\"/><w:szCs w:val=\"{size}\"/>{language}</w:rPr></w:rPrDefault><w:pPrDefault><w:pPr>{spacing}<w:jc w:val=\"{align}\"/></w:pPr></w:pPrDefault></w:docDefaults>\n",
+            "<w:docDefaults><w:rPrDefault><w:rPr>{fonts}{color}<w:sz w:val=\"{size}\"/><w:szCs w:val=\"{size}\"/>{language}</w:rPr></w:rPrDefault><w:pPrDefault><w:pPr>{spacing}<w:jc w:val=\"{align}\"/></w:pPr></w:pPrDefault></w:docDefaults>\n",
             fonts = run_fonts(face),
+            color = foreground(face),
             size = metrics::half_points(face.size().points()),
             spacing = spacing(line, after),
             align = alignment(paragraph.alignment()),
@@ -31,8 +32,9 @@ pub(crate) fn styles_xml(document: &Document, template: &Template) -> String {
     xml::push_fmt(
         &mut output,
         format_args!(
-            "<w:style w:type=\"paragraph\" w:default=\"1\" w:styleId=\"Normal\"><w:name w:val=\"Normal\"/><w:qFormat/><w:pPr>{spacing}<w:jc w:val=\"{align}\"/></w:pPr><w:rPr>{fonts}<w:sz w:val=\"{size}\"/><w:szCs w:val=\"{size}\"/>{language}</w:rPr></w:style>\n",
+            "<w:style w:type=\"paragraph\" w:default=\"1\" w:styleId=\"Normal\"><w:name w:val=\"Normal\"/><w:qFormat/><w:pPr>{spacing}<w:jc w:val=\"{align}\"/></w:pPr><w:rPr>{fonts}{color}<w:sz w:val=\"{size}\"/><w:szCs w:val=\"{size}\"/>{language}</w:rPr></w:style>\n",
             fonts = run_fonts(face),
+            color = foreground(face),
             size = metrics::half_points(face.size().points()),
             spacing = spacing(line, after),
             align = alignment(paragraph.alignment()),
@@ -64,7 +66,7 @@ pub(crate) fn styles_xml(document: &Document, template: &Template) -> String {
         xml::push_fmt(
             &mut output,
             format_args!(
-                "<w:style w:type=\"paragraph\" w:styleId=\"Heading{level}\"><w:name w:val=\"heading {level}\"/><w:basedOn w:val=\"Normal\"/><w:next w:val=\"Normal\"/><w:qFormat/><w:pPr><w:keepNext/>{page_break}{border}{shading}<w:spacing w:before=\"{before}\" w:after=\"{after}\" w:line=\"{line}\" w:lineRule=\"atLeast\"/><w:outlineLvl w:val=\"{outline}\"/></w:pPr><w:rPr>{fonts}{bold}{italic}<w:sz w:val=\"{size}\"/><w:szCs w:val=\"{size}\"/></w:rPr></w:style>\n",
+                "<w:style w:type=\"paragraph\" w:styleId=\"Heading{level}\"><w:name w:val=\"heading {level}\"/><w:basedOn w:val=\"Normal\"/><w:next w:val=\"Normal\"/><w:qFormat/><w:pPr><w:keepNext/>{page_break}{border}{shading}<w:spacing w:before=\"{before}\" w:after=\"{after}\" w:line=\"{line}\" w:lineRule=\"atLeast\"/><w:outlineLvl w:val=\"{outline}\"/></w:pPr><w:rPr>{fonts}{bold}{italic}{color}<w:sz w:val=\"{size}\"/><w:szCs w:val=\"{size}\"/></w:rPr></w:style>\n",
                 page_break = if heading.page_break_before() {
                     "<w:pageBreakBefore/>"
                 } else {
@@ -82,6 +84,7 @@ pub(crate) fn styles_xml(document: &Document, template: &Template) -> String {
                 line = metrics::twips(line),
                 outline = index,
                 fonts = run_fonts(face),
+                color = foreground(face),
                 bold = if face.weight().get() >= 600 {
                     "<w:b/>"
                 } else {
@@ -119,6 +122,15 @@ fn run_fonts(face: &TextFace) -> String {
     format!(
         "<w:rFonts w:ascii=\"{name}\" w:hAnsi=\"{name}\" w:eastAsia=\"{name}\" w:cs=\"{name}\"/>"
     )
+}
+
+fn foreground(face: &TextFace) -> String {
+    face.foreground().map_or_else(String::new, |color| {
+        format!(
+            "<w:color w:val=\"{}\"/>",
+            color.hex().trim_start_matches('#')
+        )
+    })
 }
 
 fn language_attribute(document: &Document) -> String {

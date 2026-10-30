@@ -35,6 +35,26 @@ pub(crate) fn media_plan(assets: &Assets) -> Vec<Media> {
         .collect()
 }
 
+/// The inline spans whose face can carry a color.
+enum Span {
+    Emphasis,
+    Strong,
+}
+
+fn foreground_run(template: &Template, span: Span) -> String {
+    let paragraph = template.formatting().paragraph();
+    let face = match span {
+        Span::Emphasis => paragraph.emphasis(),
+        Span::Strong => paragraph.strong(),
+    };
+    face.foreground().map_or_else(String::new, |color| {
+        format!(
+            "<w:color w:val=\"{}\"/>",
+            color.hex().trim_start_matches('#')
+        )
+    })
+}
+
 fn file_name(virtual_name: &str) -> &str {
     match virtual_name.rsplit_once('/') {
         Some((_, name)) => name,
@@ -255,11 +275,13 @@ impl<'a> Builder<'a> {
             }
             Inline::Emphasis(content) => {
                 let mut merged = String::from("<w:i/>");
+                merged.push_str(&foreground_run(self.template, Span::Emphasis));
                 merged.push_str(properties);
                 self.runs(content, &merged)
             }
             Inline::Strong(content) => {
                 let mut merged = String::from("<w:b/>");
+                merged.push_str(&foreground_run(self.template, Span::Strong));
                 merged.push_str(properties);
                 self.runs(content, &merged)
             }

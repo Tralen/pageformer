@@ -4,6 +4,12 @@
 
 *Major updates and feature releases.*
 
+### 0.21.0
+
+- Added `foreground`, a text color written as `#rrggbb`, to `formatting.paragraph`, to the `emphasis` and `strong` overrides and to `formatting.heading` and `h1` to `h6`. Headings inherit it from the base map and clear it with `none`, like `background` and `rule`; an inline span keeps the paragraph color unless it declares its own.
+- Every format reads the color: Typst `fill`, `fo:color` in ODT and `w:color` in DOCX, including the running header and footer. TXT has no color.
+- Documented the DOCX heading-fill divergence: a very large `formatting.paragraph.leading` makes the DOCX fill taller than the PDF and ODT ones.
+
 ### 0.20.2
 
 - ODT headings now use the font's natural line height, `fo:line-height="100%"`, instead of the leading plus cap height. A heading fill therefore scales with the heading size, the same box DOCX gets from "at least" spacing: the ODT band measures 20.6pt at the 18pt heading and 16.3pt at 14pt, matching DOCX exactly. Body paragraphs keep the calibrated leading plus cap height.

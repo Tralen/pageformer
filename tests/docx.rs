@@ -244,6 +244,52 @@ formatting:
 }
 
 #[test]
+fn the_foreground_reaches_the_styles_and_the_runs() {
+    let document = markdown::parse("## Escopo\n\nTexto com *ênfase* e **forte**.\n")
+        .expect("the document must parse");
+    let template = Template::from_yaml(
+        r##"
+version: "0.5"
+formatting:
+  paragraph:
+    foreground: "#112233"
+    emphasis:
+      foreground: "#445566"
+  heading:
+    foreground: "#778899"
+"##,
+    )
+    .expect("the template must be valid");
+
+    let bytes = docx::render(&document, &template, &Assets::default()).expect("the package");
+    let mut archive = ZipArchive::new(Cursor::new(bytes)).expect("the package must be a ZIP");
+    let styles = entry(&mut archive, "word/styles.xml");
+    let content = entry(&mut archive, "word/document.xml");
+
+    assert!(
+        styles.contains("<w:rPrDefault><w:rPr><w:rFonts"),
+        "the defaults carry the body color: {styles}"
+    );
+    assert_eq!(
+        styles.matches("<w:color w:val=\"112233\"/>").count(),
+        2,
+        "the document defaults and Normal take the body color: {styles}"
+    );
+    assert!(
+        styles.contains("<w:color w:val=\"778899\"/>"),
+        "headings take their own color: {styles}"
+    );
+    assert!(
+        content.contains("<w:i/><w:color w:val=\"445566\"/>"),
+        "emphasis overrides the body color: {content}"
+    );
+    assert!(
+        !content.contains("<w:b/><w:color"),
+        "strong inherits the body color instead of repeating it: {content}"
+    );
+}
+
+#[test]
 fn a_heading_rule_is_a_bottom_border_of_its_level() {
     let document = markdown::parse("## Escopo\n\nTexto.\n").expect("the document must parse");
     let template = Template::from_yaml(

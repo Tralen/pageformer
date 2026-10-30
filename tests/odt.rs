@@ -281,6 +281,53 @@ formatting:
 }
 
 #[test]
+fn the_foreground_reaches_the_styles() {
+    let document = markdown::parse("# Um\n\nTexto com *ênfase* e **forte**.\n")
+        .expect("the document must parse");
+    let template = Template::from_yaml(
+        r##"
+version: "0.5"
+formatting:
+  paragraph:
+    foreground: "#112233"
+    emphasis:
+      foreground: "#445566"
+  heading:
+    foreground: "#778899"
+"##,
+    )
+    .expect("the template must be valid");
+
+    let bytes = odt::render(&document, &template, &Assets::default()).expect("the package");
+    let mut archive = ZipArchive::new(Cursor::new(bytes)).expect("the package must be a ZIP");
+    let styles = entry(&mut archive, "styles.xml");
+
+    assert!(
+        styles.contains("<style:style style:name=\"Standard\"")
+            && styles.contains("fo:font-style=\"normal\" fo:color=\"#112233\""),
+        "the body takes the paragraph color: {styles}"
+    );
+    assert!(
+        styles.contains("<style:style style:name=\"Emphasis\" style:family=\"text\">")
+            && styles.contains("fo:color=\"#445566\""),
+        "emphasis overrides it: {styles}"
+    );
+    assert!(
+        styles.contains("fo:color=\"#778899\""),
+        "headings take their own color: {styles}"
+    );
+    assert_eq!(
+        styles.matches("fo:color=\"#112233\"").count(),
+        3,
+        "the default style, Standard and the running style carry the body color: {styles}"
+    );
+    assert!(
+        !styles.contains("<style:style style:name=\"Strong\" style:family=\"text\"><style:text-properties style:font-name=\"Liberation Serif\" fo:font-size=\"12.00pt\" fo:font-weight=\"700\" fo:font-style=\"normal\" fo:color="),
+        "strong inherits instead of repeating the body color: {styles}"
+    );
+}
+
+#[test]
 fn a_heading_fill_scales_with_the_heading_size() {
     let document =
         markdown::parse("# Um\n\nTexto.\n\n## Dois\n\nTexto.\n").expect("the document must parse");

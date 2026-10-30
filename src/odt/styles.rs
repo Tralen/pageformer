@@ -37,18 +37,19 @@ pub fn styles_xml(document: &Document, template: &Template, assets: &Assets) -> 
     xml::push_fmt(
         &mut output,
         format_args!(
-            "<style:default-style style:family=\"paragraph\"><style:paragraph-properties fo:orphans=\"2\" fo:widows=\"2\"/><style:text-properties fo:font-family=\"'{family}'\" fo:font-size=\"{size}\" fo:font-weight=\"{weight}\" fo:font-style=\"{slant}\"{language}/></style:default-style>\n",
+            "<style:default-style style:family=\"paragraph\"><style:paragraph-properties fo:orphans=\"2\" fo:widows=\"2\"/><style:text-properties fo:font-family=\"'{family}'\" fo:font-size=\"{size}\" fo:font-weight=\"{weight}\" fo:font-style=\"{slant}\"{color}{language}/></style:default-style>\n",
             family = xml::escape_attribute(first_family(face)),
             size = xml::points(face.size()),
             weight = weight(face.weight().get()),
             slant = slant(face.slant()),
+            color = foreground_attribute(face),
             language = language,
         ),
     );
     xml::push_fmt(
         &mut output,
         format_args!(
-            "<style:style style:name=\"Standard\" style:family=\"paragraph\" style:class=\"text\"><style:paragraph-properties {line_height}{margin_bottom}fo:hyphenate=\"true\" fo:text-align=\"{align}\"/><style:text-properties style:font-name=\"{family}\" fo:font-size=\"{size}\" fo:font-weight=\"{weight}\" fo:font-style=\"{slant}\"{language}/></style:style>\n",
+            "<style:style style:name=\"Standard\" style:family=\"paragraph\" style:class=\"text\"><style:paragraph-properties {line_height}{margin_bottom}fo:hyphenate=\"true\" fo:text-align=\"{align}\"/><style:text-properties style:font-name=\"{family}\" fo:font-size=\"{size}\" fo:font-weight=\"{weight}\" fo:font-style=\"{slant}\"{color}{language}/></style:style>\n",
             line_height = line_height_attribute(face.size(), paragraph.leading()),
             margin_bottom = margin_bottom(paragraph.spacing(), paragraph.leading()),
             align = alignment(paragraph.alignment()),
@@ -56,6 +57,7 @@ pub fn styles_xml(document: &Document, template: &Template, assets: &Assets) -> 
             size = xml::points(face.size()),
             weight = weight(face.weight().get()),
             slant = slant(face.slant()),
+            color = foreground_attribute(face),
             language = language,
         ),
     );
@@ -77,7 +79,7 @@ pub fn styles_xml(document: &Document, template: &Template, assets: &Assets) -> 
         xml::push_fmt(
             &mut output,
             format_args!(
-                "<style:style style:name=\"Heading{level}\" style:family=\"paragraph\" style:parent-style-name=\"Standard\" style:next-style-name=\"Standard\"><style:paragraph-properties fo:line-height=\"100%\" fo:margin-top=\"{before}\" fo:margin-bottom=\"{after}\" fo:keep-with-next=\"always\" fo:hyphenate=\"true\" style:default-outline-level=\"{level}\"{page_break}{background}{rule}/><style:text-properties style:font-name=\"{family}\" fo:font-size=\"{size}\" fo:font-weight=\"{weight}\" fo:font-style=\"{slant}\"/></style:style>\n",
+                "<style:style style:name=\"Heading{level}\" style:family=\"paragraph\" style:parent-style-name=\"Standard\" style:next-style-name=\"Standard\"><style:paragraph-properties fo:line-height=\"100%\" fo:margin-top=\"{before}\" fo:margin-bottom=\"{after}\" fo:keep-with-next=\"always\" fo:hyphenate=\"true\" style:default-outline-level=\"{level}\"{page_break}{background}{rule}/><style:text-properties style:font-name=\"{family}\" fo:font-size=\"{size}\" fo:font-weight=\"{weight}\" fo:font-style=\"{slant}\"{color}/></style:style>\n",
                 // The natural line height of the font, so a heading fill scales with the
                 // size, the same box DOCX gets from `atLeast`. A percentage of 100% is
                 // the font's own line height, not the size, in ODF.
@@ -112,6 +114,7 @@ pub fn styles_xml(document: &Document, template: &Template, assets: &Assets) -> 
                 size = xml::points(face.size()),
                 weight = weight(face.weight().get()),
                 slant = slant(face.slant()),
+                color = foreground_attribute(face),
             ),
         );
     }
@@ -136,13 +139,20 @@ fn character_style(output: &mut String, name: &str, face: &TextFace) {
     xml::push_fmt(
         output,
         format_args!(
-            "<style:style style:name=\"{name}\" style:family=\"text\"><style:text-properties style:font-name=\"{family}\" fo:font-size=\"{size}\" fo:font-weight=\"{weight}\" fo:font-style=\"{slant}\"/></style:style>\n",
+            "<style:style style:name=\"{name}\" style:family=\"text\"><style:text-properties style:font-name=\"{family}\" fo:font-size=\"{size}\" fo:font-weight=\"{weight}\" fo:font-style=\"{slant}\"{color}/></style:style>\n",
             family = xml::escape_attribute(first_family(face)),
             size = xml::points(face.size()),
             weight = weight(face.weight().get()),
             slant = slant(face.slant()),
+            color = foreground_attribute(face),
         ),
     );
+}
+
+fn foreground_attribute(face: &TextFace) -> String {
+    face.foreground().map_or_else(String::new, |color| {
+        format!(" fo:color=\"{}\"", color.hex())
+    })
 }
 
 fn font_families(template: &Template) -> BTreeSet<String> {
@@ -340,13 +350,14 @@ fn running_style(output: &mut String, template: &Template, document: &Document) 
     xml::push_fmt(
         output,
         format_args!(
-            "<style:style style:name=\"RunningText\" style:family=\"paragraph\"><style:paragraph-properties fo:text-align=\"left\"><style:tab-stops><style:tab-stop style:position=\"{center}\" style:type=\"center\"/><style:tab-stop style:position=\"{right}\" style:type=\"right\"/></style:tab-stops></style:paragraph-properties><style:text-properties style:font-name=\"{family}\" fo:font-size=\"{size}\" fo:font-weight=\"{weight}\" fo:font-style=\"{slant}\"{language}/></style:style>\n",
+            "<style:style style:name=\"RunningText\" style:family=\"paragraph\"><style:paragraph-properties fo:text-align=\"left\"><style:tab-stops><style:tab-stop style:position=\"{center}\" style:type=\"center\"/><style:tab-stop style:position=\"{right}\" style:type=\"right\"/></style:tab-stops></style:paragraph-properties><style:text-properties style:font-name=\"{family}\" fo:font-size=\"{size}\" fo:font-weight=\"{weight}\" fo:font-style=\"{slant}\"{color}{language}/></style:style>\n",
             center = xml::centimetres_points(text_width / 2.0),
             right = xml::centimetres_points(text_width),
             family = xml::escape_attribute(first_family(face)),
             size = xml::points(face.size()),
             weight = weight(face.weight().get()),
             slant = slant(face.slant()),
+            color = foreground_attribute(face),
         ),
     );
 }

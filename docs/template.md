@@ -44,6 +44,7 @@ formatting:
     size: 12
     weight: normal
     style: normal
+    foreground: "#222222"
     leading: 7.8
     spacing: 24
     alignment: justified
@@ -57,6 +58,7 @@ formatting:
       - Liberation Sans
     weight: bold
     style: normal
+    foreground: "#222222"
     spacing_before: 18
     spacing_after: 6
     h1:
@@ -165,13 +167,14 @@ The header and footer use the paragraph face. Their content sits inside the top 
 - `size`: a positive length. The default is `12pt`.
 - `weight`: `thin`, `extralight`, `light`, `normal`, `medium`, `semibold`, `bold`, `extrabold` or `black`, or a number from 100 to 900. The default is `normal`.
 - `style`: `normal` or `italic`. The default is `normal`.
+- `foreground`: the text color, as `#rrggbb`. When omitted, the text is black.
 - `leading`: extra space between lines, as a length. The default is `7.8pt`.
 - `spacing`: space between paragraphs. When omitted, Typst's default spacing applies (`1.2em`).
 - `alignment`: `justified` or `left`. The default is `justified`.
 - `emphasis`: a map of overrides for `*...*` and `_..._`. It inherits from `paragraph`; its `style` defaults to `italic`.
 - `strong`: a map of overrides for `**...**` and `__...__`. It inherits from `paragraph`; its `weight` defaults to `bold`.
 
-Inside `emphasis` and `strong`, the allowed keys are `font_families`, `size`, `weight` and `style`. Only the declared keys override the paragraph values, so an empty map is valid and changes nothing beyond the semantic default.
+Inside `emphasis` and `strong`, the allowed keys are `font_families`, `size`, `weight`, `style` and `foreground`. Only the declared keys override the paragraph values, so an empty map is valid and changes nothing beyond the semantic default. Without its own `foreground`, an inline span keeps the surrounding color: the paragraph color in body text, and the heading color inside a heading.
 
 ### `formatting.heading`
 
@@ -181,9 +184,12 @@ The `heading` map is the base for every heading level:
 - `size`: a positive length. It applies to every level that does not override it.
 - `weight`: the base weight. The default is `bold`.
 - `style`: `normal` or `italic`. The default is `normal`.
+- `foreground`: the heading text color, as `#rrggbb`. It is inherited from the base map and cleared by a level with `none`. When neither the level nor the base declares one, the heading keeps the paragraph color, and a colored heading also colors the inline spans inside it that declare no color of their own.
 - `spacing_before` and `spacing_after`: lengths around the heading. They apply to every level that does not override them.
 - `page_break_before`: `true` starts the level on a new page. The break is weak: a heading already at the top of a page does not create a blank page. The default is `false`.
 - `background`: a solid fill behind the heading text, as `#rrggbb`. The fill spans the full text width with no horizontal margins, and the spacing stays outside it. When omitted, the heading has no fill, or keeps the one inherited from the base map; `none` clears an inherited fill.
+
+The height of a fill follows the font's natural line box in the PDF and in ODT. In DOCX it follows `w:line` with "at least" spacing, which is the paragraph leading plus the cap height: with the current leading values that stays below the natural box, so the three formats agree, but a template with a very large `formatting.paragraph.leading` makes the DOCX fill taller than the other two. That is a known divergence, not a defect to fix by guesswork.
 
 The `h1` to `h6` maps are optional overrides with the same keys. Only declared keys replace the base values. The default sizes are `18pt` for `h1`, `14pt` for `h2` and `12pt` for `h3` to `h6`; the default spacing is 18/6 for `h1`, 12/4 for `h2`, 10/4 for `h3` and 8/2 for `h4` to `h6`.
 
@@ -236,7 +242,7 @@ Images in the Markdown body resolve relative to the Markdown file, not to the te
 
 ## Current backend
 
-The PDF backend applies the paragraph face, leading, spacing and alignment. It emits one show rule per heading level with the resolved font, size, weight, style and spacing, and show rules for `emph` and `strong` from the inline overrides. A level with `page_break_before` also gets a weak page-break show rule. The backend draws the running header and footer, expands their tokens, applies the table style and explicit page breaks, and writes the frontmatter title, author, subject, keywords, language and date into the PDF metadata. The thematic break follows `formatting.rule`. A heading background and a heading rule are drawn as one block: the fill wraps the text across the full width with a vertical padding of 0.24 of the heading size, so the fill does not hug the glyphs, and the rule sits below it. Typst measures a zero-inset block by its cap height and baseline, while the DOCX fill covers the font's line box, so the padding makes up the difference; the DOCX fill is the reference for the other formats.
+Every format reads the text colors: the body, the headings, emphasis and strong. TXT has no color and ignores them. The PDF backend applies the paragraph face, leading, spacing and alignment. It emits one show rule per heading level with the resolved font, size, weight, style and spacing, and show rules for `emph` and `strong` from the inline overrides. A level with `page_break_before` also gets a weak page-break show rule. The backend draws the running header and footer, expands their tokens, applies the table style and explicit page breaks, and writes the frontmatter title, author, subject, keywords, language and date into the PDF metadata. The thematic break follows `formatting.rule`. A heading background and a heading rule are drawn as one block: the fill wraps the text across the full width with a vertical padding of 0.24 of the heading size, so the fill does not hug the glyphs, and the rule sits below it. Typst measures a zero-inset block by its cap height and baseline, while the DOCX fill covers the font's line box, so the padding makes up the difference; the DOCX fill is the reference for the other formats.
 
 ## Example
 

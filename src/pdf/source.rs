@@ -141,6 +141,9 @@ impl<'a> SourceBuilder<'a> {
             "  style: {},",
             typst_string(face.slant().as_str())
         );
+        if let Some(foreground) = face.foreground() {
+            let _ = writeln!(self.output, "  fill: rgb(\"{}\"),", foreground.hex());
+        }
         if let Some(language) = language {
             self.language_rules(language);
         }
@@ -177,10 +180,11 @@ impl<'a> SourceBuilder<'a> {
         }
         let _ = writeln!(
             self.output,
-            "), size: {}, weight: {}, style: {})",
+            "), size: {}, weight: {}, style: {}{})",
             typst_length(face.size()),
             face.weight().get(),
-            typst_string(face.slant().as_str())
+            typst_string(face.slant().as_str()),
+            fill_argument(face)
         );
     }
 
@@ -199,10 +203,11 @@ impl<'a> SourceBuilder<'a> {
         }
         let _ = writeln!(
             self.output,
-            "), size: {}, weight: {}, style: {})",
+            "), size: {}, weight: {}, style: {}{})",
             typst_length(face.size()),
             face.weight().get(),
-            typst_string(face.slant().as_str())
+            typst_string(face.slant().as_str()),
+            fill_argument(face)
         );
         self.output
             .push_str("    #grid(columns: (1fr, 1fr, 1fr), align: (left, center, right),\n");
@@ -278,10 +283,11 @@ impl<'a> SourceBuilder<'a> {
             }
             let _ = writeln!(
                 self.output,
-                "), size: {}, weight: {}, style: {})",
+                "), size: {}, weight: {}, style: {}{})",
                 typst_length(face.size()),
                 face.weight().get(),
-                typst_string(face.slant().as_str())
+                typst_string(face.slant().as_str()),
+                fill_argument(face)
             );
             if style.background().is_some() || style.rule().is_some() {
                 // The wrapper carries the heading spacing, so the text inside it keeps none.
@@ -635,6 +641,12 @@ fn alignment_name(alignment: ColumnAlignment) -> &'static str {
 
 fn typst_length(length: Length) -> String {
     format!("{:.3}pt", length.points())
+}
+
+fn fill_argument(face: &TextFace) -> String {
+    face.foreground().map_or_else(String::new, |color| {
+        format!(", fill: rgb(\"{}\")", color.hex())
+    })
 }
 
 fn optional_length(length: Option<Length>) -> String {
@@ -1365,6 +1377,62 @@ mod tests {
             ),
             "{source}"
         );
+    }
+
+    #[test]
+    fn the_foreground_reaches_the_text_styles() {
+        let template = Template::from_yaml(
+            "version: \"0.5\"\nformatting:\n  paragraph:\n    foreground: \"#112233\"\n    emphasis:\n      foreground: \"#445566\"\n  heading:\n    foreground: \"#778899\"\n",
+        )
+        .expect("the template");
+        let document = Document::new(Metadata::default(), Vec::new());
+        let source = typst_source(&document, &template, &AssetMap::new()).expect("the source");
+        assert!(
+            source.contains("  style: \"normal\",\n  fill: rgb(\"#112233\"),"),
+            "the document text takes the paragraph color: {source}"
+        );
+        assert!(
+            source.contains("style: \"italic\", fill: rgb(\"#445566\"))"),
+            "emphasis overrides it: {source}"
+        );
+        assert!(
+            source.contains("style: \"normal\", fill: rgb(\"#778899\"))"),
+            "headings take their own color: {source}"
+        );
+    }
+
+    #[test]
+    fn a_heading_without_a_foreground_inherits_the_document_color() {
+        let template = Template::from_yaml(
+            "version: \"0.5\"\nformatting:\n  paragraph:\n    foreground: \"#112233\"\n",
+        )
+        .expect("the template");
+        let document = Document::new(
+            Metadata::default(),
+            vec![Block::Heading(Heading::new(
+                HeadingLevel::new(2).expect("a level"),
+                vec![Inline::Text("Escopo".to_owned())],
+            ))],
+        );
+        let source = typst_source(&document, &template, &AssetMap::new()).expect("the source");
+        let heading_rule = source
+            .lines()
+            .find(|line| line.starts_with("#show heading.where(level: 2): set text("))
+            .expect("the heading rule");
+        assert!(
+            !heading_rule.contains("fill:"),
+            "the heading inherits the document color: {heading_rule}"
+        );
+        assert!(
+            source.contains("  fill: rgb(\"#112233\"),"),
+            "the document text sets the color: {source}"
+        );
+    }
+
+    #[test]
+    fn without_a_foreground_no_fill_is_emitted() {
+        let source = source(&paragraph("Texto"), &AssetMap::new());
+        assert!(!source.contains("fill: rgb("), "{source}");
     }
 
     #[test]

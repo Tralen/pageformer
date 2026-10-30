@@ -1,8 +1,14 @@
-//! Loads confidential values from the environment and a `NAME=value` file.
+//! Loads confidential values from the environment and an INI-style file.
 //!
 //! The file path is the only confidential argument accepted on the command
 //! line. A value is never read from an argument, never printed, and never
 //! included in an error.
+//!
+//! The format is one `NAME = value` per line. Whitespace around the name, the
+//! `=` and the value is trimmed; a value keeps every `=` after the first one and
+//! any `#` or `;` that does not start the line. Lines whose first non-blank
+//! character is `#` or `;` are comments. Sections, quotes, escapes and
+//! interpolation are not part of the format.
 
 use std::collections::BTreeMap;
 use std::fmt;
@@ -75,7 +81,7 @@ impl fmt::Display for LoadError {
             ),
             Self::InvalidLine { path, line } => write!(
                 formatter,
-                "confidential file {} line {line}: a line must be `NAME=value`",
+                "confidential file {} line {line}: a line must be `NAME = value`",
                 path.display()
             ),
             Self::InvalidName { path, line } => write!(
@@ -184,8 +190,8 @@ fn parse_file(text: &str, path: &Path, store: &mut ConfidentialStore) -> Result<
     for (index, raw) in text.lines().enumerate() {
         let line = index + 1;
         let raw = raw.strip_suffix('\r').unwrap_or(raw);
-        let trimmed = raw.trim_start();
-        if trimmed.is_empty() || trimmed.starts_with('#') {
+        let trimmed = raw.trim();
+        if trimmed.is_empty() || trimmed.starts_with('#') || trimmed.starts_with(';') {
             continue;
         }
         let Some((name, value)) = raw.split_once('=') else {
@@ -207,7 +213,7 @@ fn parse_file(text: &str, path: &Path, store: &mut ConfidentialStore) -> Result<
                 name: name.as_str().to_owned(),
             });
         }
-        store.insert(name, ConfidentialValue::new(value));
+        store.insert(name, ConfidentialValue::new(value.trim()));
     }
     Ok(())
 }
@@ -278,7 +284,7 @@ mod tests {
     #[test]
     fn the_file_overrides_the_environment() {
         let project = TempDir::new().expect("a project");
-        let file = project.path().join("values.env");
+        let file = project.path().join("values.ini");
         write_file(&file, "NOME=Arquivo\n");
         let store =
             build(Some(&file), &[], vec![(name("NOME"), value("Ambiente"))]).expect("the store");
@@ -291,10 +297,10 @@ mod tests {
     #[test]
     fn comments_blank_lines_crlf_and_empty_values_are_accepted() {
         let project = TempDir::new().expect("a project");
-        let file = project.path().join("values.env");
+        let file = project.path().join("values.ini");
         write_file(
             &file,
-            "# comment\r\n\r\nNOME=Fulano de Tal\r\nVAZIO=\r\nSENHA=a=b\r\n",
+            "# comment\r\n; another comment\r\n\r\nNOME=Fulano de Tal\r\nVAZIO=\r\nSENHA=a=b\r\n",
         );
         let store = build(Some(&file), &[], Vec::new()).expect("the store");
         assert_eq!(store.names().count(), 3);
@@ -309,9 +315,61 @@ mod tests {
     }
 
     #[test]
+    fn whitespace_around_the_separator_is_trimmed() {
+        let project = TempDir::new().expect("a project");
+        let file = project.path().join("values.ini");
+        write_file(
+            &file,
+            "  NOME   =   Fulano de Tal  \n\tCPF\t=\t000.000.000-00\n",
+        );
+        let store = build(Some(&file), &[], Vec::new()).expect("the store");
+        assert_eq!(
+            store.get(&name("NOME")).map(ConfidentialValue::expose),
+            Some("Fulano de Tal")
+        );
+        assert_eq!(
+            store.get(&name("CPF")).map(ConfidentialValue::expose),
+            Some("000.000.000-00")
+        );
+    }
+
+    #[test]
+    fn a_value_keeps_separators_and_comment_characters_after_the_first() {
+        let project = TempDir::new().expect("a project");
+        let file = project.path().join("values.ini");
+        write_file(
+            &file,
+            "OAB = OAB/DF nº 88.666\nEQUACAO = a=b # literal\nFIM = valor; com ponto e vírgula\n",
+        );
+        let store = build(Some(&file), &[], Vec::new()).expect("the store");
+        assert_eq!(
+            store.get(&name("OAB")).map(ConfidentialValue::expose),
+            Some("OAB/DF nº 88.666")
+        );
+        assert_eq!(
+            store.get(&name("EQUACAO")).map(ConfidentialValue::expose),
+            Some("a=b # literal")
+        );
+        assert_eq!(
+            store.get(&name("FIM")).map(ConfidentialValue::expose),
+            Some("valor; com ponto e vírgula")
+        );
+    }
+
+    #[test]
+    fn a_section_header_is_rejected() {
+        let project = TempDir::new().expect("a project");
+        let file = project.path().join("values.ini");
+        write_file(&file, "[confidencial]\nNOME = Fulano\n");
+        let error = build(Some(&file), &[], Vec::new()).expect_err("a section header");
+        assert!(matches!(error, LoadError::InvalidLine { line: 1, .. }));
+        assert!(!error.to_string().contains("Fulano"), "{error}");
+    }
+
+    #[test]
     fn an_invalid_line_is_reported_by_number() {
         let project = TempDir::new().expect("a project");
-        let file = project.path().join("values.env");
+        let file = project.path().join("values.ini");
         write_file(&file, "NOME=Fulano\nsem sinal\n");
         let error = build(Some(&file), &[], Vec::new()).expect_err("an invalid line");
         assert!(matches!(error, LoadError::InvalidLine { line: 2, .. }));
@@ -322,7 +380,7 @@ mod tests {
     #[test]
     fn an_invalid_name_is_reported_without_the_value() {
         let project = TempDir::new().expect("a project");
-        let file = project.path().join("values.env");
+        let file = project.path().join("values.ini");
         write_file(&file, "nome=Fulano\n");
         let error = build(Some(&file), &[], Vec::new()).expect_err("an invalid name");
         assert!(matches!(error, LoadError::InvalidName { line: 1, .. }));
@@ -332,7 +390,7 @@ mod tests {
     #[test]
     fn a_duplicate_field_is_rejected() {
         let project = TempDir::new().expect("a project");
-        let file = project.path().join("values.env");
+        let file = project.path().join("values.ini");
         write_file(&file, "NOME=A\nNOME=B\n");
         let error = build(Some(&file), &[], Vec::new()).expect_err("a duplicate");
         assert!(matches!(error, LoadError::Duplicate { line: 2, .. }));
@@ -342,7 +400,7 @@ mod tests {
     #[test]
     fn a_file_inside_a_source_tree_is_rejected() {
         let project = TempDir::new().expect("a project");
-        let file = project.path().join("values.env");
+        let file = project.path().join("values.ini");
         write_file(&file, "NOME=A\n");
         let error = build(Some(&file), &[project.path()], Vec::new())
             .expect_err("a file inside the source tree");
@@ -353,7 +411,7 @@ mod tests {
     fn a_file_outside_the_source_tree_is_accepted() {
         let source = TempDir::new().expect("a source");
         let values = TempDir::new().expect("a values directory");
-        let file = values.path().join("values.env");
+        let file = values.path().join("values.ini");
         write_file(&file, "NOME=A\n");
         let store = build(Some(&file), &[source.path()], Vec::new()).expect("the store");
         assert_eq!(
@@ -368,7 +426,7 @@ mod tests {
         use std::os::unix::fs::PermissionsExt;
 
         let project = TempDir::new().expect("a project");
-        let file = project.path().join("values.env");
+        let file = project.path().join("values.ini");
         fs::write(&file, "NOME=A\n").expect("the file must be written");
         fs::set_permissions(&file, fs::Permissions::from_mode(0o644))
             .expect("the permissions must change");
@@ -379,7 +437,7 @@ mod tests {
     #[test]
     fn a_missing_file_is_an_error() {
         let project = TempDir::new().expect("a project");
-        let error = build(Some(&project.path().join("missing.env")), &[], Vec::new())
+        let error = build(Some(&project.path().join("missing.ini")), &[], Vec::new())
             .expect_err("a missing file");
         assert!(matches!(error, LoadError::Read { .. }));
     }

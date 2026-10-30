@@ -14,7 +14,7 @@ use tempfile::TempDir;
 
 const CONTRACT: &str = include_str!("../assets/examples/escritorio/Contrato.md");
 const EMBARGOS: &str = include_str!("../assets/examples/escritorio/Embargos.md");
-const EMBARGOS_VALUES: &str = include_str!("../assets/examples/confidencial/embargos.env");
+const EMBARGOS_VALUES: &str = include_str!("../assets/examples/confidencial/embargos.ini");
 
 fn embedded() -> Template {
     Template::embedded().expect("the embedded template must be valid")
@@ -22,7 +22,7 @@ fn embedded() -> Template {
 
 fn example_store() -> ConfidentialStore {
     let directory = TempDir::new().expect("a temporary directory");
-    let path = directory.path().join("embargos.env");
+    let path = directory.path().join("embargos.ini");
     fs::write(&path, EMBARGOS_VALUES).expect("the values must be written");
     make_private(&path);
     confidential_loader::load(Some(&path), &[]).expect("the example values must load")

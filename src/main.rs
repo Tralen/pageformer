@@ -270,7 +270,7 @@ fn command() -> Command {
             Arg::new("confidential-file")
                 .long("confidential-file")
                 .value_name("FILE")
-                .help("Read confidential fields from a NAME=value file outside the source tree")
+                .help("Read confidential fields from an INI-style `NAME = value` file outside the source tree")
                 .value_parser(clap::value_parser!(String)),
         )
 }

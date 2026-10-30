@@ -31,21 +31,21 @@ Documentation is stored in [`docs/`](docs/). The rendering pipeline and the sett
 The command renders each Markdown file to PDF/A next to its source, using the template resolved for it.
 
 ```sh
-cargo run -- --confidential-file assets/examples/confidencial/embargos.env --output assets/examples/publicacao assets/examples/escritorio/
-cargo run -- --check --confidential-file assets/examples/confidencial/embargos.env assets/examples/escritorio/
+cargo run -- --confidential-file assets/examples/confidencial/embargos.ini --output assets/examples/publicacao assets/examples/escritorio/
+cargo run -- --check --confidential-file assets/examples/confidencial/embargos.ini assets/examples/escritorio/
 cargo run -- assets/examples/tecnico/Relatorio.md
-cargo run -- --output /tmp/pageformer --confidential-file assets/examples/confidencial/embargos.env assets/examples/escritorio/
-cargo run -- --check --color=never --confidential-file assets/examples/confidencial/embargos.env assets/examples/escritorio/Contrato.md
+cargo run -- --output /tmp/pageformer --confidential-file assets/examples/confidencial/embargos.ini assets/examples/escritorio/
+cargo run -- --check --color=never --confidential-file assets/examples/confidencial/embargos.ini assets/examples/escritorio/Contrato.md
 ```
 
 The first command writes each PDF under `assets/examples/publicacao/`, which keeps it outside the source tree, and regenerates the versioned examples. A file or a directory can be given; a directory is walked recursively and only `.md` files are read. Hidden directories and `target/` are skipped, and directory symlinks are not followed. A paragraph that contains only `{pagebreak}` starts a new page.
 
 `--output` writes under another directory; a directory input mirrors its relative tree there, while a direct file is written flat. `--check` parses the Markdown and validates the template without writing. A failure in one file does not stop the rest of the batch, and the exit code is `1` when any input fails.
 
-A `{NAME}` field in the body is a confidential field. Its value comes from a `PAGEFORMER_CONFIDENTIAL_NAME` environment variable or from a `NAME=value` file passed with `--confidential-file`; the file must sit outside the source tree and, on Unix, be readable only by its owner. A document with fields must be written with `--output` to a directory outside its source tree. `--check` lists the field names without their values, and unknown fields are errors. The committed `assets/examples/confidencial/embargos.env` holds fictional values and must be `chmod 600` after a checkout, because Git does not preserve that mode.
+A `{NAME}` field in the body is a confidential field. Its value comes from a `PAGEFORMER_CONFIDENTIAL_NAME` environment variable or from an INI-style file of `NAME = value` lines passed with `--confidential-file`; whitespace around `=` is ignored, a line whose first character is `#` or `;` is a comment, and a value keeps any `#`, `;` or further `=` after the first. The file must sit outside the source tree and, on Unix, be readable only by its owner. A document with fields must be written with `--output` to a directory outside its source tree. `--check` lists the field names without their values, and unknown fields are errors. The committed `assets/examples/confidencial/embargos.ini` holds fictional values and must be `chmod 600` after a checkout, because Git does not preserve that mode.
 
 The terminal output uses color, bold and italic when the stream is a terminal. `--color=auto` is the default and respects `NO_COLOR` and `TERM=dumb`; use `--color=always` or `--color=never` to force or disable it.
 
 ## Examples
 
-The fixtures in [`assets/examples/`](assets/examples/) exercise the parser and the PDF backend. `escritorio/` holds `Contrato.md` and `Embargos.md` with the shared `.pageformer.yaml`, its fictional `Timbre.png` letterhead and a page-number header. `confidencial/embargos.env` holds the fictional values for the fields in `Embargos.md`, and `publicacao/` holds the generated `Contrato.pdf` and `Embargos.pdf`; the signature block of the contract is on its own page. The nested `tecnico/Relatorio.md` has its own template, which demonstrates the running header and footer, the table style, an explicit page break and first-level headings that start a new page, without a letterhead. All three PDFs pass veraPDF as PDF/A-2b.
+The fixtures in [`assets/examples/`](assets/examples/) exercise the parser and the PDF backend. `escritorio/` holds `Contrato.md` and `Embargos.md` with the shared `.pageformer.yaml`, its fictional `Timbre.png` letterhead and a page-number header. `confidencial/embargos.ini` holds the fictional values for the fields in `Embargos.md`, and `publicacao/` holds the generated `Contrato.pdf` and `Embargos.pdf`; the signature block of the contract is on its own page. The nested `tecnico/Relatorio.md` has its own template, which demonstrates the running header and footer, the table style, an explicit page break and first-level headings that start a new page, without a letterhead. All three PDFs pass veraPDF as PDF/A-2b.

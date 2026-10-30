@@ -4,6 +4,12 @@
 
 *Major updates and feature releases.*
 
+### 0.14.0
+
+- Replaced the `NAME=value` confidential values file with an INI-style `NAME = value` format, which is easier to read and receives syntax highlighting in editors; the example is now `assets/examples/confidencial/embargos.ini`.
+- Whitespace around the name, the `=` and the value is trimmed; `;` also starts a comment, alongside `#`; a value keeps every `=` after the first and any `#` or `;` that does not start the line; sections, quotes and escapes are rejected.
+- The compact `NAME=value` form still parses, so existing files keep working.
+
 ### 0.13.2
 
 - Shrank the development build: the dev profile keeps line tables only, dependencies carry no debug info and incremental compilation is off, so the main test binary dropped from about 540 MB to 155 MB and the debug tree from 88 GB to about 1.7 GB.

@@ -72,8 +72,8 @@ fn run_with_environment(arguments: &[&OsStr], variables: &[(&str, &str)]) -> Out
 fn confidential_project() -> (TempDir, TempDir, PathBuf) {
     let project = TempDir::new().expect("a temporary project");
     let source = TempDir::new().expect("a temporary source");
-    let values = project.path().join("values.env");
-    write_private(&values, "NOME=Fulano de Tal\nCPF=000.000.000-00\n");
+    let values = project.path().join("values.ini");
+    write_private(&values, "NOME = Fulano de Tal\nCPF = 000.000.000-00\n");
     fs::write(
         source.path().join("Doc.md"),
         "---\ntitle: Documento\nlanguage: pt-BR\n---\n\n# Documento\n\nNome: {NOME}; CPF: {CPF}.\n",
@@ -84,10 +84,10 @@ fn confidential_project() -> (TempDir, TempDir, PathBuf) {
 
 fn example_confidential_file() -> (TempDir, PathBuf) {
     let directory = TempDir::new().expect("a temporary directory");
-    let path = directory.path().join("embargos.env");
+    let path = directory.path().join("embargos.ini");
     write_private(
         &path,
-        include_str!("../assets/examples/confidencial/embargos.env"),
+        include_str!("../assets/examples/confidencial/embargos.ini"),
     );
     (directory, path)
 }
@@ -246,7 +246,7 @@ fn a_confidential_directory_input_needs_an_output_outside_the_tree() {
     let source = TempDir::new().expect("a temporary source");
     fs::write(source.path().join("Doc.md"), "# Doc\n\n{NOME}.\n")
         .expect("the document must be written");
-    let values = project.path().join("values.env");
+    let values = project.path().join("values.ini");
     write_private(&values, "NOME=Fulano\n");
 
     let output = run(&[
@@ -268,7 +268,7 @@ fn a_confidential_directory_input_needs_an_output_outside_the_tree() {
 #[test]
 fn a_confidential_file_inside_the_source_tree_is_rejected() {
     let source = TempDir::new().expect("a source");
-    let values = source.path().join("values.env");
+    let values = source.path().join("values.ini");
     write_private(&values, "NOME=Fulano\n");
     write_markdown(&source.path().join("Doc.md"), "Doc");
     let output = run(&[
@@ -292,7 +292,7 @@ fn a_readable_confidential_file_is_rejected() {
     use std::os::unix::fs::PermissionsExt;
 
     let project = TempDir::new().expect("a project");
-    let values = project.path().join("values.env");
+    let values = project.path().join("values.ini");
     fs::write(&values, "NOME=Fulano\n").expect("the file must be written");
     fs::set_permissions(&values, fs::Permissions::from_mode(0o644))
         .expect("the permissions must change");

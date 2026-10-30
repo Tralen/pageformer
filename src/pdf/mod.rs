@@ -17,6 +17,7 @@ use typst_layout::PagedDocument;
 use typst_pdf::{PdfOptions, PdfStandard, PdfStandards};
 
 use crate::document::{Document, DocumentDate};
+use crate::render::{Rendered, Renderer};
 use crate::template::Template;
 
 use self::world::{PdfWorld, format_diagnostics};
@@ -50,6 +51,29 @@ impl PdfOutput {
 
     pub fn warnings(&self) -> &[String] {
         &self.warnings
+    }
+}
+
+/// The PDF backend with its resolved assets.
+#[derive(Debug, Clone)]
+pub struct PdfRenderer {
+    assets: Assets,
+}
+
+impl PdfRenderer {
+    /// Wraps the assets loaded by [`load_assets`].
+    pub fn new(assets: Assets) -> Self {
+        Self { assets }
+    }
+}
+
+impl Renderer for PdfRenderer {
+    type Error = PdfError;
+
+    fn render(&self, document: &Document, template: &Template) -> Result<Rendered, Self::Error> {
+        let output = crate::pdf::render(document, template, &self.assets)?;
+        let warnings = output.warnings().to_vec();
+        Ok(Rendered::new(output.into_bytes(), warnings))
     }
 }
 

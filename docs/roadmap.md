@@ -9,7 +9,7 @@ Pageformer reaches 1.0.0 through ten phases, in the order below. The order is a 
 | 1. CLI | Input discovery, format selection, output rules | Done in 0.6.0: files and directories, path-ordered batches, mirrored output, ANSI styling | 0.5.0 |
 | 2. PDF | Primary output and reference backend | Done in 0.12.0: running header and footer with tokens, explicit page breaks, per-level page starts, table styling and the frontmatter `date`, `subject` and `keywords`; PDF/A-2b stays the declared profile | CLI output rules |
 | 3. Confidentiality | Placeholder resolution and leak prevention | Done in 0.13.0: `{NAME}` fields, environment and file loading, output rule, redaction | PDF pipeline |
-| 4. TXT | Plain-text view and the renderer boundary | Not started | Confidentiality |
+| 4. TXT | Plain-text view and the renderer boundary | Done in 0.15.0: the renderer trait, `--format txt` and plain-text goldens | Confidentiality |
 | 5. ODT | Second-priority paged format | Not started | Renderer boundary |
 | 6. DOCX | Office format for review and exchange | Not started | ODT style mapping |
 | 7. GUI | Minimal egui window over the pipeline | Not started | Every format it exposes |
@@ -120,6 +120,8 @@ A phase is closed only when all of the following hold:
 ## Phase 4: TXT
 
 **Goal.** Prove the renderer boundary with the cheapest format and supply the copy-as-plain-text action the GUI will expose.
+
+**Status.** Done in 0.15.0. `src/render.rs` holds the `Renderer` trait and the backend-neutral `Rendered` value; `src/txt.rs` implements the text view without assets and without failure; `--format` selects `pdf` or `txt`; the office and technical examples have text goldens beside their PDFs.
 
 **Work.**
 

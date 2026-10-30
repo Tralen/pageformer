@@ -39,9 +39,11 @@ The inline model covers every construct of that subset: text, code spans, emphas
 
 - `src/document.rs` holds the backend-independent model, with newtypes and smart constructors for the values the pipeline validates.
 - `src/markdown.rs` parses CommonMark plus the extensions into the model. It is total: malformed event streams, raw HTML and nesting deeper than 128 levels become `MarkdownError` values.
+- `src/render.rs` holds the renderer boundary: the `Renderer` trait and the backend-neutral `Rendered` value.
 - `src/template/` holds the versioned YAML schema and the loader that resolves which template applies.
 - `src/pdf/` is the PDF backend: `source.rs` generates Typst source, `assets.rs` reads local images and the letterhead, and `world.rs` is the Typst world that serves them.
-- `src/main.rs` is the CLI. It parses each input, resolves the template and either renders a PDF or reports the pipeline result.
+- `src/txt.rs` is the plain-text backend. It needs no assets and cannot fail.
+- `src/main.rs` is the CLI. It parses each input, resolves the template and either renders the chosen format or reports the pipeline result.
 
 The library is the pure core. File reading, the environment and the terminal live in the binary or in the loader's explicitly named functions.
 
@@ -61,7 +63,7 @@ Paths inside the template, such as the letterhead image or a font file, resolve 
 
 ## Output
 
-Without confidential fields, the output is written next to the Markdown source, with the same name and the new extension. `--output` selects another directory, and the program creates it when missing. Writes are atomic: the bytes go to a temporary file in the destination directory and are renamed into place.
+Without confidential fields, the output is written next to the Markdown source, with the same name and the extension of the chosen format. `--output` selects another directory, and the program creates it when missing. Writes are atomic: the bytes go to a temporary file in the destination directory and are renamed into place.
 
 An input may be a file or a directory. A directory is walked recursively in path order; only `.md` files are read, hidden directories and `target/` are skipped, and directory symlinks are not followed. A file reached from more than one input is processed once, under the first input that found it. With `--output`, a directory input mirrors its relative tree under the destination, while a direct file is written flat. Two inputs that would write the same output are an error, never a silent overwrite.
 
@@ -79,19 +81,27 @@ Every token that matches `{[A-Z][A-Z0-9_]*}` is reserved for a confidential fiel
 
 Placeholders are resolved only in body content. One found in frontmatter metadata is an error, because confidential values must never reach the PDF XMP package, the DOCX core properties or the ODT metadata. Running header and footer slots are template content, so an uppercase token there is a template error instead of literal text.
 
-Values come from the environment and from a file, never from a command-line argument. Environment variables use the `PAGEFORMER_CONFIDENTIAL_` prefix, such as `PAGEFORMER_CONFIDENTIAL_NOME`. The file is named with `--confidential-file`, resolves outside every source tree, and must not be readable by group or others on Unix; the file must use `chmod 600`. The file format is INI-style: one `NAME = value` per line, with whitespace around the name, the `=` and the value trimmed, lines whose first non-blank character is `#` or `;` treated as comments and blank lines ignored. A value keeps every `=` after the first one and any `#` or `;` that does not start the line. Sections, quotes, escapes, shell evaluation and interpolation are not part of the format. A duplicate name is rejected, and the file overrides the environment.
+Values come from the environment and from a file, never from a command-line argument. Environment variables use the `PAGEFORMER_CONFIDENTIAL_` prefix, such as `PAGEFORMER_CONFIDENTIAL_NOME`. The file is named with `--confidential-file`, resolves outside every source tree, and must not be readable by group or others on Unix; the file must use `chmod 600`. The file format is INI-style: one `NAME = value` per line, with whitespace around the name, the `=` and the value trimmed, lines whose first non-blank character is `#` or `;` treated as comments and blank lines ignored. A value keeps every `=` after the first one and any `#` or `;` that does not start the line. Sections, quotes, escapes, shell evaluation and interpolation are not part of the format. A duplicate name is rejected, and the file overrides the environment. Using INI instead of Markdown or YAML also keeps the values file outside the editorial sources, so the editor `private_files` (global) and `private_paths` (worktree) settings can refuse it to the assistant's file reads; the guarantee does not depend on the editor, because the file already lives outside the source tree and is never printed.
 
 The document model resolves the placeholders after parsing and before asset loading, and returns a new document plus the names that were found. Every backend receives only final text and never the store. A `--check` run reports the field names only. Values are redacted from warnings and errors before they reach the terminal.
 
 Metadata comes from the frontmatter only. The template carries no document metadata, so one template serves many documents.
 
+## Renderer boundary
+
+Every format implements `Renderer`: the pipeline resolves the document, the template and the assets the backend needs, then calls `render`, which returns bytes plus warnings. The trait is deliberately small so the GUI can call the same function as the command line, and `render` never reads a file, the environment or the clock. Asset loading is a separate, explicitly named step because the policy differs per format: PDF reads images and the letterhead, while plain text reads no assets at all.
+
+## Plain text
+
+Plain text is a view of the model, used by the copy-as-plain-text action. The output is UTF-8 with LF line endings, no automatic wrapping and one blank line between blocks; the renderer appends one final newline unless the document is empty. Headings become their text. Lists keep `-` and `1.` markers, nested items are indented under the parent marker, and task items keep `[ ]` and `[x]`; a numbered paragraph keeps its number. Tables are tab-separated cells with a `---` separator row, quotes prefix every line with `>` and a space, and a blank quote line with `>` alone, code blocks are preserved, links become `label (destination)`, images become `[alt]`, footnote references stay as `[^id]` and the definitions are collected at the end, soft breaks become spaces and hard breaks become newlines. A thematic break is `---` and an explicit page break becomes a form feed. Layout fields are ignored, but the template is resolved and validated first, so a broken template fails the same way in every format.
+
 ## Formats
 
 - PDF is the primary output and must conform to PDF/A-2b, or PDF/A-2u when every character maps to Unicode.
+- Plain text is implemented and carries the copy-as-plain-text view.
 - ODT is the second priority.
 - DOCX follows.
-- HTML, plain text and EPUB reuse the same document model. HTML is the basis for EPUB, which splits chapters at first-level headings and uses deterministic metadata.
-- Plain text is a view of the model, used by the copy-as-plain-text action.
+- HTML and EPUB reuse the same document model. HTML is the basis for EPUB, which splits chapters at first-level headings and uses deterministic metadata.
 
 ## PDF engine
 

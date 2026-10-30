@@ -4,6 +4,13 @@
 
 *Major updates and feature releases.*
 
+### 0.15.0
+
+- Added `--format txt` and the plain-text backend: UTF-8 with LF line endings, no automatic wrapping, one blank line between blocks, Markdown-style list markers, tab-separated tables with a separator row, quotes prefixed with `>` and a space, `label (destination)` links, `[alt]` images, footnotes collected at the end and a form feed for an explicit page break.
+- Introduced the renderer boundary: `Renderer` returns backend-neutral bytes plus warnings, `PdfRenderer` moved the PDF backend under it, and the TXT backend is total.
+- Added text goldens for the office and technical examples, compared byte for byte, and regenerated them.
+- Documented that the INI values file stays outside the Markdown and YAML sources, so editor `private_files` and `private_paths` rules can keep it out of agent file reads.
+
 ### 0.14.0
 
 - Replaced the `NAME=value` confidential values file with an INI-style `NAME = value` format, which is easier to read and receives syntax highlighting in editors; the example is now `assets/examples/confidencial/embargos.ini`.

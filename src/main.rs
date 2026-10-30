@@ -8,6 +8,7 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
+use std::str::FromStr;
 
 use anyhow::{Context, Result};
 use clap::{Arg, ArgAction, Command};
@@ -15,9 +16,11 @@ use clap::{Arg, ArgAction, Command};
 use pageformer::confidential::{self, ConfidentialStore};
 use pageformer::markdown;
 use pageformer::pdf;
+use pageformer::render::Renderer;
 use pageformer::template::loader::{self, ResolvedTemplate, TemplateOrigin};
+use pageformer::txt::TxtRenderer;
 
-use self::cli::{ColorChoice, InputFile, OutputFormat, Painter, Stream, Style, write_atomic};
+use self::cli::{ColorChoice, Format, InputFile, Painter, Stream, Style, write_atomic};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Mode {
@@ -84,7 +87,10 @@ fn main() -> ExitCode {
     } else {
         Mode::Render
     };
-    let format = OutputFormat::Pdf;
+    let format = matches
+        .get_one::<Format>("format")
+        .copied()
+        .unwrap_or(Format::Pdf);
     let global = loader::global_template_path();
 
     let mut discovered = Vec::new();
@@ -162,7 +168,14 @@ fn main() -> ExitCode {
         .map(|job| {
             (
                 job,
-                process(job, mode, explicit.as_deref(), global.as_deref(), &store),
+                process(
+                    job,
+                    mode,
+                    format,
+                    explicit.as_deref(),
+                    global.as_deref(),
+                    &store,
+                ),
             )
         })
         .collect::<Vec<_>>();
@@ -226,7 +239,7 @@ fn main() -> ExitCode {
 fn command() -> Command {
     Command::new("pageformer")
         .version(env!("CARGO_PKG_VERSION"))
-        .about("Generates PDF/A documents from Markdown and a YAML template.")
+        .about("Generates documents from Markdown and a YAML template.")
         .arg(
             Arg::new("input")
                 .value_name("INPUT")
@@ -259,6 +272,14 @@ fn command() -> Command {
                 .help("Parse the Markdown and validate the template without writing"),
         )
         .arg(
+            Arg::new("format")
+                .long("format")
+                .value_name("FORMAT")
+                .help("Output format: pdf or txt")
+                .value_parser(clap::builder::ValueParser::new(Format::from_str))
+                .default_value("pdf"),
+        )
+        .arg(
             Arg::new("color")
                 .long("color")
                 .value_name("WHEN")
@@ -278,6 +299,7 @@ fn command() -> Command {
 fn process(
     job: &Job,
     mode: Mode,
+    format: Format,
     explicit: Option<&Path>,
     global: Option<&Path>,
     store: &ConfidentialStore,
@@ -314,14 +336,22 @@ fn process(
                 .parent()
                 .filter(|parent| !parent.as_os_str().is_empty())
                 .unwrap_or_else(|| Path::new("."));
-            let assets = pdf::load_assets(
-                document,
-                resolved.template(),
-                source_directory,
-                resolved.base_directory(),
-            )?;
-            let rendered = pdf::render(document, resolved.template(), &assets)
-                .with_context(|| "cannot render the PDF")?;
+            let rendered = match format {
+                Format::Pdf => {
+                    let assets = pdf::load_assets(
+                        document,
+                        resolved.template(),
+                        source_directory,
+                        resolved.base_directory(),
+                    )?;
+                    pdf::PdfRenderer::new(assets)
+                        .render(document, resolved.template())
+                        .with_context(|| "cannot render the PDF")?
+                }
+                Format::Txt => TxtRenderer
+                    .render(document, resolved.template())
+                    .with_context(|| "cannot render the plain text")?,
+            };
             write_atomic(output, rendered.bytes())?;
             Ok(Outcome::Rendered {
                 output: output.to_path_buf(),
@@ -511,6 +541,25 @@ mod tests {
             .try_get_matches_from(["pageformer", "--color", "sometimes", "a.md"])
             .expect_err("the value is not accepted");
         assert_eq!(error.kind(), clap::error::ErrorKind::InvalidValue);
+    }
+
+    #[test]
+    fn the_format_option_selects_the_backend() {
+        let matches = command()
+            .try_get_matches_from(["pageformer", "--format", "txt", "a.md"])
+            .expect("valid arguments");
+        assert_eq!(
+            matches.get_one::<Format>("format").copied(),
+            Some(Format::Txt)
+        );
+    }
+
+    #[test]
+    fn the_format_option_rejects_an_unknown_value() {
+        let error = command()
+            .try_get_matches_from(["pageformer", "--format", "docx", "a.md"])
+            .expect_err("the value is not accepted");
+        assert_eq!(error.kind(), clap::error::ErrorKind::ValueValidation);
     }
 
     #[test]

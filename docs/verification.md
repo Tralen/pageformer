@@ -87,4 +87,13 @@ pdftotext assets/examples/publicacao/Contrato.pdf -
 
 A passing PDF/A run prints `PASS <path> 2b`. The tests also assert the PDF header, the PDF/A markers and that two renders produce identical bytes.
 
+## Plain-text goldens
+
+The text goldens in `assets/examples/publicacao/` and `assets/examples/tecnico/` are compared byte for byte by `tests/txt.rs`. Regenerate them after a parser, model or text-renderer change and commit the result:
+
+```sh
+cargo run -- --format txt --confidential-file assets/examples/confidencial/embargos.ini --output assets/examples/publicacao assets/examples/escritorio/
+cargo run -- --format txt assets/examples/tecnico/Relatorio.md
+```
+
 The `typst` CLI matches the library version used by the binary. The application compiles Typst in-process, so the CLI is a convenience for experimenting with Typst source, not a runtime dependency.

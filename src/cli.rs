@@ -7,22 +7,55 @@ use std::fmt;
 use std::fs;
 use std::io::{self, IsTerminal};
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
 
 use anyhow::{Context, Result};
 
 /// The output formats the command can produce.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum OutputFormat {
+pub enum Format {
     Pdf,
+    Txt,
 }
 
-impl OutputFormat {
+impl Format {
     pub fn extension(self) -> &'static str {
         match self {
             Self::Pdf => "pdf",
+            Self::Txt => "txt",
         }
     }
 }
+
+impl FromStr for Format {
+    type Err = FormatError;
+
+    fn from_str(text: &str) -> Result<Self, Self::Err> {
+        match text {
+            "pdf" => Ok(Self::Pdf),
+            "txt" => Ok(Self::Txt),
+            other => Err(FormatError::Unknown(other.to_owned())),
+        }
+    }
+}
+
+/// Why a format name was rejected.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum FormatError {
+    Unknown(String),
+}
+
+impl fmt::Display for FormatError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Unknown(name) => {
+                write!(formatter, "unknown format `{name}`; use pdf or txt")
+            }
+        }
+    }
+}
+
+impl std::error::Error for FormatError {}
 
 /// A Markdown file and the root that discovered it.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -49,7 +82,7 @@ impl InputFile {
     ///
     /// A directory root keeps the relative tree under the output directory; a
     /// direct file is written flat.
-    pub fn output_path(&self, directory: Option<&Path>, format: OutputFormat) -> Result<PathBuf> {
+    pub fn output_path(&self, directory: Option<&Path>, format: Format) -> Result<PathBuf> {
         match directory {
             None => Ok(self.path.with_extension(format.extension())),
             Some(directory) => {
@@ -102,7 +135,7 @@ impl PlanError {
 pub fn plan_outputs(
     files: Vec<InputFile>,
     directory: Option<&Path>,
-    format: OutputFormat,
+    format: Format,
 ) -> (Vec<PlannedInput>, Vec<PlanError>) {
     let mut planned = Vec::new();
     let mut errors = Vec::new();
@@ -554,7 +587,7 @@ mod tests {
         let input = InputFile::new(PathBuf::from("docs/sub/A.md"), PathBuf::from("docs"));
 
         let output = input
-            .output_path(Some(Path::new("out")), OutputFormat::Pdf)
+            .output_path(Some(Path::new("out")), Format::Pdf)
             .expect("the output path must be computed");
 
         assert_eq!(output, PathBuf::from("out/sub/A.pdf"));
@@ -565,10 +598,24 @@ mod tests {
         let input = InputFile::new(PathBuf::from("docs/A.md"), PathBuf::from("docs"));
 
         let output = input
-            .output_path(Some(Path::new("out")), OutputFormat::Pdf)
+            .output_path(Some(Path::new("out")), Format::Pdf)
             .expect("the output path must be computed");
 
         assert_eq!(output, PathBuf::from("out/A.pdf"));
+    }
+
+    #[test]
+    fn a_format_name_selects_the_extension() {
+        assert_eq!(Format::Pdf.extension(), "pdf");
+        assert_eq!(Format::Txt.extension(), "txt");
+        assert_eq!("txt".parse::<Format>(), Ok(Format::Txt));
+    }
+
+    #[test]
+    fn an_unknown_format_name_is_rejected() {
+        let error = "docx".parse::<Format>().expect_err("an unknown format");
+
+        assert!(error.to_string().contains("pdf or txt"), "{error}");
     }
 
     #[test]
@@ -576,7 +623,7 @@ mod tests {
         let input = InputFile::new(PathBuf::from("docs/A.md"), PathBuf::from("docs"));
 
         let output = input
-            .output_path(None, OutputFormat::Pdf)
+            .output_path(None, Format::Pdf)
             .expect("the output path must be computed");
 
         assert_eq!(output, PathBuf::from("docs/A.pdf"));
@@ -589,7 +636,7 @@ mod tests {
             InputFile::new(PathBuf::from("two/A.md"), PathBuf::from("two")),
         ];
 
-        let (planned, errors) = plan_outputs(files, Some(Path::new("out")), OutputFormat::Pdf);
+        let (planned, errors) = plan_outputs(files, Some(Path::new("out")), Format::Pdf);
 
         assert_eq!(planned.len(), 1);
         assert_eq!(planned[0].output, PathBuf::from("out/A.pdf"));

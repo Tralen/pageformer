@@ -583,6 +583,43 @@ fn an_invalid_explicit_template_fails_with_a_diagnostic() {
 }
 
 #[test]
+fn the_text_format_writes_a_txt_file_under_the_output() {
+    let source = TempDir::new().expect("a temporary source");
+    let output = TempDir::new().expect("a temporary output");
+    write_markdown(&source.path().join("Doc.md"), "Doc");
+
+    let result = run(&[
+        OsStr::new("--format"),
+        OsStr::new("txt"),
+        OsStr::new("--color=never"),
+        OsStr::new("--output"),
+        output.path().as_os_str(),
+        source.path().join("Doc.md").as_os_str(),
+    ]);
+    assert!(result.status.success(), "{}", stderr(&result));
+
+    let text = fs::read_to_string(output.path().join("Doc.txt")).expect("the text must be written");
+    assert_eq!(text, "Doc\n\nText.\n");
+    assert!(!output.path().join("Doc.pdf").exists());
+}
+
+#[test]
+fn an_unknown_format_fails_before_rendering() {
+    let output = run(&[
+        OsStr::new("--format"),
+        OsStr::new("docx"),
+        fixture("Contrato.md").as_os_str(),
+    ]);
+
+    assert!(!output.status.success());
+    assert!(
+        stderr(&output).contains("pdf or txt"),
+        "{}",
+        stderr(&output)
+    );
+}
+
+#[test]
 fn a_missing_input_file_fails() {
     let output = run(&[OsStr::new("does-not-exist.md")]);
     assert!(!output.status.success());

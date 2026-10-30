@@ -9,6 +9,7 @@
 - ODT footnote citations are now superscript both in the text and in the note body, using the `Footnote anchor` and `Footnote Symbol` character styles at `super 58%`. The PDF and DOCX already did this.
 - Documented that a task `marker` accepts Unicode glyphs such as `☑`, `☐`, `✔` and `✗`, and that a monochrome symbol is the safe choice for PDF/A. The schema already carried the string; the tests now cover a Unicode pair.
 - Regenerates the ODT examples for the generator version and the new footnote styles. The PDF, DOCX and TXT examples stay byte-identical.
+- Documented that a hand-typed letter or roman label is ordinary text, not an ordered list; only numeric CommonMark markers form lists.
 
 ### 0.28.0
 

@@ -4,6 +4,10 @@
 
 *Major updates and feature releases.*
 
+### 0.20.2
+
+- ODT headings now use the font's natural line height, `fo:line-height="100%"`, instead of the leading plus cap height. A heading fill therefore scales with the heading size, the same box DOCX gets from "at least" spacing: the ODT band measures 20.6pt at the 18pt heading and 16.3pt at 14pt, matching DOCX exactly. Body paragraphs keep the calibrated leading plus cap height.
+
 ### 0.20.1
 
 - Raised the PDF heading fill padding from 0.15 to 0.24 of the heading size, so the PDF band matches the DOCX one, which is now the reference: at the 18pt heading the band grows from 17.8pt to 21.1pt against 20.6pt in DOCX, and at 14pt both measure 16.3pt.

@@ -77,8 +77,10 @@ pub fn styles_xml(document: &Document, template: &Template, assets: &Assets) -> 
         xml::push_fmt(
             &mut output,
             format_args!(
-                "<style:style style:name=\"Heading{level}\" style:family=\"paragraph\" style:parent-style-name=\"Standard\" style:next-style-name=\"Standard\"><style:paragraph-properties {line_height}fo:margin-top=\"{before}\" fo:margin-bottom=\"{after}\" fo:keep-with-next=\"always\" fo:hyphenate=\"true\" style:default-outline-level=\"{level}\"{page_break}{background}{rule}/><style:text-properties style:font-name=\"{family}\" fo:font-size=\"{size}\" fo:font-weight=\"{weight}\" fo:font-style=\"{slant}\"/></style:style>\n",
-                line_height = line_height_attribute(face.size(), paragraph.leading()),
+                "<style:style style:name=\"Heading{level}\" style:family=\"paragraph\" style:parent-style-name=\"Standard\" style:next-style-name=\"Standard\"><style:paragraph-properties fo:line-height=\"100%\" fo:margin-top=\"{before}\" fo:margin-bottom=\"{after}\" fo:keep-with-next=\"always\" fo:hyphenate=\"true\" style:default-outline-level=\"{level}\"{page_break}{background}{rule}/><style:text-properties style:font-name=\"{family}\" fo:font-size=\"{size}\" fo:font-weight=\"{weight}\" fo:font-style=\"{slant}\"/></style:style>\n",
+                // The natural line height of the font, so a heading fill scales with the
+                // size, the same box DOCX gets from `atLeast`. A percentage of 100% is
+                // the font's own line height, not the size, in ODF.
                 background = heading.background().map_or_else(String::new, |color| {
                     format!(" fo:background-color=\"{}\"", color.hex())
                 }),

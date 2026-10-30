@@ -281,6 +281,42 @@ formatting:
 }
 
 #[test]
+fn a_heading_fill_scales_with_the_heading_size() {
+    let document =
+        markdown::parse("# Um\n\nTexto.\n\n## Dois\n\nTexto.\n").expect("the document must parse");
+    let template = Template::from_yaml(
+        r##"
+version: "0.5"
+formatting:
+  paragraph:
+    size: 12
+    leading: 8
+  heading:
+    background: "#eeeeee"
+"##,
+    )
+    .expect("the template must be valid");
+
+    let bytes = odt::render(&document, &template, &Assets::default()).expect("the package");
+    let mut archive = ZipArchive::new(Cursor::new(bytes)).expect("the package must be a ZIP");
+    let styles = entry(&mut archive, "styles.xml");
+
+    assert!(
+        !styles.contains("fo:line-height=\"11.88pt\""),
+        "a heading does not use the leading plus cap height: {styles}"
+    );
+    assert_eq!(
+        styles.matches("fo:line-height=\"100%\"").count(),
+        6,
+        "every heading level uses the font's natural line height: {styles}"
+    );
+    assert!(
+        styles.contains("fo:line-height=\"15.88pt\""),
+        "the paragraph keeps the calibrated line height: {styles}"
+    );
+}
+
+#[test]
 fn a_heading_rule_is_a_bottom_border_of_its_level() {
     let document = markdown::parse("## Escopo\n\nTexto.\n").expect("the document must parse");
     let template = Template::from_yaml(

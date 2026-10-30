@@ -12,7 +12,7 @@ Pageformer reaches 1.0.0 through ten phases, in the order below. The order is a 
 | 4. TXT | Plain-text view and the renderer boundary | Done in 0.15.0: the renderer trait, `--format txt` and plain-text goldens | Confidentiality |
 | 5. ODT | Second-priority paged format | Done in 0.16.0: internal ODF writer, deterministic package, styles from the template | Renderer boundary |
 | 6. DOCX | Office format for review and exchange | Done in 0.17.0: internal OOXML writer, numbering instances, repeating table headers, footnotes and a deterministic package | ODT style mapping |
-| 7. GUI | Minimal egui window over the pipeline | Not started | Every format it exposes |
+| 7. Minimal GUI | Converter window over the pipeline; Pageweaver is separate | Not started | Every format it exposes |
 | 8. HTML | Self-contained semantic view | Not started | GUI and renderer boundary |
 | 9. EPUB | HTML packaged with chapters and metadata | Not started | HTML |
 | 10. Release 1.0.0 | Stability review and release | Not started | Every phase above |
@@ -45,7 +45,7 @@ TXT comes fourth because it is the cheapest backend and the first one that justi
 
 ODT and DOCX come next because they are the office formats with the highest legal value and the closest semantic match to the PDF. They also force the shared style mapping, the deterministic ZIP packaging and the structural tests that HTML and EPUB will reuse.
 
-The GUI comes after the formats it exposes, so its buttons map to a stable pipeline instead of to promises. HTML follows because a correct HTML view is the real prerequisite for EPUB; EPUB is HTML packaged with chapters and metadata.
+The minimal GUI comes after the formats it exposes, so its buttons map to a stable pipeline instead of to promises. HTML follows because a correct HTML view is the real prerequisite for EPUB; EPUB is HTML packaged with chapters and metadata. The separate WYSIWYG editor, Pageweaver, is not part of this roadmap's release; it consumes the same library for export and preview.
 
 Release 1.0.0 comes last and is not a feature. It is the point where the template schema and the document model are stable enough to promise compatibility.
 
@@ -168,14 +168,14 @@ A phase is closed only when all of the following hold:
 
 **Done when.** Both fixtures open in Word and LibreOffice without repair, lists and footnotes survive the round trip, and two runs produce identical bytes.
 
-## Phase 7: GUI
+## Phase 7: Minimal GUI
 
-**Goal.** Expose the pipeline in a minimal egui window without duplicating any of it.
+**Goal.** Expose the pipeline in a minimal egui converter without duplicating any of it. The WYSIWYG editor, Pageweaver, is a separate project; it calls the same library for export.
 
 **Work.**
 
-- Launch with `--gui`; the terminal remains the main workflow.
-- Follow the sketch: a drop box, format buttons enabled only after a valid Markdown file, a template label with edit and open-folder actions, a status line and an open-output action.
+- Extract the pipeline and the export API into the library first; the CLI, the minimal GUI and Pageweaver call the same functions.
+- Ship a small converter window, working name `pageformer-publisher`: a drop box, format buttons enabled only after a valid Markdown file, a template label with edit and open-folder actions, a status line and an open-output action. The CLI remains the main workflow.
 - Model the window as a state machine with `Idle`, `Working`, `Succeeded` and `Failed`. Render on a worker thread and communicate through a channel, so the frame loop never blocks; a second request while working is disabled, not queued.
 - Call the same pipeline. The GUI never parses Markdown, resolves a template or writes a file itself.
 - Require an output directory outside the source tree when the document contains placeholders, and never display a confidential value.
@@ -186,7 +186,7 @@ A phase is closed only when all of the following hold:
 
 ## Phase 8: HTML
 
-**Goal.** Produce a self-contained HTML view and the base for EPUB.
+**Goal.** Produce a self-contained HTML view, the base for EPUB and the CSS boundary for the Pageweaver preview.
 
 **Work.**
 
@@ -195,6 +195,7 @@ A phase is closed only when all of the following hold:
 - Derive CSS from the template: page size and margins for print, fonts, size, leading, paragraph spacing, alignment, heading styles and table styling. Decide how the letterhead appears on screen and in print, and do not fake pagination.
 - Escape all text and attributes. Link destinations may be remote and are emitted escaped, never fetched; images stay local and embedded. Restrict schemes to `http`, `https` and `mailto` and reject `javascript:` and `data:` at the boundary.
 - Take title, author and language from the frontmatter.
+- Expose the generated CSS to Pageweaver's preview, so the editor does not reparse the template; the preview is visually close, not byte-identical to the PDF.
 - Fix the order of style rules and attributes for deterministic bytes.
 - Compare the rendered HTML as normalized text for both fixtures, and add focused tests for escaping, tables and footnotes.
 

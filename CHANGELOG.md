@@ -4,6 +4,11 @@
 
 *Major updates and feature releases.*
 
+### 0.29.1
+
+- Added `docs/pageweaver.md`, describing the separate Pageweaver editor, the library export contract, the preview CSS boundary and the minimal converter GUI.
+- Updated the README, the architecture page and the roadmap to name the minimal GUI and to record that Pageweaver is a separate Tauri project that exports through the Pageformer library, never by itself.
+
 ### 0.29.0
 
 - Replaced the `{pagebreak}` marker with `-pagebreak-`, and added `-!-` as its shorthand. A paragraph that contains only one of them is a page break; the old brace form is now ordinary text. The change keeps braces reserved for confidential fields and running slots.

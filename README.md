@@ -2,11 +2,11 @@
 
 *"One document, every format."*
 
-Generates documents from Markdown content and a single generic YAML template. One template drives every output format, so all of them stay consistent.
+Generates documents from Markdown content and a single generic YAML template. One template drives every output format, so all of them stay consistent. A separate WYSIWYG editor, [Pageweaver](docs/pageweaver.md), uses the same library for authoring, while Pageformer keeps a minimal converter window for quick exports.
 
 ## Stack
 
-Rust with egui for the graphical interface. The main workflow runs in the terminal; the interface is a minimal window launched by argument. PDF rendering uses Typst as an internal library, and users never write Typst.
+Rust with egui for the graphical interface. The main workflow runs in the terminal; the interface is a minimal window launched by argument. The companion editor, Pageweaver, is a separate Tauri project. PDF rendering uses Typst as an internal library, and users never write Typst.
 
 ## Build
 
@@ -24,7 +24,7 @@ SemVer; source: `Cargo.toml` (`[package].version`).
 
 Take a Markdown file or folder and render it through a template into PDF, ODT, DOCX and plain text, with the same document model behind every backend. PDF is the primary output, ODT is the paged office format, DOCX is the review and exchange format, and plain text is the readable view behind copy-as-plain-text; additional formats, such as HTML and EPUB, fit behind the same renderer boundary.
 
-Documentation is stored in [`docs/`](docs/). The rendering pipeline and the settled decisions are described in [`docs/architecture.md`](docs/architecture.md), the YAML schema in [`docs/template.md`](docs/template.md), the verification tools in [`docs/verification.md`](docs/verification.md), and the ordered path to 1.0.0 in [`docs/roadmap.md`](docs/roadmap.md).
+Documentation is stored in [`docs/`](docs/). The rendering pipeline and the settled decisions are described in [`docs/architecture.md`](docs/architecture.md), the YAML schema in [`docs/template.md`](docs/template.md), the verification tools in [`docs/verification.md`](docs/verification.md), the boundary with the separate editor in [`docs/pageweaver.md`](docs/pageweaver.md), and the ordered path to 1.0.0 in [`docs/roadmap.md`](docs/roadmap.md).
 
 ## Usage
 

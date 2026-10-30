@@ -8,7 +8,8 @@ use crate::template::{
     FontSlant, Orientation, ParagraphAlignment, RunningText, Template, TextFace,
 };
 
-use super::{picture_name, xml};
+use super::picture_name;
+use crate::xml;
 
 const PREFIX: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
 <office:document-styles xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" office:version="1.3">
@@ -48,7 +49,7 @@ pub fn styles_xml(document: &Document, template: &Template, assets: &Assets) -> 
         &mut output,
         format_args!(
             "<style:style style:name=\"Standard\" style:family=\"paragraph\" style:class=\"text\"><style:paragraph-properties {line_height}{margin_bottom}fo:hyphenate=\"true\" fo:text-align=\"{align}\"/><style:text-properties style:font-name=\"{family}\" fo:font-size=\"{size}\" fo:font-weight=\"{weight}\" fo:font-style=\"{slant}\"{language}/></style:style>\n",
-            line_height = xml::line_advance_attribute(face.size(), paragraph.leading()),
+            line_height = line_height_attribute(face.size(), paragraph.leading()),
             margin_bottom = margin_bottom(paragraph.spacing(), paragraph.leading()),
             align = alignment(paragraph.alignment()),
             family = xml::escape_attribute(first_family(face)),
@@ -77,13 +78,13 @@ pub fn styles_xml(document: &Document, template: &Template, assets: &Assets) -> 
             &mut output,
             format_args!(
                 "<style:style style:name=\"Heading{level}\" style:family=\"paragraph\" style:parent-style-name=\"Standard\" style:next-style-name=\"Standard\"><style:paragraph-properties {line_height}fo:margin-top=\"{before}\" fo:margin-bottom=\"{after}\" fo:keep-with-next=\"always\" fo:hyphenate=\"true\" style:default-outline-level=\"{level}\"{page_break}/><style:text-properties style:font-name=\"{family}\" fo:font-size=\"{size}\" fo:font-weight=\"{weight}\" fo:font-style=\"{slant}\"/></style:style>\n",
-                line_height = xml::line_advance_attribute(face.size(), paragraph.leading()),
-                before = xml::points_value(heading_margin(
+                line_height = line_height_attribute(face.size(), paragraph.leading()),
+                before = xml::points_value(crate::metrics::heading_before(
                     heading.spacing_before(),
                     paragraph.leading(),
                     paragraph.spacing()
                 )),
-                after = xml::points_value(heading_after(heading.spacing_after())),
+                after = xml::points_value(crate::metrics::heading_after(heading.spacing_after())),
                 page_break = if heading.page_break_before() {
                     " fo:break-before=\"page\""
                 } else {
@@ -191,38 +192,22 @@ fn margin_bottom(
     spacing: Option<crate::template::Length>,
     leading: crate::template::Length,
 ) -> String {
-    match spacing {
-        Some(spacing) => {
-            let value = spacing.points() - leading.points();
-            if value > 0.0 {
-                format!("fo:margin-bottom=\"{}\" ", xml::points_value(value))
-            } else {
-                String::new()
-            }
-        }
-        None => String::new(),
+    let value = crate::metrics::paragraph_after(spacing, leading);
+    if value > 0.0 {
+        format!("fo:margin-bottom=\"{}\" ", xml::points_value(value))
+    } else {
+        String::new()
     }
 }
 
-/// Writer adds the space below a paragraph to the space above the next block,
-/// while Typst uses the heading spacing alone, so the paragraph margin is
-/// subtracted from the heading margin.
-fn heading_margin(
-    spacing: crate::template::Length,
+fn line_height_attribute(
+    size: crate::template::Length,
     leading: crate::template::Length,
-    paragraph_spacing: Option<crate::template::Length>,
-) -> f64 {
-    let paragraph = match paragraph_spacing {
-        Some(value) => (value.points() - leading.points()).max(0.0),
-        None => 0.0,
-    };
-    (spacing.points() - paragraph - HEADING_TOP_TRIM).max(0.0)
-}
-
-/// Writer places the heading line box before the space below it, so the
-/// heading margin is trimmed by the line box the Typst heading does not add.
-fn heading_after(spacing: crate::template::Length) -> f64 {
-    (spacing.points() - HEADING_BOTTOM_TRIM).max(0.0)
+) -> String {
+    format!(
+        "fo:line-height=\"{}\" ",
+        xml::points_value(crate::metrics::line_advance(size, leading))
+    )
 }
 
 fn list_styles(output: &mut String) {
@@ -257,10 +242,6 @@ fn list_styles(output: &mut String) {
 const RUNNING_MIN_HEIGHT: f64 = 1.2 * 72.0 / 2.54;
 /// The gap between a running header or footer and the text area.
 const RUNNING_SPACING: f64 = 0.3 * 72.0 / 2.54;
-/// How much of the heading space above Writer already counts in the line box.
-const HEADING_TOP_TRIM: f64 = 6.0;
-/// How much of the heading space below Writer already counts in the line box.
-const HEADING_BOTTOM_TRIM: f64 = 10.0;
 
 fn page_layout(output: &mut String, template: &Template, assets: &Assets) {
     let page = template.page();

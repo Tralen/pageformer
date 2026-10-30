@@ -7,7 +7,6 @@
 mod content;
 mod meta;
 mod styles;
-mod xml;
 
 use std::fmt;
 
@@ -96,16 +95,7 @@ pub(crate) fn picture_name(virtual_name: &str) -> &str {
     }
 }
 
-pub(crate) fn media_type(name: &str) -> Option<&'static str> {
-    match name.rsplit('.').next()?.to_ascii_lowercase().as_str() {
-        "png" => Some("image/png"),
-        "jpg" | "jpeg" => Some("image/jpeg"),
-        "gif" => Some("image/gif"),
-        "svg" => Some("image/svg+xml"),
-        "webp" => Some("image/webp"),
-        _ => None,
-    }
-}
+pub(crate) use crate::assets::media_type;
 
 /// Why an ODT package could not be produced.
 #[derive(Debug)]

@@ -99,6 +99,18 @@ soffice --headless --convert-to pdf --outdir /tmp/odt-check assets/examples/publ
 
 The three examples match the PDF page counts (4, 4 and 3). Editor rendering can still break a line differently, so treat the count as a regression guard, not as a byte target.
 
+## DOCX packages
+
+`tests/docx.rs` unzips the package with the `zip` dev-dependency, parses every XML part with `roxmltree`, asserts that every required part and relationship exists, that every list has its own numbering instance with a restart, that the header row repeats, and that two renders are byte-identical. The same tests assert that a confidential value never reaches `docProps/core.xml`.
+
+The LibreOffice smoke test converts the DOCX examples next to the ODT ones; the conversion must succeed without repair:
+
+```sh
+soffice --headless --convert-to pdf --outdir /tmp/office-check assets/examples/publicacao/Contrato.docx assets/examples/publicacao/Embargos.docx assets/examples/tecnico/Relatorio.docx
+```
+
+The DOCX target is a faithful package, not a page-count match: Word and LibreOffice lay out lines with their own engines.
+
 ## Plain-text goldens
 
 The text goldens in `assets/examples/publicacao/` and `assets/examples/tecnico/` are compared byte for byte by `tests/txt.rs`. Regenerate them after a parser, model or text-renderer change and commit the result:

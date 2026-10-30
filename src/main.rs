@@ -14,6 +14,7 @@ use anyhow::{Context, Result};
 use clap::{Arg, ArgAction, Command};
 
 use pageformer::confidential::{self, ConfidentialStore};
+use pageformer::docx::DocxRenderer;
 use pageformer::markdown;
 use pageformer::odt::OdtRenderer;
 use pageformer::pdf;
@@ -276,7 +277,7 @@ fn command() -> Command {
             Arg::new("format")
                 .long("format")
                 .value_name("FORMAT")
-                .help("Output format: pdf, txt or odt")
+                .help("Output format: pdf, txt, odt or docx")
                 .value_parser(clap::builder::ValueParser::new(Format::from_str))
                 .default_value("pdf"),
         )
@@ -360,6 +361,14 @@ fn process(
                 )?
                 .render(document, resolved.template())
                 .with_context(|| "cannot render the ODT")?,
+                Format::Docx => DocxRenderer::load(
+                    document,
+                    resolved.template(),
+                    source_directory,
+                    resolved.base_directory(),
+                )?
+                .render(document, resolved.template())
+                .with_context(|| "cannot render the DOCX")?,
             };
             write_atomic(output, rendered.bytes())?;
             Ok(Outcome::Rendered {
@@ -566,7 +575,7 @@ mod tests {
     #[test]
     fn the_format_option_rejects_an_unknown_value() {
         let error = command()
-            .try_get_matches_from(["pageformer", "--format", "docx", "a.md"])
+            .try_get_matches_from(["pageformer", "--format", "epub", "a.md"])
             .expect_err("the value is not accepted");
         assert_eq!(error.kind(), clap::error::ErrorKind::ValueValidation);
     }

@@ -45,6 +45,8 @@ The inline model covers every construct of that subset: text, code spans, emphas
 - `src/pdf/` is the PDF backend: `source.rs` generates Typst source and `world.rs` is the Typst world that serves the fonts and assets.
 - `src/txt.rs` is the plain-text backend. It needs no assets and cannot fail.
 - `src/odt/` is the ODT backend: `content.rs`, `styles.rs` and `meta.rs` generate the XML parts, and `src/zip.rs` builds the deterministic stored ZIP package.
+- `src/docx/` is the DOCX backend: `content.rs`, `styles.rs`, `numbering.rs` and `package.rs` generate the OOXML parts, reusing the same ZIP and metrics.
+- `src/xml.rs`, `src/metrics.rs` and `src/image.rs` hold the XML escaping, the Typst spacing model and the intrinsic image sizes shared by the office backends.
 - `src/main.rs` is the CLI. It parses each input, resolves the template and either renders the chosen format or reports the pipeline result.
 
 The library is the pure core. File reading, the environment and the terminal live in the binary or in the loader's explicitly named functions.
@@ -101,8 +103,8 @@ Plain text is a view of the model, used by the copy-as-plain-text action. The ou
 
 - PDF is the primary output and must conform to PDF/A-2b, or PDF/A-2u when every character maps to Unicode.
 - ODT is the paged format for office review and is implemented with the internal writer below.
+- DOCX is the review and exchange format and is implemented with the internal OOXML writer below.
 - Plain text is implemented and carries the copy-as-plain-text view.
-- DOCX follows.
 - HTML and EPUB reuse the same document model. HTML is the basis for EPUB, which splits chapters at first-level headings and uses deterministic metadata.
 
 ## ODT writer
@@ -112,6 +114,14 @@ ODT uses an internal ODF writer instead of a full ODT library, because the templ
 The template maps to named styles for the paragraph face, leading, spacing and alignment, to character styles for emphasis, strong, strikethrough and code, to one heading style per level with its spacing and optional page break, and to list, table and page styles. The page layout carries the size, orientation and margins, the letterhead as a stretched page background, and the running header and footer, whose `{page}` and `{pages}` tokens become page fields while `{title}` and `{author}` expand from the frontmatter.
 
 The body maps blocks and inlines to ODF content: paragraphs, headings with outline levels, lists with their start value, task markers, tables with a header row and cell alignment, quotes with a visible `[!KIND]` label for alerts, preserved code, links, footnotes as inline notes whose definitions are collected, and images under `Pictures/` with their intrinsic size capped to the text width. Numbered paragraphs keep their literal number. Spacing follows the Typst model rather than the ODF defaults: Typst advances a line by the leading plus the font's cap height, so the ODF line height uses that sum (the cap height is approximated by 0.657 of the size), and the paragraph margin is the template spacing minus the leading. Heading margins are trimmed by the line box Writer adds. A table cell uses the same line advance, but the leading is moved into the vertical padding, because Typst cells hold inline content rather than a paragraph; the row height then matches the PDF. The last item of a tight list keeps the paragraph margin, so the list still separates from the next block. Hyphenation is enabled on paragraphs, headings and cells with the frontmatter language, because Typst hyphenates and the line breaks otherwise drift far enough to move a paragraph to the next page. A running header or footer uses the paragraph face and reserves a 1.5cm band from the page margin, so the body keeps the template margins and the header sits in the letterhead band instead of pushing the text. Metadata carries the title, author, language, subject, keywords and generator, and never a body value.
+
+## DOCX writer
+
+DOCX uses an internal OOXML writer that reuses the deterministic ZIP and the shared metrics; a full library would add a large dependency and still leave the style and determinism decisions open. The fixed parts are `[Content_Types].xml`, `_rels/.rels`, `docProps/core.xml`, `docProps/app.xml`, `word/document.xml` with its relationships, `word/styles.xml`, `word/numbering.xml`, `word/footnotes.xml`, `word/settings.xml`, an optional header and footer, and the media under `word/media/`. Relationship ids, numbering ids, drawing ids and the core property dates are fixed, so two runs are byte-identical.
+
+Every list gets its own numbering instance, and an ordered list that does not start at one carries a start override, so legal numbering restarts where the source says. Table header rows repeat through `w:tblHeader`, the template supplies the borders, the header fill and the cell padding, and the Markdown alignment sets the cell alignment. The running header and footer use tab stops for the three slots, `PAGE` and `NUMPAGES` fields for the page tokens, and the letterhead as a floating image anchored to the page behind the text. Footnotes are inline note references with collected bodies. Metadata carries the title, author, subject, keywords and language, and never a body value.
+
+Word hyphenates through `w:autoHyphenation` and the document language, so the line breaks stay close to Typst. Pagination can still differ between an editor and the PDF, because Word and LibreOffice lay out lines with their own engines; the DOCX target is a faithful, repairable package, not a page-count match.
 
 ## PDF engine
 

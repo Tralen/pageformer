@@ -17,6 +17,7 @@ pub enum Format {
     Pdf,
     Txt,
     Odt,
+    Docx,
 }
 
 impl Format {
@@ -25,6 +26,7 @@ impl Format {
             Self::Pdf => "pdf",
             Self::Txt => "txt",
             Self::Odt => "odt",
+            Self::Docx => "docx",
         }
     }
 }
@@ -37,6 +39,7 @@ impl FromStr for Format {
             "pdf" => Ok(Self::Pdf),
             "txt" => Ok(Self::Txt),
             "odt" => Ok(Self::Odt),
+            "docx" => Ok(Self::Docx),
             other => Err(FormatError::Unknown(other.to_owned())),
         }
     }
@@ -52,7 +55,10 @@ impl fmt::Display for FormatError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Unknown(name) => {
-                write!(formatter, "unknown format `{name}`; use pdf, txt or odt")
+                write!(
+                    formatter,
+                    "unknown format `{name}`; use pdf, txt, odt or docx"
+                )
             }
         }
     }
@@ -612,15 +618,20 @@ mod tests {
         assert_eq!(Format::Pdf.extension(), "pdf");
         assert_eq!(Format::Txt.extension(), "txt");
         assert_eq!(Format::Odt.extension(), "odt");
+        assert_eq!(Format::Docx.extension(), "docx");
         assert_eq!("txt".parse::<Format>(), Ok(Format::Txt));
         assert_eq!("odt".parse::<Format>(), Ok(Format::Odt));
+        assert_eq!("docx".parse::<Format>(), Ok(Format::Docx));
     }
 
     #[test]
     fn an_unknown_format_name_is_rejected() {
-        let error = "docx".parse::<Format>().expect_err("an unknown format");
+        let error = "epub".parse::<Format>().expect_err("an unknown format");
 
-        assert!(error.to_string().contains("pdf, txt or odt"), "{error}");
+        assert!(
+            error.to_string().contains("pdf, txt, odt or docx"),
+            "{error}"
+        );
     }
 
     #[test]

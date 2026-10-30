@@ -1,0 +1,278 @@
+//! Structural tests for the DOCX backend.
+
+use std::fs;
+use std::io::{Cursor, Read};
+use std::path::Path;
+
+use pageformer::assets::Assets;
+use pageformer::confidential::loader as confidential_loader;
+use pageformer::confidential::{self, ConfidentialStore};
+use pageformer::document::{Block, Destination, Document, Inline, Metadata};
+use pageformer::docx;
+use pageformer::markdown;
+use pageformer::template::Template;
+use tempfile::TempDir;
+use zip::ZipArchive;
+
+const CONTRACT: &str = include_str!("../assets/examples/escritorio/Contrato.md");
+const EMBARGOS: &str = include_str!("../assets/examples/escritorio/Embargos.md");
+const REPORT: &str = include_str!("../assets/examples/tecnico/Relatorio.md");
+const EMBARGOS_VALUES: &str = include_str!("../assets/examples/confidencial/embargos.ini");
+
+fn embedded() -> Template {
+    Template::embedded().expect("the embedded template must be valid")
+}
+
+fn example_store() -> ConfidentialStore {
+    let directory = TempDir::new().expect("a temporary directory");
+    let path = directory.path().join("embargos.ini");
+    fs::write(&path, EMBARGOS_VALUES).expect("the values must be written");
+    make_private(&path);
+    confidential_loader::load(Some(&path), &[]).expect("the example values must load")
+}
+
+#[cfg(unix)]
+fn make_private(path: &Path) {
+    use std::os::unix::fs::PermissionsExt;
+
+    fs::set_permissions(path, fs::Permissions::from_mode(0o600))
+        .expect("the permissions must change");
+}
+
+#[cfg(not(unix))]
+fn make_private(_path: &Path) {}
+
+fn render(document: &Document) -> Vec<u8> {
+    docx::render(document, &embedded(), &Assets::default()).expect("the package must be produced")
+}
+
+fn entry(archive: &mut ZipArchive<Cursor<Vec<u8>>>, name: &str) -> String {
+    let mut text = String::new();
+    archive
+        .by_name(name)
+        .expect("the entry must exist")
+        .read_to_string(&mut text)
+        .expect("the entry must be UTF-8");
+    text
+}
+
+fn names(archive: &mut ZipArchive<Cursor<Vec<u8>>>) -> Vec<String> {
+    archive
+        .file_names()
+        .filter_map(Result::ok)
+        .map(|name| name.into_owned())
+        .collect()
+}
+
+#[test]
+fn the_package_has_the_required_parts_and_every_xml_parses() {
+    let examples = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("assets")
+        .join("examples")
+        .join("escritorio");
+    let resolved = pageformer::template::loader::resolve(&examples, None)
+        .expect("the example template must resolve");
+    let document = markdown::parse(CONTRACT).expect("the contract fixture must parse");
+    let assets = pageformer::assets::load_assets(
+        &document,
+        resolved.template(),
+        &examples,
+        resolved.base_directory(),
+    )
+    .expect("the assets must load");
+    let bytes = docx::render(&document, resolved.template(), &assets).expect("the package");
+    let mut archive = ZipArchive::new(Cursor::new(bytes)).expect("the package must be a ZIP");
+    let names = names(&mut archive);
+
+    for required in [
+        "[Content_Types].xml",
+        "_rels/.rels",
+        "docProps/core.xml",
+        "docProps/app.xml",
+        "word/document.xml",
+        "word/_rels/document.xml.rels",
+        "word/styles.xml",
+        "word/numbering.xml",
+        "word/footnotes.xml",
+        "word/settings.xml",
+        "word/header1.xml",
+        "word/_rels/header1.xml.rels",
+        "word/media/letterhead.png",
+    ] {
+        assert!(
+            names.iter().any(|name| name == required),
+            "missing {required}"
+        );
+    }
+    for name in [
+        "[Content_Types].xml",
+        "_rels/.rels",
+        "docProps/core.xml",
+        "docProps/app.xml",
+        "word/document.xml",
+        "word/_rels/document.xml.rels",
+        "word/styles.xml",
+        "word/numbering.xml",
+        "word/footnotes.xml",
+        "word/settings.xml",
+        "word/header1.xml",
+        "word/_rels/header1.xml.rels",
+    ] {
+        let text = entry(&mut archive, name);
+        roxmltree::Document::parse(&text)
+            .unwrap_or_else(|error| panic!("{name} is not well formed: {error}"));
+    }
+
+    let content = entry(&mut archive, "word/document.xml");
+    assert!(content.contains("Das partes"), "{content}");
+    assert!(content.contains("<w:tbl>"), "tables must survive");
+    assert!(content.contains("<w:tblHeader/>"), "the header row repeats");
+    assert!(content.contains("<w:numPr>"), "lists use numbering");
+    let header = entry(&mut archive, "word/header1.xml");
+    assert!(header.contains("behindDoc=\"1\""), "the letterhead floats");
+}
+
+#[test]
+fn the_same_document_produces_the_same_bytes() {
+    let document = markdown::parse(REPORT).expect("the report fixture must parse");
+
+    assert_eq!(
+        docx::render(&document, &embedded(), &Assets::default()).expect("the package"),
+        docx::render(&document, &embedded(), &Assets::default()).expect("the package")
+    );
+}
+
+#[test]
+fn the_embargos_metadata_never_carries_a_value() {
+    let document = markdown::parse(EMBARGOS).expect("the embargos fixture must parse");
+    let resolution = confidential::resolve(&document, &example_store())
+        .expect("the example values must resolve the fixture");
+
+    let bytes = docx::render(resolution.document(), &embedded(), &Assets::default())
+        .expect("the package must be produced");
+    let mut archive = ZipArchive::new(Cursor::new(bytes)).expect("the package must be a ZIP");
+    let core = entry(&mut archive, "docProps/core.xml");
+    let content = entry(&mut archive, "word/document.xml");
+
+    assert!(content.contains("55.444.333"), "the body carries the value");
+    assert!(
+        !core.contains("55.444.333"),
+        "a confidential value reached the properties"
+    );
+}
+
+#[test]
+fn a_template_change_is_visible_in_the_styles() {
+    let document = Document::new(
+        Metadata::default(),
+        vec![Block::Paragraph(vec![Inline::Text("Texto".to_owned())])],
+    );
+    let template = Template::from_yaml(
+        r##"
+version: "0.5"
+formatting:
+  paragraph:
+    size: 13
+    leading: 4
+  heading:
+    h1:
+      size: 27
+table:
+  header_fill: "#123456"
+  border: 2pt
+"##,
+    )
+    .expect("the template must be valid");
+
+    let bytes = docx::render(&document, &template, &Assets::default()).expect("the package");
+    let mut archive = ZipArchive::new(Cursor::new(bytes)).expect("the package must be a ZIP");
+    let styles = entry(&mut archive, "word/styles.xml");
+
+    assert!(styles.contains("<w:sz w:val=\"26\"/>"), "{styles}");
+    assert!(styles.contains("<w:sz w:val=\"54\"/>"), "{styles}");
+}
+
+#[test]
+fn two_lists_get_their_own_numbering_and_a_restart() {
+    let source = "- a\n- b\n\n3. c\n4. d\n";
+    let document = markdown::parse(source).expect("the document must parse");
+    let bytes = render(&document);
+    let mut archive = ZipArchive::new(Cursor::new(bytes)).expect("the package must be a ZIP");
+    let numbering = entry(&mut archive, "word/numbering.xml");
+    let content = entry(&mut archive, "word/document.xml");
+
+    assert_eq!(numbering.matches("<w:num ").count(), 2, "{numbering}");
+    assert!(
+        numbering.contains("<w:lvlOverride w:ilvl=\"0\"><w:startOverride w:val=\"3\"/>"),
+        "{numbering}"
+    );
+    assert!(content.contains("<w:numId w:val=\"1\"/>"), "{content}");
+    assert!(content.contains("<w:numId w:val=\"2\"/>"), "{content}");
+}
+
+#[test]
+fn footnotes_and_links_are_packaged() {
+    let source = "Texto[^1] e [site](https://example.org).\n\n[^1]: Nota.\n";
+    let document = markdown::parse(source).expect("the document must parse");
+    let bytes = render(&document);
+    let mut archive = ZipArchive::new(Cursor::new(bytes)).expect("the package must be a ZIP");
+    let content = entry(&mut archive, "word/document.xml");
+    let footnotes = entry(&mut archive, "word/footnotes.xml");
+    let relationships = entry(&mut archive, "word/_rels/document.xml.rels");
+
+    assert!(
+        content.contains("<w:footnoteReference w:id=\"1\"/>"),
+        "{content}"
+    );
+    assert!(footnotes.contains("<w:footnote w:id=\"1\">"), "{footnotes}");
+    assert!(footnotes.contains("<w:footnoteRef/>"), "{footnotes}");
+    assert!(content.contains("<w:hyperlink r:id="), "{content}");
+    assert!(
+        relationships.contains("TargetMode=\"External\""),
+        "{relationships}"
+    );
+    assert!(
+        relationships.contains("https://example.org"),
+        "{relationships}"
+    );
+}
+
+#[test]
+fn an_inline_image_is_packaged_and_referenced() {
+    let project = TempDir::new().expect("a temporary project");
+    fs::write(project.path().join("logo.png"), minimal_png()).expect("the image must be written");
+    let document = Document::new(
+        Metadata::default(),
+        vec![Block::Paragraph(vec![Inline::Image {
+            destination: Destination::new("logo.png"),
+            title: None,
+            alternative: vec![Inline::Text("Logo".to_owned())],
+        }])],
+    );
+    let assets = pageformer::assets::load_assets(&document, &embedded(), project.path(), None)
+        .expect("the assets must load");
+
+    let bytes = docx::render(&document, &embedded(), &assets).expect("the package");
+    let mut archive = ZipArchive::new(Cursor::new(bytes)).expect("the package must be a ZIP");
+    let names = names(&mut archive);
+    let content = entry(&mut archive, "word/document.xml");
+    let relationships = entry(&mut archive, "word/_rels/document.xml.rels");
+
+    assert!(
+        names.iter().any(|name| name == "word/media/image-0.png"),
+        "{names:?}"
+    );
+    assert!(content.contains("r:embed=\"rId7\""), "{content}");
+    assert!(content.contains("descr=\"Logo\""), "{content}");
+    assert!(
+        relationships.contains("Target=\"media/image-0.png\""),
+        "{relationships}"
+    );
+}
+
+fn minimal_png() -> Vec<u8> {
+    vec![
+        0x89, b'P', b'N', b'G', 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d, b'I', b'H', b'D',
+        b'R', 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x06, 0x00, 0x00, 0x00,
+    ]
+}

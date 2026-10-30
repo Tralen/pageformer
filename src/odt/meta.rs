@@ -3,8 +3,8 @@
 use crate::assets::Assets;
 use crate::document::Document;
 
-use super::xml;
 use super::{OdtError, media_type, picture_name};
+use crate::xml;
 
 const META_PREFIX: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
 <office:document-meta xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0" xmlns:dc="http://purl.org/dc/elements/1.1/" office:version="1.3">

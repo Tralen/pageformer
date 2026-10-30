@@ -11,7 +11,7 @@ Pageformer reaches 1.0.0 through ten phases, in the order below. The order is a 
 | 3. Confidentiality | Placeholder resolution and leak prevention | Done in 0.13.0: `{NAME}` fields, environment and file loading, output rule, redaction | PDF pipeline |
 | 4. TXT | Plain-text view and the renderer boundary | Done in 0.15.0: the renderer trait, `--format txt` and plain-text goldens | Confidentiality |
 | 5. ODT | Second-priority paged format | Done in 0.16.0: internal ODF writer, deterministic package, styles from the template | Renderer boundary |
-| 6. DOCX | Office format for review and exchange | Not started | ODT style mapping |
+| 6. DOCX | Office format for review and exchange | Done in 0.17.0: internal OOXML writer, numbering instances, repeating table headers, footnotes and a deterministic package | ODT style mapping |
 | 7. GUI | Minimal egui window over the pipeline | Not started | Every format it exposes |
 | 8. HTML | Self-contained semantic view | Not started | GUI and renderer boundary |
 | 9. EPUB | HTML packaged with chapters and metadata | Not started | HTML |
@@ -154,6 +154,8 @@ A phase is closed only when all of the following hold:
 ## Phase 6: DOCX
 
 **Goal.** Produce the format reviewers expect, with lists, tables and footnotes intact.
+
+**Status.** Done in 0.17.0. `src/docx/` writes the OOXML parts and package, reusing `src/zip.rs` and the shared metrics. Every list has its own numbering instance with start overrides, table header rows repeat, the template supplies borders, fill and padding, footnotes and hyperlinks are packaged, and the letterhead floats behind the header. The three examples open in LibreOffice without repair and are byte-identical across runs.
 
 **Work.**
 

@@ -9,6 +9,7 @@
 pub mod assets;
 pub mod confidential;
 pub mod document;
+pub mod docx;
 pub mod markdown;
 pub mod odt;
 pub mod pdf;
@@ -16,4 +17,7 @@ pub mod render;
 pub mod template;
 pub mod txt;
 
+mod image;
+mod metrics;
+mod xml;
 mod zip;

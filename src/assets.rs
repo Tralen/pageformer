@@ -235,6 +235,18 @@ fn read_asset(path: &Path) -> Result<Vec<u8>, AssetError> {
     })
 }
 
+/// The media type of a packaged image, from its file name.
+pub(crate) fn media_type(name: &str) -> Option<&'static str> {
+    match name.rsplit('.').next()?.to_ascii_lowercase().as_str() {
+        "png" => Some("image/png"),
+        "jpg" | "jpeg" => Some("image/jpeg"),
+        "gif" => Some("image/gif"),
+        "svg" => Some("image/svg+xml"),
+        "webp" => Some("image/webp"),
+        _ => None,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

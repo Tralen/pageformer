@@ -607,13 +607,13 @@ fn the_text_format_writes_a_txt_file_under_the_output() {
 fn an_unknown_format_fails_before_rendering() {
     let output = run(&[
         OsStr::new("--format"),
-        OsStr::new("docx"),
+        OsStr::new("epub"),
         fixture("Contrato.md").as_os_str(),
     ]);
 
     assert!(!output.status.success());
     assert!(
-        stderr(&output).contains("pdf, txt or odt"),
+        stderr(&output).contains("pdf, txt, odt or docx"),
         "{}",
         stderr(&output)
     );
@@ -636,6 +636,27 @@ fn the_odt_format_writes_an_opendocument_package() {
     assert!(result.status.success(), "{}", stderr(&result));
 
     let bytes = fs::read(output.path().join("Doc.odt")).expect("the package must be written");
+    assert_eq!(&bytes[..4], b"PK\x03\x04");
+    assert!(!output.path().join("Doc.pdf").exists());
+}
+
+#[test]
+fn the_docx_format_writes_an_ooxml_package() {
+    let source = TempDir::new().expect("a temporary source");
+    let output = TempDir::new().expect("a temporary output");
+    write_markdown(&source.path().join("Doc.md"), "Doc");
+
+    let result = run(&[
+        OsStr::new("--format"),
+        OsStr::new("docx"),
+        OsStr::new("--color=never"),
+        OsStr::new("--output"),
+        output.path().as_os_str(),
+        source.path().join("Doc.md").as_os_str(),
+    ]);
+    assert!(result.status.success(), "{}", stderr(&result));
+
+    let bytes = fs::read(output.path().join("Doc.docx")).expect("the package must be written");
     assert_eq!(&bytes[..4], b"PK\x03\x04");
     assert!(!output.path().join("Doc.pdf").exists());
 }

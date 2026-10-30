@@ -4,6 +4,14 @@
 
 *Major updates and feature releases.*
 
+### 0.17.0
+
+- Added `--format docx` and the DOCX backend: an Office Open XML package with the template's page layout, fonts, headings, lists, tables, letterhead, running header and footer, footnotes, hyperlinks, images and properties.
+- Every list gets its own numbering instance with a start override; table header rows repeat; the template supplies borders, header fill and cell padding; the letterhead floats behind the header.
+- The package is a stored ZIP assembled by the internal `src/zip.rs`; all relationship ids, numbering ids, drawing ids and property dates are fixed, so two runs are byte-identical.
+- Shared the XML escaping, the Typst spacing model and the image size reader between the office backends in `src/xml.rs`, `src/metrics.rs` and `src/image.rs`.
+- Added DOCX examples and structural tests, plus a LibreOffice smoke test documented in `docs/verification.md`.
+
 ### 0.16.2
 
 - Enabled hyphenation with the frontmatter language on paragraphs, headings and cells, because Typst hyphenates and the ODT line breaks otherwise drift; the Embargos item 12 now stays on page 2, as in the PDF.

@@ -53,23 +53,6 @@ pub fn points_value(points: f64) -> String {
     format!("{:.2}pt", points)
 }
 
-/// The ratio of a font's cap height to its size, the line box Typst uses by
-/// default.
-pub const CAP_HEIGHT_RATIO: f64 = 0.657;
-
-/// The line advance Typst produces: the leading plus the cap height.
-pub fn line_advance(size: Length, leading: Length) -> f64 {
-    leading.points() + size.points() * CAP_HEIGHT_RATIO
-}
-
-/// Formats a line advance in points.
-pub fn line_advance_attribute(size: Length, leading: Length) -> String {
-    format!(
-        "fo:line-height=\"{}\" ",
-        points_value(line_advance(size, leading))
-    )
-}
-
 /// Formats a length in centimetres, such as `21.000cm`.
 pub fn centimetres(length: Length) -> String {
     centimetres_points(length.points())

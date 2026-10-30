@@ -27,6 +27,12 @@ const DEFAULT_TABLE_COLOR: Color = Color {
     blue: 0xbb,
 };
 const DEFAULT_TABLE_PADDING: Length = Length(6.0);
+const DEFAULT_RULE_THICKNESS: Length = Length(0.5);
+const DEFAULT_RULE_COLOR: Color = Color {
+    red: 0x00,
+    green: 0x00,
+    blue: 0x00,
+};
 
 /// The tokens a running header or footer slot expands.
 const RUNNING_TOKENS: [&str; 4] = ["page", "pages", "title", "author"];
@@ -903,6 +909,7 @@ pub struct HeadingStyle {
     spacing_before: Length,
     spacing_after: Length,
     page_break_before: bool,
+    background: Option<Color>,
 }
 
 impl HeadingStyle {
@@ -911,12 +918,14 @@ impl HeadingStyle {
         spacing_before: Length,
         spacing_after: Length,
         page_break_before: bool,
+        background: Option<Color>,
     ) -> Self {
         Self {
             face,
             spacing_before,
             spacing_after,
             page_break_before,
+            background,
         }
     }
 
@@ -934,6 +943,11 @@ impl HeadingStyle {
 
     pub fn page_break_before(&self) -> bool {
         self.page_break_before
+    }
+
+    /// The solid fill behind the heading text, across the full line width.
+    pub fn background(&self) -> Option<Color> {
+        self.background
     }
 }
 
@@ -953,16 +967,62 @@ impl HeadingStyles {
     }
 }
 
+/// The thematic break, written as a horizontal rule across the text width.
+///
+/// The spacing is optional: when a side is omitted, each backend keeps its own
+/// default spacing for that side.
+#[derive(Debug, Clone, PartialEq)]
+pub struct RuleStyle {
+    thickness: Length,
+    color: Color,
+    spacing_before: Option<Length>,
+    spacing_after: Option<Length>,
+}
+
+impl RuleStyle {
+    pub fn thickness(&self) -> Length {
+        self.thickness
+    }
+
+    pub fn color(&self) -> Color {
+        self.color
+    }
+
+    pub fn spacing_before(&self) -> Option<Length> {
+        self.spacing_before
+    }
+
+    pub fn spacing_after(&self) -> Option<Length> {
+        self.spacing_after
+    }
+}
+
+impl Default for RuleStyle {
+    fn default() -> Self {
+        Self {
+            thickness: DEFAULT_RULE_THICKNESS,
+            color: DEFAULT_RULE_COLOR,
+            spacing_before: None,
+            spacing_after: None,
+        }
+    }
+}
+
 /// The formatting section of a template.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Formatting {
     paragraph: ParagraphStyle,
     heading: HeadingStyles,
+    rule: RuleStyle,
 }
 
 impl Formatting {
-    pub fn new(paragraph: ParagraphStyle, heading: HeadingStyles) -> Self {
-        Self { paragraph, heading }
+    pub fn new(paragraph: ParagraphStyle, heading: HeadingStyles, rule: RuleStyle) -> Self {
+        Self {
+            paragraph,
+            heading,
+            rule,
+        }
     }
 
     pub fn paragraph(&self) -> &ParagraphStyle {
@@ -971,6 +1031,10 @@ impl Formatting {
 
     pub fn heading(&self) -> &HeadingStyles {
         &self.heading
+    }
+
+    pub fn rule(&self) -> &RuleStyle {
+        &self.rule
     }
 }
 
@@ -1050,6 +1114,7 @@ struct RawMargins {
 struct RawFormatting {
     paragraph: Option<RawParagraph>,
     heading: Option<RawHeading>,
+    rule: Option<RawRule>,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -1077,6 +1142,15 @@ struct RawInlineStyle {
 
 #[derive(Debug, Default, Deserialize)]
 #[serde(deny_unknown_fields)]
+struct RawRule {
+    thickness: Option<String>,
+    color: Option<String>,
+    spacing_before: Option<String>,
+    spacing_after: Option<String>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct RawHeading {
     font_families: Option<Vec<String>>,
     size: Option<String>,
@@ -1085,6 +1159,7 @@ struct RawHeading {
     spacing_before: Option<String>,
     spacing_after: Option<String>,
     page_break_before: Option<bool>,
+    background: Option<String>,
     h1: Option<RawHeadingLevel>,
     h2: Option<RawHeadingLevel>,
     h3: Option<RawHeadingLevel>,
@@ -1103,6 +1178,7 @@ struct RawHeadingLevel {
     spacing_before: Option<String>,
     spacing_after: Option<String>,
     page_break_before: Option<bool>,
+    background: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -1212,7 +1288,35 @@ fn convert_formatting(raw: RawFormatting) -> Result<Formatting, TemplateError> {
     Ok(Formatting::new(
         convert_paragraph(raw.paragraph.unwrap_or_default())?,
         convert_headings(raw.heading.unwrap_or_default())?,
+        convert_rule(raw.rule.unwrap_or_default())?,
     ))
+}
+
+fn convert_rule(raw: RawRule) -> Result<RuleStyle, TemplateError> {
+    let defaults = RuleStyle::default();
+    let thickness = parse_size_field(
+        raw.thickness,
+        "formatting.rule.thickness",
+        defaults.thickness(),
+    )?;
+    if thickness.points() <= 0.0 {
+        return Err(value_error("formatting.rule.thickness", ValueError::Zero));
+    }
+    let color = raw
+        .color
+        .map(|text| Color::parse(&text))
+        .transpose()
+        .map_err(|problem| value_error("formatting.rule.color", problem))?
+        .unwrap_or(defaults.color());
+    Ok(RuleStyle {
+        thickness,
+        color,
+        spacing_before: parse_optional_length(
+            raw.spacing_before,
+            "formatting.rule.spacing_before",
+        )?,
+        spacing_after: parse_optional_length(raw.spacing_after, "formatting.rule.spacing_after")?,
+    })
 }
 
 fn convert_paragraph(raw: RawParagraph) -> Result<ParagraphStyle, TemplateError> {
@@ -1295,6 +1399,7 @@ fn convert_headings(raw: RawHeading) -> Result<HeadingStyles, TemplateError> {
         spacing_before,
         spacing_after,
         page_break_before,
+        background,
         h1,
         h2,
         h3,
@@ -1311,6 +1416,7 @@ fn convert_headings(raw: RawHeading) -> Result<HeadingStyles, TemplateError> {
             spacing_before,
             spacing_after,
             page_break_before,
+            background,
         },
         "formatting.heading",
     )?;
@@ -1328,6 +1434,7 @@ fn convert_headings(raw: RawHeading) -> Result<HeadingStyles, TemplateError> {
                     spacing_before: raw_level.spacing_before,
                     spacing_after: raw_level.spacing_after,
                     page_break_before: raw_level.page_break_before,
+                    background: raw_level.background,
                 },
                 &prefix,
             )?);
@@ -1353,6 +1460,7 @@ struct RawHeadingOverrides {
     spacing_before: Option<String>,
     spacing_after: Option<String>,
     page_break_before: Option<bool>,
+    background: Option<String>,
 }
 
 #[derive(Debug, Default)]
@@ -1364,6 +1472,7 @@ struct HeadingOverrides {
     spacing_before: Option<Length>,
     spacing_after: Option<Length>,
     page_break_before: Option<bool>,
+    background: Option<Color>,
 }
 
 impl HeadingOverrides {
@@ -1376,6 +1485,7 @@ impl HeadingOverrides {
             spacing_before,
             spacing_after,
             page_break_before,
+            background,
         } = raw;
         let size = size
             .map(|text| parse_length_field(&text, &format!("{prefix}.size")))
@@ -1401,6 +1511,12 @@ impl HeadingOverrides {
                 .map(|text| parse_length_field(&text, &format!("{prefix}.spacing_after")))
                 .transpose()?,
             page_break_before,
+            background: background
+                .map(|text| {
+                    Color::parse(&text)
+                        .map_err(|problem| value_error(format!("{prefix}.background"), problem))
+                })
+                .transpose()?,
         })
     }
 
@@ -1425,6 +1541,9 @@ impl HeadingOverrides {
         }
         if let Some(page_break_before) = self.page_break_before {
             style.page_break_before = page_break_before;
+        }
+        if let Some(background) = self.background {
+            style.background = Some(background);
         }
     }
 }
@@ -1521,6 +1640,7 @@ fn default_heading_style(level: usize) -> HeadingStyle {
         Length(HEADING_SPACING_BEFORE[index]),
         Length(HEADING_SPACING_AFTER[index]),
         false,
+        None,
     )
 }
 

@@ -520,6 +520,100 @@ fn an_unknown_heading_key_is_rejected_with_page_breaks() {
 }
 
 #[test]
+fn the_rule_defaults_are_a_black_half_point_line() {
+    let template = parse("version: \"0.5\"\n");
+    let rule = template.formatting().rule();
+    assert_eq!(rule.thickness().points(), 0.5);
+    assert_eq!(rule.color().hex(), "#000000");
+    assert_eq!(rule.spacing_before(), None);
+    assert_eq!(rule.spacing_after(), None);
+}
+
+#[test]
+fn the_rule_is_read_field_by_field() {
+    let template = parse(
+        r##"
+version: "0.5"
+formatting:
+  rule:
+    thickness: 1.5pt
+    color: "#112233"
+    spacing_before: 12
+    spacing_after: 4mm
+"##,
+    );
+    let rule = template.formatting().rule();
+    assert_eq!(rule.thickness().points(), 1.5);
+    assert_eq!(rule.color().hex(), "#112233");
+    assert_eq!(rule.spacing_before().map(Length::points), Some(12.0));
+    assert_millimetres(millimetres(rule.spacing_after().expect("a spacing")), 4.0);
+}
+
+#[test]
+fn an_invalid_rule_value_is_rejected_with_its_field() {
+    let zero = Template::from_yaml("version: \"0.5\"\nformatting:\n  rule:\n    thickness: 0\n")
+        .expect_err("a zero thickness");
+    assert!(
+        value_error_is(&zero, "formatting.rule.thickness", ValueError::Zero),
+        "{zero}"
+    );
+
+    let color = Template::from_yaml("version: \"0.5\"\nformatting:\n  rule:\n    color: red\n")
+        .expect_err("an invalid color");
+    assert!(
+        value_error_is(&color, "formatting.rule.color", ValueError::InvalidColor),
+        "{color}"
+    );
+
+    let spacing =
+        Template::from_yaml("version: \"0.5\"\nformatting:\n  rule:\n    spacing_after: -4\n")
+            .expect_err("a negative spacing");
+    assert!(
+        value_error_is(
+            &spacing,
+            "formatting.rule.spacing_after",
+            ValueError::Negative
+        ),
+        "{spacing}"
+    );
+
+    let unknown = Template::from_yaml("version: \"0.5\"\nformatting:\n  rule:\n    width: 1pt\n")
+        .expect_err("the key is not supported");
+    assert!(matches!(unknown, TemplateError::Yaml { .. }), "{unknown}");
+}
+
+#[test]
+fn a_heading_background_is_inherited_and_overridden_per_level() {
+    let template = parse(
+        "version: \"0.5\"\nformatting:\n  heading:\n    background: \"#eeeeee\"\n    h2:\n      background: \"#DDDDDD\"\n",
+    );
+    let levels = template.formatting().heading().levels();
+    let hex = |index: usize| levels[index].background().map(|color| color.hex());
+    assert_eq!(hex(0), Some("#eeeeee".to_owned()));
+    assert_eq!(hex(1), Some("#dddddd".to_owned()));
+    assert_eq!(hex(5), Some("#eeeeee".to_owned()));
+
+    let plain = parse("version: \"0.5\"\n");
+    assert_eq!(plain.formatting().heading().levels()[0].background(), None);
+}
+
+#[test]
+fn an_invalid_heading_background_names_its_level() {
+    let error = Template::from_yaml(
+        "version: \"0.5\"\nformatting:\n  heading:\n    h3:\n      background: grey\n",
+    )
+    .expect_err("an invalid color");
+    assert!(
+        value_error_is(
+            &error,
+            "formatting.heading.h3.background",
+            ValueError::InvalidColor
+        ),
+        "{error}"
+    );
+}
+
+#[test]
 fn the_embedded_template_matches_the_project_defaults() {
     let template = Template::embedded().expect("the embedded template must be valid");
     assert_eq!(template.schema_version(), CURRENT_SCHEMA_VERSION);

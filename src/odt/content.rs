@@ -27,7 +27,6 @@ const PREFIX: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
 <style:style style:name="CodeBreak" style:family="paragraph" style:parent-style-name="Code"><style:paragraph-properties fo:break-before="page"/></style:style>
 <style:style style:name="QuoteParagraph" style:family="paragraph" style:parent-style-name="Standard"><style:paragraph-properties fo:margin-left="1cm" fo:margin-right="1cm"/></style:style>
 <style:style style:name="ListItem" style:family="paragraph" style:parent-style-name="Standard"><style:paragraph-properties fo:margin-bottom="0cm"/></style:style>
-<style:style style:name="HorizontalLine" style:family="paragraph" style:parent-style-name="Standard"><style:paragraph-properties fo:border-bottom="0.75pt solid #000000" fo:padding-bottom="0.1cm"/></style:style>
 "#;
 
 /// Generates the content part.
@@ -39,6 +38,7 @@ pub fn content_xml(document: &Document, template: &Template, assets: &Assets) ->
     let mut output = String::new();
     xml::push(&mut output, PREFIX);
     cell_paragraph_styles(&mut output, template);
+    horizontal_line_style(&mut output, template);
     xml::push(&mut output, &builder.generated);
     xml::push(
         &mut output,
@@ -541,6 +541,26 @@ fn cell_paragraph_styles(output: &mut String, template: &Template) {
             ),
         );
     }
+}
+
+fn horizontal_line_style(output: &mut String, template: &Template) {
+    let rule = template.formatting().rule();
+    let before = rule.spacing_before().map_or_else(String::new, |length| {
+        format!("fo:margin-top=\"{}\" ", xml::points(length))
+    });
+    let after = rule.spacing_after().map_or_else(String::new, |length| {
+        format!("fo:margin-bottom=\"{}\" ", xml::points(length))
+    });
+    xml::push_fmt(
+        output,
+        format_args!(
+            "<style:style style:name=\"HorizontalLine\" style:family=\"paragraph\" style:parent-style-name=\"Standard\"><style:paragraph-properties {before}{after}fo:border-bottom=\"{thickness} solid {color}\" fo:padding-bottom=\"0.1cm\"/></style:style>\n",
+            before = before,
+            after = after,
+            thickness = xml::points(rule.thickness()),
+            color = rule.color().hex(),
+        ),
+    );
 }
 
 fn alert_label(alert: Alert) -> &'static str {

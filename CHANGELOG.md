@@ -4,6 +4,14 @@
 
 *Major updates and feature releases.*
 
+### 0.18.0
+
+- Added the `formatting.rule` section to the template: `thickness`, `color`, `spacing_before` and `spacing_after` style the thematic break in every format. The defaults are `0.5pt`, `#000000` and each format's own spacing.
+- Added `background` to `formatting.heading` and to `h1` to `h6`: a solid fill across the full text width with no horizontal margins, with the spacing kept outside the fill.
+- The ODT and DOCX rules now follow the template. Their default thickness changes from `0.75pt` to `0.5pt` to match the PDF, and DOCX border widths are clamped to the OOXML range.
+- Regenerated the ODT examples; their only change is the rule style, because the examples contain no thematic break.
+- Added tests for the new keys, the PDF source, the ODT and DOCX parts and a PDF render with rules and backgrounds.
+
 ### 0.17.1
 
 - Removed automatic hyphenation from the DOCX settings: LibreOffice asked for a dictionary even when the system package was installed. The document language stays in the styles, so the editor can enable hyphenation itself.

@@ -52,8 +52,11 @@ pub(crate) fn half_points(points: f64) -> String {
 }
 
 /// A point value in eighths of a point, for border widths.
+///
+/// OOXML accepts widths from 2 (a quarter point) to 96 eighths, so thinner or
+/// thicker borders are clamped to that range.
 pub(crate) fn eighths(points: f64) -> String {
-    format!("{:.0}", (points * 8.0).round())
+    format!("{:.0}", (points * 8.0).round().clamp(2.0, 96.0))
 }
 
 /// A point value in English Metric Units, for DrawingML.
@@ -86,6 +89,8 @@ mod tests {
         assert_eq!(twips(15.9), "318");
         assert_eq!(half_points(12.0), "24");
         assert_eq!(eighths(0.5), "4");
+        assert_eq!(eighths(0.1), "2");
+        assert_eq!(eighths(30.0), "96");
         assert_eq!(emu(72.0), "914400");
     }
 }

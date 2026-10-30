@@ -177,11 +177,7 @@ impl<'a> Builder<'a> {
             Block::Quote(quote) => self.quote(quote),
             Block::CodeBlock(code) => self.code(code),
             Block::ThematicBreak => {
-                let line = self.paragraph(
-                    None,
-                    "<w:pBdr><w:bottom w:val=\"single\" w:sz=\"6\" w:space=\"1\" w:color=\"000000\"/></w:pBdr>",
-                    "",
-                );
+                let line = self.paragraph(None, &self.thematic_break_properties(), "");
                 self.document.push_str(&line);
             }
             Block::PageBreak => self
@@ -189,6 +185,26 @@ impl<'a> Builder<'a> {
                 .push_str("<w:p><w:r><w:br w:type=\"page\"/></w:r></w:p>\n"),
             Block::FootnoteDefinition(_) => {}
         }
+    }
+
+    /// The bottom border that draws the rule, plus the spacing the template declares.
+    fn thematic_break_properties(&self) -> String {
+        let rule = self.template.formatting().rule();
+        let mut output = format!(
+            "<w:pBdr><w:bottom w:val=\"single\" w:sz=\"{}\" w:space=\"1\" w:color=\"{}\"/></w:pBdr>",
+            metrics::eighths(rule.thickness().points()),
+            rule.color().hex().trim_start_matches('#')
+        );
+        let before = rule.spacing_before().map_or_else(String::new, |length| {
+            format!(" w:before=\"{}\"", metrics::twips(length.points()))
+        });
+        let after = rule.spacing_after().map_or_else(String::new, |length| {
+            format!(" w:after=\"{}\"", metrics::twips(length.points()))
+        });
+        if !before.is_empty() || !after.is_empty() {
+            output.push_str(&format!("<w:spacing{before}{after}/>"));
+        }
+        output
     }
 
     fn paragraph(&self, style: Option<&str>, extra: &str, runs: &str) -> String {

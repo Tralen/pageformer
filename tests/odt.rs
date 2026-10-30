@@ -243,6 +243,44 @@ fn footnotes_alerts_and_page_breaks_are_mapped() {
 }
 
 #[test]
+fn a_rule_and_a_heading_background_follow_the_template() {
+    let document =
+        markdown::parse("# Título\n\nTexto.\n\n---\n\nDepois.\n").expect("the document must parse");
+    let template = Template::from_yaml(
+        r##"
+version: "0.5"
+formatting:
+  heading:
+    background: "#EEEEEE"
+  rule:
+    thickness: 1.5pt
+    color: "#112233"
+    spacing_before: 12
+"##,
+    )
+    .expect("the template must be valid");
+
+    let bytes = odt::render(&document, &template, &Assets::default()).expect("the package");
+    let mut archive = ZipArchive::new(Cursor::new(bytes)).expect("the package must be a ZIP");
+    let styles = entry(&mut archive, "styles.xml");
+    let content = entry(&mut archive, "content.xml");
+
+    assert!(
+        styles.contains("fo:background-color=\"#eeeeee\""),
+        "{styles}"
+    );
+    assert!(
+        content.contains("fo:border-bottom=\"1.50pt solid #112233\""),
+        "{content}"
+    );
+    assert!(content.contains("fo:margin-top=\"12.00pt\""), "{content}");
+    assert!(
+        content.contains("<text:p text:style-name=\"HorizontalLine\"/>"),
+        "{content}"
+    );
+}
+
+#[test]
 fn the_line_spacing_follows_the_typst_leading_model() {
     let template = Template::from_yaml(
         "version: \"0.5\"\nformatting:\n  paragraph:\n    size: 12\n    leading: 8\n    spacing: 24\n",

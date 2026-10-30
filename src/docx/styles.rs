@@ -51,12 +51,18 @@ pub(crate) fn styles_xml(document: &Document, template: &Template) -> String {
         xml::push_fmt(
             &mut output,
             format_args!(
-                "<w:style w:type=\"paragraph\" w:styleId=\"Heading{level}\"><w:name w:val=\"heading {level}\"/><w:basedOn w:val=\"Normal\"/><w:next w:val=\"Normal\"/><w:qFormat/><w:pPr><w:keepNext/>{page_break}<w:spacing w:before=\"{before}\" w:after=\"{after}\" w:line=\"{line}\" w:lineRule=\"atLeast\"/><w:outlineLvl w:val=\"{outline}\"/></w:pPr><w:rPr>{fonts}{bold}{italic}<w:sz w:val=\"{size}\"/><w:szCs w:val=\"{size}\"/></w:rPr></w:style>\n",
+                "<w:style w:type=\"paragraph\" w:styleId=\"Heading{level}\"><w:name w:val=\"heading {level}\"/><w:basedOn w:val=\"Normal\"/><w:next w:val=\"Normal\"/><w:qFormat/><w:pPr><w:keepNext/>{page_break}{shading}<w:spacing w:before=\"{before}\" w:after=\"{after}\" w:line=\"{line}\" w:lineRule=\"atLeast\"/><w:outlineLvl w:val=\"{outline}\"/></w:pPr><w:rPr>{fonts}{bold}{italic}<w:sz w:val=\"{size}\"/><w:szCs w:val=\"{size}\"/></w:rPr></w:style>\n",
                 page_break = if heading.page_break_before() {
                     "<w:pageBreakBefore/>"
                 } else {
                     ""
                 },
+                shading = heading.background().map_or_else(String::new, |color| {
+                    format!(
+                        "<w:shd w:val=\"clear\" w:color=\"auto\" w:fill=\"{}\"/>",
+                        color.hex().trim_start_matches('#')
+                    )
+                }),
                 before = metrics::twips(before),
                 after = metrics::twips(after),
                 line = metrics::twips(line),

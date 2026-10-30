@@ -193,6 +193,42 @@ formatting:
 }
 
 #[test]
+fn rules_and_heading_backgrounds_render_deterministically() {
+    let document =
+        markdown::parse("# Título\n\nTexto.\n\n---\n\nDepois.\n").expect("the document must parse");
+    let template = Template::from_yaml(
+        r##"
+version: "0.5"
+formatting:
+  heading:
+    background: "#eeeeee"
+  rule:
+    thickness: 1pt
+    color: "#112233"
+    spacing_before: 12
+    spacing_after: 12
+"##,
+    )
+    .expect("the template must be valid");
+
+    let first =
+        pdf::render(&document, &template, &Assets::default()).expect("the document must render");
+    assert!(first.bytes().starts_with(b"%PDF-"));
+    assert!(
+        first.warnings().is_empty(),
+        "the document produced warnings: {:?}",
+        first.warnings()
+    );
+    let second =
+        pdf::render(&document, &template, &Assets::default()).expect("the rerender must work");
+    assert_eq!(
+        first.bytes(),
+        second.bytes(),
+        "the output must be deterministic"
+    );
+}
+
+#[test]
 fn the_technical_report_uses_its_own_template() {
     let examples = Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("assets")

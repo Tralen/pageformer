@@ -209,6 +209,41 @@ table:
 }
 
 #[test]
+fn a_rule_and_a_heading_background_follow_the_template() {
+    let document =
+        markdown::parse("# Título\n\nTexto.\n\n---\n\nDepois.\n").expect("the document must parse");
+    let template = Template::from_yaml(
+        r##"
+version: "0.5"
+formatting:
+  heading:
+    background: "#EEEEEE"
+  rule:
+    thickness: 1.5pt
+    color: "#112233"
+    spacing_before: 12
+"##,
+    )
+    .expect("the template must be valid");
+
+    let bytes = docx::render(&document, &template, &Assets::default()).expect("the package");
+    let mut archive = ZipArchive::new(Cursor::new(bytes)).expect("the package must be a ZIP");
+    let styles = entry(&mut archive, "word/styles.xml");
+    let content = entry(&mut archive, "word/document.xml");
+
+    assert!(
+        styles.contains("<w:shd w:val=\"clear\" w:color=\"auto\" w:fill=\"eeeeee\"/>"),
+        "{styles}"
+    );
+    assert!(
+        content.contains(
+            "<w:pBdr><w:bottom w:val=\"single\" w:sz=\"12\" w:space=\"1\" w:color=\"112233\"/></w:pBdr><w:spacing w:before=\"240\"/>"
+        ),
+        "{content}"
+    );
+}
+
+#[test]
 fn two_lists_get_their_own_numbering_and_a_restart() {
     let source = "- a\n- b\n\n3. c\n4. d\n";
     let document = markdown::parse(source).expect("the document must parse");

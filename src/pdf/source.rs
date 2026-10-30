@@ -12,7 +12,8 @@ use crate::document::{
     TaskState,
 };
 use crate::template::{
-    Length, ParagraphAlignment, RunningText, TableStyle, Template, TextFace, is_lowercase_token,
+    Length, ParagraphAlignment, RuleStyle, RunningText, TableStyle, Template, TextFace,
+    is_lowercase_token,
 };
 
 use super::assets::AssetMap;
@@ -35,6 +36,7 @@ struct SourceBuilder<'a> {
     output: String,
     assets: &'a AssetMap,
     table: &'a TableStyle,
+    rule: &'a RuleStyle,
     footnotes: BTreeMap<String, Vec<Block>>,
     footnote_stack: Vec<String>,
 }
@@ -47,6 +49,7 @@ impl<'a> SourceBuilder<'a> {
             output: String::new(),
             assets,
             table: template.table(),
+            rule: template.formatting().rule(),
             footnotes,
             footnote_stack: Vec::new(),
         }
@@ -280,12 +283,31 @@ impl<'a> SourceBuilder<'a> {
                 face.weight().get(),
                 typst_string(face.slant().as_str())
             );
-            let _ = writeln!(
-                self.output,
-                "#show heading.where(level: {level}): set block(above: {}, below: {})",
-                typst_length(style.spacing_before()),
-                typst_length(style.spacing_after())
-            );
+            match style.background() {
+                Some(background) => {
+                    // The fill wraps the text only, so the spacing moves to the wrapper
+                    // outside it and the text block keeps no spacing of its own.
+                    let _ = writeln!(
+                        self.output,
+                        "#show heading.where(level: {level}): set block(above: 0pt, below: 0pt)"
+                    );
+                    let _ = writeln!(
+                        self.output,
+                        "#show heading.where(level: {level}): it => block(width: 100%, fill: rgb(\"{}\"), inset: 0pt, above: {}, below: {}, sticky: true)[#it]",
+                        background.hex(),
+                        typst_length(style.spacing_before()),
+                        typst_length(style.spacing_after())
+                    );
+                }
+                None => {
+                    let _ = writeln!(
+                        self.output,
+                        "#show heading.where(level: {level}): set block(above: {}, below: {})",
+                        typst_length(style.spacing_before()),
+                        typst_length(style.spacing_after())
+                    );
+                }
+            }
             if style.page_break_before() {
                 let _ = writeln!(
                     self.output,
@@ -331,7 +353,7 @@ impl<'a> SourceBuilder<'a> {
                 self.output.push(']');
             }
             Block::CodeBlock(code) => self.code_block(code),
-            Block::ThematicBreak => self.output.push_str("#line(length: 100%, stroke: 0.5pt)"),
+            Block::ThematicBreak => self.thematic_break(),
             Block::PageBreak => self.output.push_str("#pagebreak()"),
             Block::FootnoteDefinition(_) => {}
         }
@@ -516,6 +538,25 @@ impl<'a> SourceBuilder<'a> {
         Ok(())
     }
 
+    fn thematic_break(&mut self) {
+        let rule = self.rule;
+        let line = format!(
+            "#line(length: 100%, stroke: {} + rgb(\"{}\"))",
+            typst_length(rule.thickness()),
+            rule.color().hex()
+        );
+        if rule.spacing_before().is_none() && rule.spacing_after().is_none() {
+            self.output.push_str(&line);
+        } else {
+            let _ = write!(
+                self.output,
+                "#block(width: 100%, above: {}, below: {})[{line}]",
+                optional_length(rule.spacing_before()),
+                optional_length(rule.spacing_after())
+            );
+        }
+    }
+
     fn code_block(&mut self, code: &CodeBlock) {
         self.output.push_str("#raw(");
         self.output.push_str(&typst_string(code.text()));
@@ -597,6 +638,10 @@ fn alignment_name(alignment: ColumnAlignment) -> &'static str {
 
 fn typst_length(length: Length) -> String {
     format!("{:.3}pt", length.points())
+}
+
+fn optional_length(length: Option<Length>) -> String {
+    length.map_or_else(|| "auto".to_owned(), typst_length)
 }
 
 fn escape_markup(text: &str) -> String {
@@ -1163,6 +1208,56 @@ mod tests {
         );
         assert!(
             !source.contains("#show heading.where(level: 2): it =>"),
+            "{source}"
+        );
+    }
+
+    #[test]
+    fn a_heading_background_wraps_the_text_at_the_full_width() {
+        let template = Template::from_yaml(
+            "version: \"0.5\"\nformatting:\n  heading:\n    spacing_before: 18\n    spacing_after: 6\n    h1:\n      background: \"#EEEEEE\"\n      page_break_before: true\n",
+        )
+        .expect("the template");
+        let document = Document::new(
+            Metadata::default(),
+            vec![Block::Heading(Heading::new(
+                HeadingLevel::new(1).expect("a level"),
+                vec![Inline::Text("Contrato".to_owned())],
+            ))],
+        );
+        let source = typst_source(&document, &template, &AssetMap::new()).expect("the source");
+        assert!(
+            source.contains(
+                "#show heading.where(level: 1): set block(above: 0pt, below: 0pt)\n#show heading.where(level: 1): it => block(width: 100%, fill: rgb(\"#eeeeee\"), inset: 0pt, above: 18.000pt, below: 6.000pt, sticky: true)[#it]\n#show heading.where(level: 1): it => {\n  pagebreak(weak: true)\n  it\n}"
+            ),
+            "{source}"
+        );
+        assert_eq!(source.matches("fill: rgb(").count(), 1, "{source}");
+    }
+
+    #[test]
+    fn the_default_thematic_break_is_a_black_line_across_the_text_width() {
+        let document = Document::new(Metadata::default(), vec![Block::ThematicBreak]);
+        let source = source(&document, &AssetMap::new());
+        assert!(
+            source.contains("#line(length: 100%, stroke: 0.500pt + rgb(\"#000000\"))"),
+            "{source}"
+        );
+        assert!(!source.contains("#block(width: 100%"), "{source}");
+    }
+
+    #[test]
+    fn the_thematic_break_follows_the_rule_style() {
+        let template = Template::from_yaml(
+            "version: \"0.5\"\nformatting:\n  rule:\n    thickness: 1.5pt\n    color: \"#112233\"\n    spacing_before: 12\n",
+        )
+        .expect("the template");
+        let document = Document::new(Metadata::default(), vec![Block::ThematicBreak]);
+        let source = typst_source(&document, &template, &AssetMap::new()).expect("the source");
+        assert!(
+            source.contains(
+                "#block(width: 100%, above: 12.000pt, below: auto)[#line(length: 100%, stroke: 1.500pt + rgb(\"#112233\"))]"
+            ),
             "{source}"
         );
     }

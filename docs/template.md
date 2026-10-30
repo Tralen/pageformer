@@ -61,6 +61,7 @@ formatting:
     spacing_after: 6
     h1:
       size: 18
+      background: "#eeeeee"
     h2:
       size: 14
       spacing_before: 12
@@ -81,6 +82,11 @@ formatting:
       size: 12
       spacing_before: 8
       spacing_after: 2
+  rule:
+    thickness: 0.5pt
+    color: "#888888"
+    spacing_before: 12
+    spacing_after: 12
 
 table:
   border: 0.5pt
@@ -173,10 +179,19 @@ The `heading` map is the base for every heading level:
 - `style`: `normal` or `italic`. The default is `normal`.
 - `spacing_before` and `spacing_after`: lengths around the heading. They apply to every level that does not override them.
 - `page_break_before`: `true` starts the level on a new page. The break is weak: a heading already at the top of a page does not create a blank page. The default is `false`.
+- `background`: a solid fill behind the heading text, as `#rrggbb`. The fill spans the full text width with no horizontal margins, and the spacing stays outside it. When omitted, the heading has no fill.
 
 The `h1` to `h6` maps are optional overrides with the same keys. Only declared keys replace the base values. The default sizes are `18pt` for `h1`, `14pt` for `h2` and `12pt` for `h3` to `h6`; the default spacing is 18/6 for `h1`, 12/4 for `h2`, 10/4 for `h3` and 8/2 for `h4` to `h6`.
 
 The template sets explicit values for each level. There is no hidden multiplier per level: what the YAML declares is what the PDF uses.
+
+### `formatting.rule`
+
+The thematic break, written as `---`, `***` or `___` in the Markdown body, is drawn as a horizontal rule across the text width. Its keys are the same in every format:
+
+- `thickness`: the line thickness, as a length greater than zero. The default is `0.5pt`.
+- `color`: the line color, as `#rrggbb`. The default is `#000000`.
+- `spacing_before` and `spacing_after`: lengths around the rule. When omitted, each format keeps its own spacing for that side.
 
 ### `table`
 
@@ -209,7 +224,7 @@ Images in the Markdown body resolve relative to the Markdown file, not to the te
 
 ## Current backend
 
-The PDF backend applies the paragraph face, leading, spacing and alignment. It emits one show rule per heading level with the resolved font, size, weight, style and spacing, and show rules for `emph` and `strong` from the inline overrides. A level with `page_break_before` also gets a weak page-break show rule. The backend draws the running header and footer, expands their tokens, applies the table style and explicit page breaks, and writes the frontmatter title, author, subject, keywords, language and date into the PDF metadata.
+The PDF backend applies the paragraph face, leading, spacing and alignment. It emits one show rule per heading level with the resolved font, size, weight, style and spacing, and show rules for `emph` and `strong` from the inline overrides. A level with `page_break_before` also gets a weak page-break show rule. The backend draws the running header and footer, expands their tokens, applies the table style and explicit page breaks, and writes the frontmatter title, author, subject, keywords, language and date into the PDF metadata. The thematic break follows `formatting.rule`, and a heading background is drawn as a block across the text width.
 
 ## Example
 
@@ -229,4 +244,4 @@ To use the same settings elsewhere, copy the file to the document directory as `
 
 ## Errors
 
-The template is validated before any document is rendered. A YAML syntax error, an unknown key, an unsupported version, a rejected weight, an unknown style, an invalid color, an unknown lowercase running token, a confidential field in running content, a negative spacing or a missing font family all stop the run with a diagnostic. The YAML parser reports the line and the column, and the loader adds the template path.
+The template is validated before any document is rendered. A YAML syntax error, an unknown key, an unsupported version, a rejected weight, an unknown style, an invalid color, an unknown lowercase running token, a confidential field in running content, a negative spacing, a zero rule thickness or a missing font family all stop the run with a diagnostic. The YAML parser reports the line and the column, and the loader adds the template path.

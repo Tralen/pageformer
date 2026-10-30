@@ -961,6 +961,79 @@ fn the_new_styles_follow_the_paragraph_face_by_default() {
     );
     assert_eq!(list.suffix(), ".");
     assert_eq!(list.spacing(), None);
+    let task = list.task();
+    assert_eq!(task.done().marker(), "[x]");
+    assert_eq!(task.todo().marker(), "[ ]");
+    assert_eq!(task.gap(), 1);
+    assert!(task.bullet(), "the bullet is kept by default");
+    assert_eq!(task.done().text().foreground(), None);
+    assert_eq!(task.todo().text().background(), None);
+}
+
+#[test]
+fn the_task_style_is_read_field_by_field() {
+    let template = parse(
+        r##"
+version: "0.6"
+formatting:
+  list:
+    task:
+      gap: 2
+      bullet: false
+      done:
+        marker: "[X]"
+        foreground: "#2e7d32"
+        background: "#e8f5e9"
+        weight: bold
+      todo:
+        marker: "[ ]"
+        foreground: "#777777"
+        style: italic
+"##,
+    );
+    let task = template.formatting().list().task();
+    assert_eq!(task.gap(), 2);
+    assert!(!task.bullet());
+    assert_eq!(task.done().marker(), "[X]");
+    assert_eq!(
+        task.done().text().foreground().map(|color| color.hex()),
+        Some("#2e7d32".to_owned())
+    );
+    assert_eq!(
+        task.done().text().background().map(|color| color.hex()),
+        Some("#e8f5e9".to_owned())
+    );
+    assert_eq!(task.done().text().weight().map(FontWeight::get), Some(700));
+    assert_eq!(
+        task.done().text().size(),
+        None,
+        "only declared keys are stored"
+    );
+    assert_eq!(task.todo().marker(), "[ ]");
+    assert_eq!(
+        task.todo().text().foreground().map(|color| color.hex()),
+        Some("#777777".to_owned())
+    );
+    assert_eq!(task.todo().text().slant(), Some(FontSlant::Italic));
+}
+
+#[test]
+fn an_empty_task_marker_is_rejected() {
+    for yaml in [
+        "version: \"0.6\"\nformatting:\n  list:\n    task:\n      done:\n        marker: \"\"\n",
+        "version: \"0.6\"\nformatting:\n  list:\n    task:\n      todo:\n        marker: \"   \"\n",
+    ] {
+        let error = Template::from_yaml(yaml).expect_err("an empty marker is invalid");
+        assert!(matches!(error, TemplateError::Value { .. }), "{yaml}");
+    }
+}
+
+#[test]
+fn a_negative_task_gap_is_rejected() {
+    let error =
+        Template::from_yaml("version: \"0.6\"\nformatting:\n  list:\n    task:\n      gap: -1\n")
+            .expect_err("a negative gap is invalid");
+    assert!(matches!(error, TemplateError::Yaml { .. }), "{error}");
 }
 
 #[test]

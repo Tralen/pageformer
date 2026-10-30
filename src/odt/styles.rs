@@ -83,6 +83,10 @@ pub fn styles_xml(document: &Document, template: &Template, assets: &Assets) -> 
         None,
     );
     partial_character_style(&mut output, "CodeInline", Some(paragraph.code()), "", None);
+    let task = template.formatting().list().task();
+    for (name, marker) in [("TaskDone", task.done()), ("TaskTodo", task.todo())] {
+        partial_character_style(&mut output, name, Some(marker.text()), "", None);
+    }
     let link = paragraph.link();
     partial_character_style(
         &mut output,
@@ -383,6 +387,19 @@ fn list_styles(output: &mut String, template: &Template) {
     let list = template.formatting().list();
     let marker_gap = xml::centimetres(list.marker_gap());
     let suffix = xml::escape_attribute(list.suffix());
+    if !list.task().bullet() {
+        xml::push(output, "<text:list-style style:name=\"TaskList\">\n");
+        for level in 1..=10_u32 {
+            let indent = xml::centimetres_points(list.indent().points() * f64::from(level));
+            xml::push_fmt(
+                output,
+                format_args!(
+                    "<text:list-level-style-bullet text:level=\"{level}\" text:bullet-char=\"&#x200B;\"><style:list-level-properties text:space-before=\"{indent}\" text:min-label-width=\"0cm\"/></text:list-level-style-bullet>\n"
+                ),
+            );
+        }
+        xml::push(output, "</text:list-style>\n");
+    }
     for (name, ordered) in [("UnorderedList", false), ("OrderedList", true)] {
         xml::push_fmt(
             output,
@@ -606,13 +623,15 @@ mod tests {
     }
 
     #[test]
-    fn the_list_styles_define_ten_levels() {
+    fn the_list_styles_define_ten_levels_and_a_task_variant() {
         let mut output = String::new();
         list_styles(
             &mut output,
             &Template::embedded().expect("the embedded template"),
         );
 
-        assert_eq!(output.matches("text:level=").count(), 20);
+        assert_eq!(output.matches("text:level=").count(), 30);
+        assert!(output.contains("style:name=\"TaskList\""), "{output}");
+        assert!(output.contains("text:bullet-char=\"&#x200B;\""), "{output}");
     }
 }

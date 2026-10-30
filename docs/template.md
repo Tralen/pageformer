@@ -92,6 +92,16 @@ formatting:
         - lower-roman
       suffix: "."
     spacing: 6pt
+    task:
+      gap: 1
+      bullet: false
+      done:
+        marker: "[x]"
+        foreground: "#2e7d32"
+        weight: bold
+      todo:
+        marker: "[ ]"
+        foreground: "#777777"
   heading:
     font_families:
       - Linux Biolinum O
@@ -282,6 +292,16 @@ For example, `format: [decimal, lower-alpha]` and `suffix: "."` render `1.`, `2.
 
 `background` fills the first paragraph of each item. A later paragraph inside the same item keeps the normal body background. In a tight list, adjacent item fills meet, so the list reads as one band; in a loose list, `spacing` stays visible between the bands. A nested list continues the parent band in every format.
 
+### `formatting.list.task`
+
+Task list items are a GFM extension, not CommonMark: the `[x]` and `[ ]` markers become `TaskState` on the item. The `task` map styles the marker itself:
+
+- `gap`: the number of spaces between the marker and the item text. The default is `1`; the writer uses non-breaking spaces, so the gap survives every format.
+- `bullet`: whether a task-only unordered list keeps its bullet. The default is `true`; `false` drops the bullet and lets the checkbox be the visible marker. A mixed list and an ordered list keep their marker.
+- `done` and `todo`: each accepts `marker`, a non-empty string, and the text keys `font_families`, `size`, `weight`, `style`, `foreground` and `background`. Only the declared keys override the list item; the rest inherits its face and color. The default markers are `[x]` and `[ ]`.
+
+The marker is inline at the start of the item, so a wrapped line aligns with the item indent, not under the text after the checkbox. TXT ignores the template and keeps `[ ]` and `[x]` for copy-as-text.
+
 ### `formatting.rule`
 
 The thematic break, written as `---`, `***` or `___` in the Markdown body, is drawn as a horizontal rule across the text width. The same keys declare the rule under a heading level, in `formatting.heading.h1` to `h6`, and every format reads them the same way:
@@ -333,7 +353,7 @@ Images in the Markdown body resolve relative to the Markdown file, not to the te
 
 ## Current backend
 
-Every format reads the text colors: the body, the headings, emphasis, strong, code, strikethrough and links. TXT has no color and ignores them. The PDF backend applies the paragraph face, leading, spacing and alignment. It emits one show rule per heading level with the resolved font, size, weight, style and spacing, show rules for `emph`, `strong`, `code` and `strike` from the inline overrides, and a `link` rule that carries the face, color, fill and underline. The ODT and DOCX writers map the same keys to their character styles. A level with `page_break_before` also gets a weak page-break show rule. List markers and numbering become `#set list` and `#set enum` rules, and each item paragraph takes the list face, color, fill and alignment. The backend draws the running header and footer, expands their tokens, applies the table style and explicit page breaks, and writes the frontmatter title, author, subject, keywords, language and date into the PDF metadata. The thematic break follows `formatting.rule`. A heading background and a heading rule are drawn as one block: the fill wraps the text across the full width with a vertical padding of 0.24 of the heading size, so the fill does not hug the glyphs, and the rule sits below it. A quote or code block fill uses the same vertical padding, unless a top or bottom border already declares a larger padding for that side. Typst measures a zero-inset block by its cap height and baseline, while the DOCX fill covers the font's line box, so the padding makes up the difference; the DOCX fill is the reference for the other formats.
+Every format reads the text colors: the body, the headings, emphasis, strong, code, strikethrough and links. TXT has no color and ignores them. The PDF backend applies the paragraph face, leading, spacing and alignment. It emits one show rule per heading level with the resolved font, size, weight, style and spacing, show rules for `emph`, `strong`, `code` and `strike` from the inline overrides, and a `link` rule that carries the face, color, fill and underline. The ODT and DOCX writers map the same keys to their character styles. A level with `page_break_before` also gets a weak page-break show rule. List markers and numbering become `#set list` and `#set enum` rules, and each item paragraph takes the list face, color, fill and alignment. A task marker is inline `#text`/`#box` content with only its declared overrides; a task-only unordered list with `task.bullet: false` passes `marker: []` and `body-indent: 0pt` to the list. The backend draws the running header and footer, expands their tokens, applies the table style and explicit page breaks, and writes the frontmatter title, author, subject, keywords, language and date into the PDF metadata. The thematic break follows `formatting.rule`. A heading background and a heading rule are drawn as one block: the fill wraps the text across the full width with a vertical padding of 0.24 of the heading size, so the fill does not hug the glyphs, and the rule sits below it. A quote or code block fill uses the same vertical padding, unless a top or bottom border already declares a larger padding for that side. Typst measures a zero-inset block by its cap height and baseline, while the DOCX fill covers the font's line box, so the padding makes up the difference; the DOCX fill is the reference for the other formats.
 
 ## Example
 
@@ -353,4 +373,4 @@ To use the same settings elsewhere, copy the file to the document directory as `
 
 ## Errors
 
-The template is validated before any document is rendered. A YAML syntax error, an unknown key, an unsupported version, a rejected weight, an unknown style, an invalid color, an unknown lowercase running token, a confidential field in running content, a negative spacing, a zero rule thickness, a missing font family, an empty bullet or numbering list or an unknown numbering format all stop the run with a diagnostic. The YAML parser reports the line and the column, and the loader adds the template path.
+The template is validated before any document is rendered. A YAML syntax error, an unknown key, an unsupported version, a rejected weight, an unknown style, an invalid color, an unknown lowercase running token, a confidential field in running content, a negative spacing or gap, a zero rule thickness, a missing font family, an empty bullet, numbering or task marker or an unknown numbering format all stop the run with a diagnostic. The YAML parser reports the line and the column, and the loader adds the template path.

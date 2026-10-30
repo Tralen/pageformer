@@ -1526,6 +1526,85 @@ impl NumberingFormat {
     }
 }
 
+/// One task state: its marker and the text overrides applied only to that marker.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TaskMarkerStyle {
+    marker: String,
+    text: PartialTextStyle,
+}
+
+impl TaskMarkerStyle {
+    pub fn new(marker: String, text: PartialTextStyle) -> Result<Self, ValueError> {
+        if marker.trim().is_empty() {
+            return Err(ValueError::EmptyText);
+        }
+        Ok(Self { marker, text })
+    }
+
+    pub fn marker(&self) -> &str {
+        &self.marker
+    }
+
+    pub fn text(&self) -> &PartialTextStyle {
+        &self.text
+    }
+}
+
+/// The two task states and the spaces after the marker.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TaskStyle {
+    done: TaskMarkerStyle,
+    todo: TaskMarkerStyle,
+    gap: usize,
+    bullet: bool,
+}
+
+impl TaskStyle {
+    pub fn new(done: TaskMarkerStyle, todo: TaskMarkerStyle, gap: usize, bullet: bool) -> Self {
+        Self {
+            done,
+            todo,
+            gap,
+            bullet,
+        }
+    }
+
+    pub fn done(&self) -> &TaskMarkerStyle {
+        &self.done
+    }
+
+    pub fn todo(&self) -> &TaskMarkerStyle {
+        &self.todo
+    }
+
+    /// The number of spaces between the marker and the item text.
+    pub fn gap(&self) -> usize {
+        self.gap
+    }
+
+    /// Whether a task-only unordered list keeps its bullet marker.
+    pub fn bullet(&self) -> bool {
+        self.bullet
+    }
+}
+
+impl Default for TaskStyle {
+    fn default() -> Self {
+        Self {
+            done: TaskMarkerStyle {
+                marker: "[x]".to_owned(),
+                text: PartialTextStyle::default(),
+            },
+            todo: TaskMarkerStyle {
+                marker: "[ ]".to_owned(),
+                text: PartialTextStyle::default(),
+            },
+            gap: 1,
+            bullet: true,
+        }
+    }
+}
+
 /// The list style: item text, marker layout and numbering.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ListStyle {
@@ -1537,6 +1616,7 @@ pub struct ListStyle {
     numbering: Vec<NumberingFormat>,
     suffix: String,
     spacing: Option<Length>,
+    task: TaskStyle,
 }
 
 impl ListStyle {
@@ -1550,6 +1630,7 @@ impl ListStyle {
         numbering: Vec<NumberingFormat>,
         suffix: String,
         spacing: Option<Length>,
+        task: TaskStyle,
     ) -> Result<Self, ValueError> {
         if bullets.iter().any(|bullet| bullet.trim().is_empty()) {
             return Err(ValueError::EmptyText);
@@ -1566,6 +1647,7 @@ impl ListStyle {
             numbering,
             suffix,
             spacing,
+            task,
         })
     }
 
@@ -1618,6 +1700,10 @@ impl ListStyle {
     pub fn spacing(&self) -> Option<Length> {
         self.spacing
     }
+
+    pub fn task(&self) -> &TaskStyle {
+        &self.task
+    }
 }
 
 impl Default for ListStyle {
@@ -1635,6 +1721,7 @@ impl Default for ListStyle {
             ],
             suffix: ".".to_owned(),
             spacing: None,
+            task: TaskStyle::default(),
         }
     }
 }
@@ -1792,6 +1879,7 @@ struct RawListStyle {
     bullet: Option<Vec<String>>,
     numbering: Option<RawListNumbering>,
     spacing: Option<String>,
+    task: Option<RawTaskStyle>,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -1799,6 +1887,27 @@ struct RawListStyle {
 struct RawListNumbering {
     format: Option<Vec<NumberingFormat>>,
     suffix: Option<String>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawTaskStyle {
+    gap: Option<usize>,
+    bullet: Option<bool>,
+    done: Option<RawTaskMarker>,
+    todo: Option<RawTaskMarker>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawTaskMarker {
+    marker: Option<String>,
+    font_families: Option<Vec<String>>,
+    size: Option<String>,
+    weight: Option<String>,
+    style: Option<FontSlant>,
+    foreground: Option<String>,
+    background: Option<String>,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -2071,6 +2180,7 @@ fn convert_list(raw: Option<RawListStyle>, base: &TextFace) -> Result<ListStyle,
         None => (ListStyle::default().numbering, ".".to_owned()),
     };
     let spacing = parse_optional_length(raw.spacing, "formatting.list.spacing")?;
+    let task = convert_task(raw.task)?;
     ListStyle::new(
         text,
         raw.alignment.unwrap_or(ParagraphAlignment::Left),
@@ -2080,8 +2190,78 @@ fn convert_list(raw: Option<RawListStyle>, base: &TextFace) -> Result<ListStyle,
         numbering,
         suffix,
         spacing,
+        task,
     )
     .map_err(|problem| value_error("formatting.list", problem))
+}
+
+fn convert_task(raw: Option<RawTaskStyle>) -> Result<TaskStyle, TemplateError> {
+    let Some(raw) = raw else {
+        return Ok(TaskStyle::default());
+    };
+    let done = convert_task_marker(raw.done, "formatting.list.task.done", "[x]")?;
+    let todo = convert_task_marker(raw.todo, "formatting.list.task.todo", "[ ]")?;
+    Ok(TaskStyle::new(
+        done,
+        todo,
+        raw.gap.unwrap_or(1),
+        raw.bullet.unwrap_or(true),
+    ))
+}
+
+fn convert_task_marker(
+    raw: Option<RawTaskMarker>,
+    prefix: &str,
+    default_marker: &str,
+) -> Result<TaskMarkerStyle, TemplateError> {
+    let Some(raw) = raw else {
+        return Ok(TaskMarkerStyle {
+            marker: default_marker.to_owned(),
+            text: PartialTextStyle::default(),
+        });
+    };
+    let text = convert_declared(
+        RawInlineStyle {
+            font_families: raw.font_families,
+            size: raw.size,
+            weight: raw.weight,
+            style: raw.style,
+            foreground: raw.foreground,
+            background: raw.background,
+        },
+        prefix,
+    )?;
+    TaskMarkerStyle::new(
+        raw.marker.unwrap_or_else(|| default_marker.to_owned()),
+        text,
+    )
+    .map_err(|problem| value_error(prefix, problem))
+}
+
+/// Resolves only the declared keys, so a task marker inherits the list item face
+/// and color at render time instead of repeating them in the character style.
+fn convert_declared(raw: RawInlineStyle, prefix: &str) -> Result<PartialTextStyle, TemplateError> {
+    let size = raw
+        .size
+        .map(|text| parse_length_field(&text, &format!("{prefix}.size")))
+        .transpose()?;
+    if size.is_some_and(|size| size.points() <= 0.0) {
+        return Err(value_error(format!("{prefix}.size"), ValueError::Zero));
+    }
+    Ok(PartialTextStyle {
+        font_families: raw
+            .font_families
+            .map(|values| parse_families(values, &format!("{prefix}.font_families")))
+            .transpose()?,
+        size,
+        weight: raw
+            .weight
+            .map(|text| parse_weight(&text, &format!("{prefix}.weight")))
+            .transpose()?,
+        slant: raw.style,
+        foreground: parse_optional_color(raw.foreground, &format!("{prefix}.foreground"))?,
+        background: parse_optional_color(raw.background, &format!("{prefix}.background"))?,
+    })
 }
 
 fn convert_block(

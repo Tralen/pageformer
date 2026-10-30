@@ -4,6 +4,12 @@
 
 *Major updates and feature releases.*
 
+### 0.28.0
+
+- Added `formatting.list.task`, with `done` and `todo` marker strings, text overrides for each state, a `gap` in non-breaking spaces and a `bullet` flag. With `bullet: false`, a task-only unordered list drops the list bullet and lets the checkbox be the visible marker; mixed and ordered lists keep their marker.
+- The PDF renders the marker as inline `#text`/`#box` content, ODT uses `TaskDone`/`TaskTodo` character styles and `TaskList`, and DOCX uses the same character styles plus a marker-free numbering level with `w:numFmt` `none`. TXT keeps `[ ]` and `[x]` for copy-as-text.
+- The default and technical templates declare green done and gray todo markers and hide the bullet on task-only lists. Regenerates the four formats; the PDFs stay deterministic, pass veraPDF as PDF/A-2b and keep their page counts.
+
 ### 0.27.1
 
 - A nested list fill in the PDF now continues the parent item band instead of starting a new one, removing the hairline that remained between a parent item and its nested list. ODT and DOCX already shaded the run continuously.

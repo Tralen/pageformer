@@ -427,9 +427,16 @@ impl<'a> Builder<'a> {
     }
 
     fn list(&mut self, list: &List, depth: usize) {
-        let (kind, start) = match list.start() {
-            ListStart::Unordered => (NumberingKind::Bullet, 1),
-            ListStart::Ordered(start) => (NumberingKind::Decimal, start),
+        let suppress_bullet = !self.template.formatting().list().task().bullet()
+            && matches!(list.start(), ListStart::Unordered)
+            && list.is_task_list();
+        let (kind, start) = if suppress_bullet {
+            (NumberingKind::Task, 1)
+        } else {
+            match list.start() {
+                ListStart::Unordered => (NumberingKind::Bullet, 1),
+                ListStart::Ordered(start) => (NumberingKind::Decimal, start),
+            }
         };
         let number = self.numbering.add(kind, start, depth);
         let marker =
@@ -446,14 +453,10 @@ impl<'a> Builder<'a> {
         } else {
             marker.to_owned()
         };
-        let task = match item.task() {
-            Some(TaskState::Done) => "[x] ",
-            Some(TaskState::Todo) => "[ ] ",
-            None => "",
-        };
+        let task = self.task_marker(item.task());
         match item.blocks().first() {
             Some(Block::Paragraph(inlines)) => {
-                let mut runs = self.run(task, "");
+                let mut runs = task;
                 runs.push_str(&self.runs(inlines, ""));
                 let paragraph = self.paragraph(Some("ListParagraph"), &extra, &runs);
                 self.document.push_str(&paragraph);
@@ -463,13 +466,25 @@ impl<'a> Builder<'a> {
             }
             _ => {
                 if !task.is_empty() {
-                    let runs = self.run(task.trim_end(), "");
-                    let paragraph = self.paragraph(Some("ListParagraph"), &extra, &runs);
+                    let paragraph = self.paragraph(Some("ListParagraph"), &extra, &task);
                     self.document.push_str(&paragraph);
                 }
                 self.blocks(item.blocks(), depth.saturating_add(1));
             }
         }
+    }
+
+    fn task_marker(&self, task: Option<TaskState>) -> String {
+        let Some(state) = task else {
+            return String::new();
+        };
+        let task_style = self.template.formatting().list().task();
+        let (name, marker) = match state {
+            TaskState::Done => ("TaskDone", task_style.done()),
+            TaskState::Todo => ("TaskTodo", task_style.todo()),
+        };
+        let text = format!("{}{}", marker.marker(), "\u{a0}".repeat(task_style.gap()));
+        self.run(&text, &format!("<w:rStyle w:val=\"{name}\"/>"))
     }
 
     fn table(&mut self, table: &Table) {

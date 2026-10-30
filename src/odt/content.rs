@@ -209,7 +209,11 @@ impl<'a> Builder<'a> {
     fn list(&mut self, list: &List) {
         self.flush_break_as_paragraph();
         let ordered = matches!(list.start(), ListStart::Ordered(_));
-        let style = if ordered {
+        let suppress_bullet =
+            !self.template.formatting().list().task().bullet() && !ordered && list.is_task_list();
+        let style = if suppress_bullet {
+            "TaskList"
+        } else if ordered {
             "OrderedList"
         } else {
             "UnorderedList"
@@ -241,16 +245,11 @@ impl<'a> Builder<'a> {
 
     fn item(&mut self, item: &ListItem, tight: bool) {
         let base = if tight { "ListItem" } else { "ListLooseItem" };
-        let marker = match item.task() {
-            Some(TaskState::Done) => "[x] ",
-            Some(TaskState::Todo) => "[ ] ",
-            None => "",
-        };
         match item.blocks().first() {
             Some(Block::Paragraph(inlines)) => {
                 let style = self.style_with_break(base);
                 self.open_paragraph(&style);
-                self.text(marker);
+                self.task_marker(item.task());
                 self.inlines(inlines);
                 self.close_paragraph();
                 if let Some(rest) = item.blocks().get(1..) {
@@ -258,12 +257,29 @@ impl<'a> Builder<'a> {
                 }
             }
             _ => {
-                if !marker.is_empty() {
+                if item.task().is_some() {
                     let style = self.style_with_break(base);
-                    self.paragraph_with(&style, &[Inline::Text(marker.trim_end().to_owned())]);
+                    self.open_paragraph(&style);
+                    self.task_marker(item.task());
+                    self.close_paragraph();
                 }
                 self.blocks(item.blocks());
             }
+        }
+    }
+
+    fn task_marker(&mut self, task: Option<TaskState>) {
+        let Some(state) = task else {
+            return;
+        };
+        let task_style = self.template.formatting().list().task();
+        let (name, marker) = match state {
+            TaskState::Done => ("TaskDone", task_style.done()),
+            TaskState::Todo => ("TaskTodo", task_style.todo()),
+        };
+        self.span(name, marker.marker());
+        for _ in 0..task_style.gap() {
+            self.text("\u{a0}");
         }
     }
 

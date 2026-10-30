@@ -170,6 +170,19 @@ pub(crate) fn styles_xml(document: &Document, template: &Template) -> String {
             "<w:style w:type=\"character\" w:styleId=\"Hyperlink\"><w:name w:val=\"Hyperlink\"/><w:rPr>{link_properties}</w:rPr></w:style>\n"
         ),
     );
+    let task = template.formatting().list().task();
+    for (name, label, marker) in [
+        ("TaskDone", "Task Done", task.done()),
+        ("TaskTodo", "Task Todo", task.todo()),
+    ] {
+        let properties = rpr(partial_properties(Some(marker.text()), None, true));
+        xml::push_fmt(
+            &mut output,
+            format_args!(
+                "<w:style w:type=\"character\" w:styleId=\"{name}\"><w:name w:val=\"{label}\"/>{properties}</w:style>\n"
+            ),
+        );
+    }
     let code_char = partial_rpr(Some(template.formatting().paragraph().code()), None);
     xml::push_fmt(
         &mut output,

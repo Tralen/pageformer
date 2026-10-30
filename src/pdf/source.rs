@@ -13,7 +13,8 @@ use crate::document::{
 };
 use crate::template::{
     BlockStyle, Color, HeadingStyle, InlineStyle, Length, LinkStyle, ListStyle, ParagraphAlignment,
-    PartialTextStyle, RuleStyle, RunningText, TableStyle, Template, TextFace, is_lowercase_token,
+    PartialTextStyle, RuleStyle, RunningText, TableStyle, TaskMarkerStyle, Template, TextFace,
+    is_lowercase_token,
 };
 
 use super::assets::AssetMap;
@@ -326,27 +327,7 @@ impl<'a> SourceBuilder<'a> {
     }
 
     fn text_partial(&mut self, selector: &str, style: &PartialTextStyle) {
-        let mut properties = Vec::new();
-        if let Some(families) = style.font_families() {
-            let mut list = String::from("(");
-            for family in families {
-                let _ = write!(list, "{}, ", typst_string(family.as_str()));
-            }
-            list.push(')');
-            properties.push(format!("font: {list}"));
-        }
-        if let Some(size) = style.size() {
-            properties.push(format!("size: {}", typst_length(size)));
-        }
-        if let Some(weight) = style.weight() {
-            properties.push(format!("weight: {}", weight.get()));
-        }
-        if let Some(slant) = style.slant() {
-            properties.push(format!("style: {}", typst_string(slant.as_str())));
-        }
-        if let Some(foreground) = style.foreground() {
-            properties.push(format!("fill: rgb(\"{}\")", foreground.hex()));
-        }
+        let properties = text_arguments(style);
         if !properties.is_empty() {
             let _ = writeln!(
                 self.output,
@@ -698,7 +679,17 @@ impl<'a> SourceBuilder<'a> {
         };
         match list.start() {
             ListStart::Unordered => {
-                let _ = writeln!(self.output, "#list(tight: {}{spacing},", list.is_tight());
+                let suppress_bullet = !self.list.task().bullet() && list.is_task_list();
+                let marker = if suppress_bullet {
+                    ", marker: [], body-indent: 0pt"
+                } else {
+                    ""
+                };
+                let _ = writeln!(
+                    self.output,
+                    "#list(tight: {}{spacing}{marker},",
+                    list.is_tight()
+                );
             }
             ListStart::Ordered(start) => {
                 let _ = writeln!(
@@ -769,10 +760,17 @@ impl<'a> SourceBuilder<'a> {
     }
 
     fn task_marker(&mut self, task: Option<TaskState>) {
-        match task {
-            Some(TaskState::Done) => self.output.push_str("\\[x\\] "),
-            Some(TaskState::Todo) => self.output.push_str("\\[ \\] "),
-            None => {}
+        let Some(state) = task else {
+            return;
+        };
+        let task_style = self.list.task();
+        let marker = match state {
+            TaskState::Done => task_style.done(),
+            TaskState::Todo => task_style.todo(),
+        };
+        self.output.push_str(&task_marker_content(marker));
+        for _ in 0..task_style.gap() {
+            self.output.push('\u{a0}');
         }
     }
 
@@ -939,6 +937,48 @@ fn fill_argument(face: &TextFace) -> String {
     face.foreground().map_or_else(String::new, |color| {
         format!(", fill: rgb(\"{}\")", color.hex())
     })
+}
+
+/// The Typst `text` arguments for the declared keys of a partial style.
+fn text_arguments(style: &PartialTextStyle) -> Vec<String> {
+    let mut arguments = Vec::new();
+    if let Some(families) = style.font_families() {
+        let mut list = String::from("(");
+        for family in families {
+            let _ = write!(list, "{}, ", typst_string(family.as_str()));
+        }
+        list.push(')');
+        arguments.push(format!("font: {list}"));
+    }
+    if let Some(size) = style.size() {
+        arguments.push(format!("size: {}", typst_length(size)));
+    }
+    if let Some(weight) = style.weight() {
+        arguments.push(format!("weight: {}", weight.get()));
+    }
+    if let Some(slant) = style.slant() {
+        arguments.push(format!("style: {}", typst_string(slant.as_str())));
+    }
+    if let Some(foreground) = style.foreground() {
+        arguments.push(format!("fill: rgb(\"{}\")", foreground.hex()));
+    }
+    arguments
+}
+
+/// The inline Typst content of a task marker, with only its declared overrides.
+fn task_marker_content(marker: &TaskMarkerStyle) -> String {
+    let mut content = escape_markup(marker.marker());
+    if let Some(background) = marker.text().background() {
+        content = format!(
+            "#box(fill: rgb(\"{}\"), inset: 0pt)[{content}]",
+            background.hex()
+        );
+    }
+    let arguments = text_arguments(marker.text());
+    if !arguments.is_empty() {
+        content = format!("#text({})[{content}]", arguments.join(", "));
+    }
+    content
 }
 
 fn optional_length(length: Option<Length>) -> String {
@@ -1287,8 +1327,8 @@ mod tests {
         let document = Document::new(Metadata::default(), vec![Block::List(list)]);
         let source = source(&document, &AssetMap::new());
         assert!(source.contains("#enum(tight: true, start: 3,"), "{source}");
-        assert!(source.contains("\\[x\\] Feito"), "{source}");
-        assert!(source.contains("\\[ \\] Pendente"), "{source}");
+        assert!(source.contains("\\[x\\]\u{a0}Feito"), "{source}");
+        assert!(source.contains("\\[ \\]\u{a0}Pendente"), "{source}");
     }
 
     #[test]
@@ -1548,6 +1588,73 @@ mod tests {
             !source.contains("#list(tight: true, spacing:"),
             "a tight list keeps the Markdown spacing: {source}"
         );
+    }
+
+    #[test]
+    fn task_markers_take_their_style_and_can_drop_the_bullet() {
+        let template = Template::from_yaml(
+            "version: \"0.6\"\nformatting:\n  list:\n    task:\n      gap: 2\n      bullet: false\n      done:\n        marker: \"[X]\"\n        foreground: \"#2e7d32\"\n        weight: bold\n      todo:\n        marker: \"[ ]\"\n        foreground: \"#777777\"\n",
+        )
+        .expect("the template");
+        let list = List::new(
+            ListStart::Unordered,
+            vec![
+                ListItem::new(
+                    Some(TaskState::Done),
+                    vec![Block::Paragraph(vec![Inline::Text("Feito".to_owned())])],
+                ),
+                ListItem::new(
+                    Some(TaskState::Todo),
+                    vec![Block::Paragraph(vec![Inline::Text("Pendente".to_owned())])],
+                ),
+            ],
+            true,
+        );
+        let document = Document::new(Metadata::default(), vec![Block::List(list)]);
+        let source = typst_source(&document, &template, &AssetMap::new()).expect("the source");
+        assert!(
+            source.contains("#list(tight: true, marker: [], body-indent: 0pt,"),
+            "a task-only list drops the bullet: {source}"
+        );
+        assert!(
+            source.contains("#text(weight: 700, fill: rgb(\"#2e7d32\"))[\\[X\\]]\u{a0}\u{a0}Feito"),
+            "the done marker takes its color, weight and gap: {source}"
+        );
+        assert!(
+            source.contains("#text(fill: rgb(\"#777777\"))[\\[ \\]]\u{a0}\u{a0}Pendente"),
+            "the todo marker takes its color and gap: {source}"
+        );
+    }
+
+    #[test]
+    fn a_mixed_or_ordered_task_list_keeps_its_marker() {
+        let template = Template::from_yaml(
+            "version: \"0.6\"\nformatting:\n  list:\n    task:\n      bullet: false\n",
+        )
+        .expect("the template");
+        let task = || {
+            ListItem::new(
+                Some(TaskState::Done),
+                vec![Block::Paragraph(vec![Inline::Text("Feito".to_owned())])],
+            )
+        };
+        let plain = || {
+            ListItem::new(
+                None,
+                vec![Block::Paragraph(vec![Inline::Text("Comum".to_owned())])],
+            )
+        };
+        let mixed = List::new(ListStart::Unordered, vec![task(), plain()], true);
+        let document = Document::new(Metadata::default(), vec![Block::List(mixed)]);
+        let source = typst_source(&document, &template, &AssetMap::new()).expect("the source");
+        assert!(source.contains("#list(tight: true,"), "{source}");
+        assert!(!source.contains("marker: []"), "{source}");
+
+        let ordered = List::new(ListStart::Ordered(1), vec![task()], true);
+        let document = Document::new(Metadata::default(), vec![Block::List(ordered)]);
+        let source = typst_source(&document, &template, &AssetMap::new()).expect("the source");
+        assert!(source.contains("#enum(tight: true, start: 1,"), "{source}");
+        assert!(!source.contains("marker: []"), "{source}");
     }
 
     #[test]

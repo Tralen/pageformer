@@ -485,6 +485,11 @@ impl List {
     pub fn is_tight(&self) -> bool {
         self.tight
     }
+
+    /// Whether every item carries a task state.
+    pub fn is_task_list(&self) -> bool {
+        !self.items.is_empty() && self.items.iter().all(|item| item.task().is_some())
+    }
 }
 
 /// How a list starts.
@@ -842,6 +847,28 @@ mod tests {
                 "`{tag}` should not be a valid language"
             );
         }
+    }
+
+    #[test]
+    fn a_task_list_needs_every_item_to_carry_a_state() {
+        let item = |task| ListItem::new(task, Vec::new());
+        assert!(
+            List::new(
+                ListStart::Unordered,
+                vec![item(Some(TaskState::Done)), item(Some(TaskState::Todo))],
+                true
+            )
+            .is_task_list()
+        );
+        assert!(
+            !List::new(
+                ListStart::Unordered,
+                vec![item(Some(TaskState::Done)), item(None)],
+                true
+            )
+            .is_task_list()
+        );
+        assert!(!List::new(ListStart::Unordered, Vec::new(), true).is_task_list());
     }
 
     #[test]

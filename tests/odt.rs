@@ -487,6 +487,76 @@ formatting:
 }
 
 #[test]
+fn task_markers_take_their_style_and_can_drop_the_bullet() {
+    let document =
+        markdown::parse("- [x] Feito\n- [ ] Pendente\n").expect("the document must parse");
+    let template = Template::from_yaml(
+        r##"
+version: "0.6"
+formatting:
+  list:
+    task:
+      gap: 2
+      bullet: false
+      done:
+        marker: "[X]"
+        foreground: "#2e7d32"
+        weight: bold
+      todo:
+        marker: "[ ]"
+        foreground: "#777777"
+"##,
+    )
+    .expect("the template must be valid");
+
+    let bytes = odt::render(&document, &template, &Assets::default()).expect("the package");
+    let mut archive = ZipArchive::new(Cursor::new(bytes)).expect("the package must be a ZIP");
+    let styles = entry(&mut archive, "styles.xml");
+    let content = entry(&mut archive, "content.xml");
+
+    assert!(
+        styles.contains("<style:style style:name=\"TaskDone\" style:family=\"text\">")
+            && styles.contains("fo:color=\"#2e7d32\"")
+            && styles.contains("fo:font-weight=\"bold\""),
+        "the done marker takes its color and weight: {styles}"
+    );
+    assert!(
+        styles.contains("<style:style style:name=\"TaskTodo\" style:family=\"text\">")
+            && styles.contains("fo:color=\"#777777\""),
+        "the todo marker takes its color: {styles}"
+    );
+    assert!(
+        styles.contains("style:name=\"TaskList\"")
+            && styles.contains("text:bullet-char=\"&#x200B;\""),
+        "a task-only list uses the marker-free list style: {styles}"
+    );
+    assert!(
+        content.contains("<text:list text:style-name=\"TaskList\">"),
+        "the task-only list drops the bullet: {content}"
+    );
+    assert!(
+        content
+            .contains("<text:span text:style-name=\"TaskDone\">[X]</text:span>\u{a0}\u{a0}Feito"),
+        "the done marker carries its style and gap: {content}"
+    );
+    assert!(
+        content.contains(
+            "<text:span text:style-name=\"TaskTodo\">[ ]</text:span>\u{a0}\u{a0}Pendente"
+        ),
+        "the todo marker carries its style and gap: {content}"
+    );
+
+    let mixed = markdown::parse("- [x] Feito\n- Comum\n").expect("the mixed list must parse");
+    let bytes = odt::render(&mixed, &template, &Assets::default()).expect("the package");
+    let mut archive = ZipArchive::new(Cursor::new(bytes)).expect("the package must be a ZIP");
+    let content = entry(&mut archive, "content.xml");
+    assert!(
+        content.contains("<text:list text:style-name=\"UnorderedList\">"),
+        "a mixed list keeps the bullet: {content}"
+    );
+}
+
+#[test]
 fn links_take_the_template_style() {
     let document =
         markdown::parse("Veja [o site](https://example.org).\n").expect("the document must parse");

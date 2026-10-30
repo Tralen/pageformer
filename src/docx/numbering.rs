@@ -11,6 +11,7 @@ use super::styles::partial_properties;
 pub(crate) enum NumberingKind {
     Bullet,
     Decimal,
+    Task,
 }
 
 /// One list in the document, numbered from its own id so a restart is local.
@@ -48,11 +49,13 @@ impl Numbering {
         let list = template.formatting().list();
         abstract_levels(&mut output, 0, NumberingKind::Bullet, list);
         abstract_levels(&mut output, 1, NumberingKind::Decimal, list);
+        abstract_levels(&mut output, 2, NumberingKind::Task, list);
         for (index, instance) in self.instances.iter().enumerate() {
             let number = index.saturating_add(1);
             let abstract_id = match instance.kind {
                 NumberingKind::Bullet => 0,
                 NumberingKind::Decimal => 1,
+                NumberingKind::Task => 2,
             };
             xml::push_fmt(
                 &mut output,
@@ -92,26 +95,44 @@ fn abstract_levels(output: &mut String, abstract_id: u8, kind: NumberingKind, li
     for level in 0..9_usize {
         let step = u32::try_from(level.saturating_add(1)).unwrap_or(1);
         let indent = list.indent().points() * f64::from(step);
-        let left = metrics::twips(indent + list.marker_gap().points());
-        let hanging = metrics::twips(list.marker_gap().points());
-        let (format, text) = match kind {
+        let (left, hanging) = if kind == NumberingKind::Task {
+            (metrics::twips(indent), "0".to_owned())
+        } else {
+            (
+                metrics::twips(indent + list.marker_gap().points()),
+                metrics::twips(list.marker_gap().points()),
+            )
+        };
+        let (format, suffix, text) = match kind {
             NumberingKind::Bullet => (
                 "bullet".to_owned(),
+                String::new(),
                 xml::escape_attribute(list.bullet(level)),
             ),
             NumberingKind::Decimal => (
                 list.numbering_format(level).ooxml_code().to_owned(),
+                String::new(),
                 format!(
                     "%{}{}",
                     level.saturating_add(1),
                     xml::escape_attribute(list.suffix())
                 ),
             ),
+            NumberingKind::Task => (
+                "none".to_owned(),
+                "<w:suff w:val=\"nothing\"/>".to_owned(),
+                String::new(),
+            ),
+        };
+        let marker_rpr = if kind == NumberingKind::Task {
+            String::new()
+        } else {
+            marker_rpr.clone()
         };
         xml::push_fmt(
             output,
             format_args!(
-                "<w:lvl w:ilvl=\"{level}\"><w:start w:val=\"1\"/><w:numFmt w:val=\"{format}\"/><w:lvlText w:val=\"{text}\"/><w:lvlJc w:val=\"left\"/><w:pPr><w:ind w:left=\"{left}\" w:hanging=\"{hanging}\"/></w:pPr>{marker_rpr}</w:lvl>"
+                "<w:lvl w:ilvl=\"{level}\"><w:start w:val=\"1\"/><w:numFmt w:val=\"{format}\"/>{suffix}<w:lvlText w:val=\"{text}\"/><w:lvlJc w:val=\"left\"/><w:pPr><w:ind w:left=\"{left}\" w:hanging=\"{hanging}\"/></w:pPr>{marker_rpr}</w:lvl>"
             ),
         );
     }

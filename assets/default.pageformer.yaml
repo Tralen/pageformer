@@ -61,6 +61,16 @@ formatting:
         - lower-alpha
         - lower-roman
       suffix: "."
+    task:
+      gap: 1
+      bullet: false
+      done:
+        marker: "[x]"
+        foreground: "#2e7d32"
+        weight: bold
+      todo:
+        marker: "[ ]"
+        foreground: "#777777"
   heading:
     font_families:
       - Liberation Sans

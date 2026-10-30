@@ -73,6 +73,16 @@ formatting:
         - decimal
         - lower-alpha
       suffix: "."
+    task:
+      gap: 1
+      bullet: false
+      done:
+        marker: "[x]"
+        foreground: "#2f7d32"
+        weight: bold
+      todo:
+        marker: "[ ]"
+        foreground: "#666666"
   heading:
     font_families:
       - Liberation Sans

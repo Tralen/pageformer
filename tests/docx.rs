@@ -495,6 +495,72 @@ formatting:
 }
 
 #[test]
+fn task_markers_take_their_style_and_can_drop_the_bullet() {
+    let document =
+        markdown::parse("- [x] Feito\n- [ ] Pendente\n").expect("the document must parse");
+    let template = Template::from_yaml(
+        r##"
+version: "0.6"
+formatting:
+  list:
+    task:
+      gap: 2
+      bullet: false
+      done:
+        marker: "[X]"
+        foreground: "#2e7d32"
+        weight: bold
+      todo:
+        marker: "[ ]"
+        foreground: "#777777"
+"##,
+    )
+    .expect("the template must be valid");
+
+    let bytes = docx::render(&document, &template, &Assets::default()).expect("the package");
+    let mut archive = ZipArchive::new(Cursor::new(bytes)).expect("the package must be a ZIP");
+    let numbering = entry(&mut archive, "word/numbering.xml");
+    let styles = entry(&mut archive, "word/styles.xml");
+    let content = entry(&mut archive, "word/document.xml");
+
+    assert!(
+        numbering.contains("<w:abstractNum w:abstractNumId=\"2\">")
+            && numbering.contains("<w:numFmt w:val=\"none\"/>")
+            && numbering.contains("<w:suff w:val=\"nothing\"/>")
+            && numbering.contains("<w:ind w:left=\"283\" w:hanging=\"0\"/>"),
+        "the task-only list has a marker-free numbering level: {numbering}"
+    );
+    assert!(
+        numbering.contains("<w:num w:numId=\"1\"><w:abstractNumId w:val=\"2\"/>"),
+        "the task-only list uses the task abstract numbering: {numbering}"
+    );
+    assert!(
+        styles.contains("w:styleId=\"TaskDone\"")
+            && styles.contains("w:styleId=\"TaskTodo\"")
+            && styles.contains("<w:color w:val=\"2e7d32\"/>")
+            && styles.contains("<w:color w:val=\"777777\"/>"),
+        "the task markers get character styles: {styles}"
+    );
+    assert!(
+        content.contains("<w:rStyle w:val=\"TaskDone\"/>") && content.contains("[X]\u{a0}\u{a0}"),
+        "the done marker carries its style and gap: {content}"
+    );
+    assert!(
+        content.contains("<w:rStyle w:val=\"TaskTodo\"/>") && content.contains("[ ]\u{a0}\u{a0}"),
+        "the todo marker carries its style and gap: {content}"
+    );
+
+    let mixed = markdown::parse("- [x] Feito\n- Comum\n").expect("the mixed list must parse");
+    let bytes = docx::render(&mixed, &template, &Assets::default()).expect("the package");
+    let mut archive = ZipArchive::new(Cursor::new(bytes)).expect("the package must be a ZIP");
+    let numbering = entry(&mut archive, "word/numbering.xml");
+    assert!(
+        numbering.contains("<w:num w:numId=\"1\"><w:abstractNumId w:val=\"0\"/>"),
+        "a mixed list keeps the bullet: {numbering}"
+    );
+}
+
+#[test]
 fn footnotes_and_links_are_packaged() {
     let source = "Texto[^1] e [site](https://example.org).\n\n[^1]: Nota.\n";
     let document = markdown::parse(source).expect("the document must parse");

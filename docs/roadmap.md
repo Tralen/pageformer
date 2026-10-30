@@ -10,7 +10,7 @@ Pageformer reaches 1.0.0 through ten phases, in the order below. The order is a 
 | 2. PDF | Primary output and reference backend | Done in 0.12.0: running header and footer with tokens, explicit page breaks, per-level page starts, table styling and the frontmatter `date`, `subject` and `keywords`; PDF/A-2b stays the declared profile | CLI output rules |
 | 3. Confidentiality | Placeholder resolution and leak prevention | Done in 0.13.0: `{NAME}` fields, environment and file loading, output rule, redaction | PDF pipeline |
 | 4. TXT | Plain-text view and the renderer boundary | Done in 0.15.0: the renderer trait, `--format txt` and plain-text goldens | Confidentiality |
-| 5. ODT | Second-priority paged format | Not started | Renderer boundary |
+| 5. ODT | Second-priority paged format | Done in 0.16.0: internal ODF writer, deterministic package, styles from the template | Renderer boundary |
 | 6. DOCX | Office format for review and exchange | Not started | ODT style mapping |
 | 7. GUI | Minimal egui window over the pipeline | Not started | Every format it exposes |
 | 8. HTML | Self-contained semantic view | Not started | GUI and renderer boundary |
@@ -137,6 +137,8 @@ A phase is closed only when all of the following hold:
 ## Phase 5: ODT
 
 **Goal.** Deliver the second-priority format with the same semantic styles as the PDF.
+
+**Status.** Done in 0.16.0. `src/odt/` writes the ODF parts and `src/zip.rs` packages them with stored entries and fixed timestamps. Page layout, fonts, headings, tables, letterhead, running header and footer, footnotes, images and metadata are mapped from the template and the model. The three examples are generated as ODT, open in LibreOffice without repair, and the packages are byte-identical across runs.
 
 **Work.**
 

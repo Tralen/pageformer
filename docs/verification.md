@@ -87,6 +87,18 @@ pdftotext assets/examples/publicacao/Contrato.pdf -
 
 A passing PDF/A run prints `PASS <path> 2b`. The tests also assert the PDF header, the PDF/A markers and that two renders produce identical bytes.
 
+## ODT packages
+
+`tests/odt.rs` unzips the package with the `zip` dev-dependency, parses every XML part with `roxmltree`, asserts that `mimetype` is first and stored, that the header fill and heading size follow the template, and that two renders are byte-identical. The same tests assert that a confidential value never reaches `meta.xml`.
+
+The LibreOffice smoke test converts the examples headlessly; the conversion must succeed without repair:
+
+```sh
+soffice --headless --convert-to pdf --outdir /tmp/odt-check assets/examples/publicacao/Contrato.odt assets/examples/publicacao/Embargos.odt assets/examples/tecnico/Relatorio.odt
+```
+
+Page counts may differ from the PDF, because pagination is engine-specific and the architecture promises consistency of presentation, not identical distribution.
+
 ## Plain-text goldens
 
 The text goldens in `assets/examples/publicacao/` and `assets/examples/tecnico/` are compared byte for byte by `tests/txt.rs`. Regenerate them after a parser, model or text-renderer change and commit the result:

@@ -613,10 +613,31 @@ fn an_unknown_format_fails_before_rendering() {
 
     assert!(!output.status.success());
     assert!(
-        stderr(&output).contains("pdf or txt"),
+        stderr(&output).contains("pdf, txt or odt"),
         "{}",
         stderr(&output)
     );
+}
+
+#[test]
+fn the_odt_format_writes_an_opendocument_package() {
+    let source = TempDir::new().expect("a temporary source");
+    let output = TempDir::new().expect("a temporary output");
+    write_markdown(&source.path().join("Doc.md"), "Doc");
+
+    let result = run(&[
+        OsStr::new("--format"),
+        OsStr::new("odt"),
+        OsStr::new("--color=never"),
+        OsStr::new("--output"),
+        output.path().as_os_str(),
+        source.path().join("Doc.md").as_os_str(),
+    ]);
+    assert!(result.status.success(), "{}", stderr(&result));
+
+    let bytes = fs::read(output.path().join("Doc.odt")).expect("the package must be written");
+    assert_eq!(&bytes[..4], b"PK\x03\x04");
+    assert!(!output.path().join("Doc.pdf").exists());
 }
 
 #[test]

@@ -5,25 +5,47 @@
 //! asset loader. The output is PDF/A-2b and the date is fixed, so two runs over
 //! the same input produce the same bytes.
 
-mod assets;
 mod source;
 mod world;
 
 use std::fmt;
 use std::io;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use typst_layout::PagedDocument;
 use typst_pdf::{PdfOptions, PdfStandard, PdfStandards};
 
+use crate::assets::{self, AssetError};
 use crate::document::{Document, DocumentDate};
 use crate::render::{Rendered, Renderer};
 use crate::template::Template;
 
 use self::world::{PdfWorld, format_diagnostics};
 
-pub use assets::{AssetMap, Assets, load_assets};
+pub use crate::assets::{AssetMap, Assets};
 pub use source::typst_source;
+
+/// Reads the letterhead and the images of a document.
+pub fn load_assets(
+    document: &Document,
+    template: &Template,
+    source_directory: &Path,
+    template_directory: Option<&Path>,
+) -> Result<Assets, PdfError> {
+    assets::load_assets(document, template, source_directory, template_directory)
+        .map_err(PdfError::from)
+}
+
+impl From<AssetError> for PdfError {
+    fn from(error: AssetError) -> Self {
+        match error {
+            AssetError::UnsupportedImage { destination } => Self::UnsupportedImage { destination },
+            AssetError::AssetRead { path, source } => Self::AssetRead { path, source },
+            AssetError::UnsupportedImageFormat { path } => Self::UnsupportedImageFormat { path },
+            AssetError::MissingTemplateDirectory => Self::MissingTemplateDirectory,
+        }
+    }
+}
 
 pub(crate) const FIXED_YEAR: i32 = 2026;
 pub(crate) const FIXED_MONTH: u8 = 1;

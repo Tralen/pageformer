@@ -15,6 +15,7 @@ use clap::{Arg, ArgAction, Command};
 
 use pageformer::confidential::{self, ConfidentialStore};
 use pageformer::markdown;
+use pageformer::odt::OdtRenderer;
 use pageformer::pdf;
 use pageformer::render::Renderer;
 use pageformer::template::loader::{self, ResolvedTemplate, TemplateOrigin};
@@ -275,7 +276,7 @@ fn command() -> Command {
             Arg::new("format")
                 .long("format")
                 .value_name("FORMAT")
-                .help("Output format: pdf or txt")
+                .help("Output format: pdf, txt or odt")
                 .value_parser(clap::builder::ValueParser::new(Format::from_str))
                 .default_value("pdf"),
         )
@@ -351,6 +352,14 @@ fn process(
                 Format::Txt => TxtRenderer
                     .render(document, resolved.template())
                     .with_context(|| "cannot render the plain text")?,
+                Format::Odt => OdtRenderer::load(
+                    document,
+                    resolved.template(),
+                    source_directory,
+                    resolved.base_directory(),
+                )?
+                .render(document, resolved.template())
+                .with_context(|| "cannot render the ODT")?,
             };
             write_atomic(output, rendered.bytes())?;
             Ok(Outcome::Rendered {

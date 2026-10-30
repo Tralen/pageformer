@@ -21,14 +21,14 @@ pub(crate) struct PdfWorld<'a> {
     fonts: FontStore,
     main: FileId,
     source: Source,
-    files: &'a BTreeMap<String, Bytes>,
+    files: &'a BTreeMap<String, Vec<u8>>,
     date: Datetime,
 }
 
 impl<'a> PdfWorld<'a> {
     pub(crate) fn new(
         source: String,
-        files: &'a BTreeMap<String, Bytes>,
+        files: &'a BTreeMap<String, Vec<u8>>,
         date: DocumentDate,
     ) -> Result<Self, PdfError> {
         let datetime = Datetime::from_ymd(date.year(), date.month(), date.day())
@@ -78,6 +78,7 @@ impl World for PdfWorld<'_> {
         self.files
             .get(path)
             .cloned()
+            .map(Bytes::new)
             .ok_or_else(|| FileError::NotFound(path.into()))
     }
 

@@ -4,6 +4,14 @@
 
 *Major updates and feature releases.*
 
+### 0.16.0
+
+- Added `--format odt` and the ODT backend: an OpenDocument text package with the template's page layout, fonts, headings, lists, tables, letterhead background, running header and footer, footnotes, links, images and metadata.
+- The package is a stored ZIP with `mimetype` first and fixed timestamps, written by an internal `src/zip.rs`, so two runs are byte-identical and no compression dependency is added.
+- Extracted the asset loader to `src/assets.rs`, shared by the PDF and ODT backends.
+- Alerts become block quotes with a visible `[!KIND]` label, footnote definitions become inline notes, and confidential values never reach the metadata.
+- Added ODT examples and structural tests with the `zip` and `roxmltree` dev-dependencies, plus a LibreOffice smoke test documented in `docs/verification.md`.
+
 ### 0.15.0
 
 - Added `--format txt` and the plain-text backend: UTF-8 with LF line endings, no automatic wrapping, one blank line between blocks, Markdown-style list markers, tab-separated tables with a separator row, quotes prefixed with `>` and a space, `label (destination)` links, `[alt]` images, footnotes collected at the end and a form feed for an explicit page break.

@@ -40,9 +40,11 @@ The inline model covers every construct of that subset: text, code spans, emphas
 - `src/document.rs` holds the backend-independent model, with newtypes and smart constructors for the values the pipeline validates.
 - `src/markdown.rs` parses CommonMark plus the extensions into the model. It is total: malformed event streams, raw HTML and nesting deeper than 128 levels become `MarkdownError` values.
 - `src/render.rs` holds the renderer boundary: the `Renderer` trait and the backend-neutral `Rendered` value.
+- `src/assets.rs` resolves the letterhead and the local images once, so every backend receives the same bytes without reading files itself.
 - `src/template/` holds the versioned YAML schema and the loader that resolves which template applies.
-- `src/pdf/` is the PDF backend: `source.rs` generates Typst source, `assets.rs` reads local images and the letterhead, and `world.rs` is the Typst world that serves them.
+- `src/pdf/` is the PDF backend: `source.rs` generates Typst source and `world.rs` is the Typst world that serves the fonts and assets.
 - `src/txt.rs` is the plain-text backend. It needs no assets and cannot fail.
+- `src/odt/` is the ODT backend: `content.rs`, `styles.rs` and `meta.rs` generate the XML parts, and `src/zip.rs` builds the deterministic stored ZIP package.
 - `src/main.rs` is the CLI. It parses each input, resolves the template and either renders the chosen format or reports the pipeline result.
 
 The library is the pure core. File reading, the environment and the terminal live in the binary or in the loader's explicitly named functions.
@@ -98,10 +100,18 @@ Plain text is a view of the model, used by the copy-as-plain-text action. The ou
 ## Formats
 
 - PDF is the primary output and must conform to PDF/A-2b, or PDF/A-2u when every character maps to Unicode.
+- ODT is the paged format for office review and is implemented with the internal writer below.
 - Plain text is implemented and carries the copy-as-plain-text view.
-- ODT is the second priority.
 - DOCX follows.
 - HTML and EPUB reuse the same document model. HTML is the basis for EPUB, which splits chapters at first-level headings and uses deterministic metadata.
+
+## ODT writer
+
+ODT uses an internal ODF writer instead of a full ODT library, because the template fields map to a small, known set of styles and the package must be deterministic. The ZIP container is written by `src/zip.rs` with stored entries and a fixed timestamp, so no compression crate is needed and two runs produce identical bytes. The order is fixed: `mimetype` first and uncompressed, then `META-INF/manifest.xml`, `content.xml`, `styles.xml`, `meta.xml` and the pictures.
+
+The template maps to named styles for the paragraph face, leading, spacing and alignment, to character styles for emphasis, strong, strikethrough and code, to one heading style per level with its spacing and optional page break, and to list, table and page styles. The page layout carries the size, orientation and margins, the letterhead as a stretched page background, and the running header and footer, whose `{page}` and `{pages}` tokens become page fields while `{title}` and `{author}` expand from the frontmatter.
+
+The body maps blocks and inlines to ODF content: paragraphs, headings with outline levels, lists with their start value, task markers, tables with a header row and cell alignment, quotes with a visible `[!KIND]` label for alerts, preserved code, links, footnotes as inline notes whose definitions are collected, and images under `Pictures/` with their intrinsic size capped to the text width. Numbered paragraphs keep their literal number. The ODF line height is the font size plus the template leading, because the Typst leading is additional spacing between lines. Metadata carries the title, author, language, subject, keywords and generator, and never a body value.
 
 ## PDF engine
 

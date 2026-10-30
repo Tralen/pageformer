@@ -1,20 +1,58 @@
-//! Loads the files a PDF needs into the Typst project.
+//! Loads the files a document references into a backend-neutral asset set.
 //!
-//! The generator never touches the file system. Every local image is read here,
-//! stored under a synthetic project path and exposed to the Typst world by
-//! [`Assets::files`].
+//! The generator never touches the file system. Every local image is read here
+//! and kept under a synthetic project path, so a backend can package it without
+//! reading anything itself.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::ffi::OsStr;
 use std::fs;
+use std::io;
 use std::path::{Path, PathBuf};
-
-use typst::foundations::Bytes;
 
 use crate::document::{Block, Document, Inline};
 use crate::template::Template;
 
-use super::PdfError;
+/// Why an asset could not be loaded.
+#[derive(Debug)]
+pub enum AssetError {
+    UnsupportedImage { destination: String },
+    AssetRead { path: PathBuf, source: io::Error },
+    UnsupportedImageFormat { path: PathBuf },
+    MissingTemplateDirectory,
+}
+
+impl std::fmt::Display for AssetError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::UnsupportedImage { destination } => write!(
+                formatter,
+                "image `{destination}` is not a local file; remote images are not supported"
+            ),
+            Self::AssetRead { path, source } => {
+                write!(formatter, "cannot read image {}: {source}", path.display())
+            }
+            Self::UnsupportedImageFormat { path } => write!(
+                formatter,
+                "unsupported image format for {}; use png, jpg, gif, svg or webp",
+                path.display()
+            ),
+            Self::MissingTemplateDirectory => formatter
+                .write_str("the template has a letterhead but no directory to resolve it from"),
+        }
+    }
+}
+
+impl std::error::Error for AssetError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::AssetRead { source, .. } => Some(source),
+            Self::UnsupportedImage { .. }
+            | Self::UnsupportedImageFormat { .. }
+            | Self::MissingTemplateDirectory => None,
+        }
+    }
+}
 
 /// The virtual project paths assigned to the files used by a document.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -51,7 +89,7 @@ impl AssetMap {
 #[derive(Debug, Clone, Default)]
 pub struct Assets {
     map: AssetMap,
-    files: BTreeMap<String, Bytes>,
+    files: BTreeMap<String, Vec<u8>>,
 }
 
 impl Assets {
@@ -59,7 +97,7 @@ impl Assets {
         &self.map
     }
 
-    pub(crate) fn files(&self) -> &BTreeMap<String, Bytes> {
+    pub(crate) fn files(&self) -> &BTreeMap<String, Vec<u8>> {
         &self.files
     }
 }
@@ -74,7 +112,7 @@ pub fn load_assets(
     template: &Template,
     source_directory: &Path,
     template_directory: Option<&Path>,
-) -> Result<Assets, PdfError> {
+) -> Result<Assets, AssetError> {
     let mut map = AssetMap::new();
     let mut files = BTreeMap::new();
     let mut destinations = Vec::new();
@@ -95,7 +133,7 @@ pub fn load_assets(
     }
 
     if let Some(letterhead) = template.page().letterhead() {
-        let directory = template_directory.ok_or(PdfError::MissingTemplateDirectory)?;
+        let directory = template_directory.ok_or(AssetError::MissingTemplateDirectory)?;
         let path = directory.join(letterhead.as_str());
         let extension = supported_extension(&path)?;
         let asset = format!("assets/letterhead.{extension}");
@@ -155,26 +193,26 @@ fn collect_inline_images<'a>(inlines: &'a [Inline], destinations: &mut Vec<&'a s
     }
 }
 
-fn resolve_image(destination: &str, source_directory: &Path) -> Result<PathBuf, PdfError> {
+fn resolve_image(destination: &str, source_directory: &Path) -> Result<PathBuf, AssetError> {
     let path = Path::new(destination);
     if path.is_absolute() {
         return Ok(path.to_owned());
     }
     if destination.is_empty() || destination.contains(':') {
-        return Err(PdfError::UnsupportedImage {
+        return Err(AssetError::UnsupportedImage {
             destination: destination.to_owned(),
         });
     }
     Ok(source_directory.join(path))
 }
 
-fn supported_extension(path: &Path) -> Result<String, PdfError> {
+fn supported_extension(path: &Path) -> Result<String, AssetError> {
     let Some(extension) = path
         .extension()
         .and_then(OsStr::to_str)
         .map(str::to_ascii_lowercase)
     else {
-        return Err(PdfError::UnsupportedImageFormat {
+        return Err(AssetError::UnsupportedImageFormat {
             path: path.to_owned(),
         });
     };
@@ -184,19 +222,17 @@ fn supported_extension(path: &Path) -> Result<String, PdfError> {
     ) {
         Ok(extension)
     } else {
-        Err(PdfError::UnsupportedImageFormat {
+        Err(AssetError::UnsupportedImageFormat {
             path: path.to_owned(),
         })
     }
 }
 
-fn read_asset(path: &Path) -> Result<Bytes, PdfError> {
-    fs::read(path)
-        .map(Bytes::new)
-        .map_err(|source| PdfError::AssetRead {
-            path: path.to_owned(),
-            source,
-        })
+fn read_asset(path: &Path) -> Result<Vec<u8>, AssetError> {
+    fs::read(path).map_err(|source| AssetError::AssetRead {
+        path: path.to_owned(),
+        source,
+    })
 }
 
 #[cfg(test)]
@@ -254,7 +290,7 @@ mod tests {
         let document = document_with_image("missing.png");
         let error = load_assets(&document, &embedded_template(), project.path(), None)
             .expect_err("a missing image");
-        assert!(matches!(error, PdfError::AssetRead { .. }), "{error}");
+        assert!(matches!(error, AssetError::AssetRead { .. }), "{error}");
     }
 
     #[test]
@@ -264,7 +300,7 @@ mod tests {
         let error = load_assets(&document, &embedded_template(), project.path(), None)
             .expect_err("a remote image");
         assert!(
-            matches!(error, PdfError::UnsupportedImage { .. }),
+            matches!(error, AssetError::UnsupportedImage { .. }),
             "{error}"
         );
     }
@@ -277,7 +313,7 @@ mod tests {
         let error = load_assets(&document, &embedded_template(), project.path(), None)
             .expect_err("an unsupported image");
         assert!(
-            matches!(error, PdfError::UnsupportedImageFormat { .. }),
+            matches!(error, AssetError::UnsupportedImageFormat { .. }),
             "{error}"
         );
     }
@@ -308,6 +344,6 @@ mod tests {
         let document = Document::new(Metadata::default(), Vec::new());
         let error = load_assets(&document, &template, project.path(), None)
             .expect_err("a letterhead without a base directory");
-        assert!(matches!(error, PdfError::MissingTemplateDirectory));
+        assert!(matches!(error, AssetError::MissingTemplateDirectory));
     }
 }

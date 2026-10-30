@@ -4,6 +4,10 @@
 
 *Major updates and feature releases.*
 
+### 0.20.1
+
+- Raised the PDF heading fill padding from 0.15 to 0.24 of the heading size, so the PDF band matches the DOCX one, which is now the reference: at the 18pt heading the band grows from 17.8pt to 21.1pt against 20.6pt in DOCX, and at 14pt both measure 16.3pt.
+
 ### 0.20.0
 
 - `background` and `rule` may now be declared on the base `formatting.heading` map, where every level inherits them, and a level clears an inherited value with `none`, in any case: `rule: none` or `background: NONE`. An empty `rule: {}` stays a rule with the defaults, which is not the same as `none`.

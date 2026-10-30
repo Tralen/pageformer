@@ -649,10 +649,13 @@ fn rule_line(rule: &RuleStyle) -> String {
     )
 }
 
-/// The vertical padding of a heading fill, as a fraction of the heading size,
-/// so the fill grows with the text instead of hugging the glyphs the way a
-/// zero-inset block does in Typst.
-const HEADING_FILL_PADDING: f64 = 0.15;
+/// The vertical padding of a heading fill, as a fraction of the heading size.
+///
+/// Typst measures a zero-inset block by its cap height and baseline, about 0.667
+/// of the size, while the DOCX fill covers the font's line box, about 1.15 of
+/// the size. The padding of 0.24 on each side makes the PDF band match the DOCX
+/// one, which is the reference for the other formats.
+const HEADING_FILL_PADDING: f64 = 0.24;
 
 fn fill_padding(size: Length) -> String {
     format!("{:.3}pt", size.points() * HEADING_FILL_PADDING)
@@ -1263,7 +1266,7 @@ mod tests {
         let source = typst_source(&document, &template, &AssetMap::new()).expect("the source");
         assert!(
             source.contains(
-                "#show heading.where(level: 1): set block(above: 0pt, below: 0pt)\n#show heading.where(level: 1): it => block(width: 100%, above: 18.000pt, below: 6.000pt, sticky: true)[\n#block(width: 100%, fill: rgb(\"#eeeeee\"), inset: (x: 0pt, y: 2.700pt))[#it]\n]\n#show heading.where(level: 1): it => {\n  pagebreak(weak: true)\n  it\n}"
+                "#show heading.where(level: 1): set block(above: 0pt, below: 0pt)\n#show heading.where(level: 1): it => block(width: 100%, above: 18.000pt, below: 6.000pt, sticky: true)[\n#block(width: 100%, fill: rgb(\"#eeeeee\"), inset: (x: 0pt, y: 4.320pt))[#it]\n]\n#show heading.where(level: 1): it => {\n  pagebreak(weak: true)\n  it\n}"
             ),
             "{source}"
         );
@@ -1279,12 +1282,12 @@ mod tests {
         let document = Document::new(Metadata::default(), Vec::new());
         let source = typst_source(&document, &template, &AssetMap::new()).expect("the source");
         assert!(
-            source.contains("inset: (x: 0pt, y: 3.000pt)"),
-            "a level-one fill keeps 0.15 of 20pt: {source}"
+            source.contains("inset: (x: 0pt, y: 4.800pt)"),
+            "a level-one fill keeps 0.24 of 20pt: {source}"
         );
         assert!(
-            source.contains("inset: (x: 0pt, y: 2.100pt)"),
-            "a level-two fill keeps 0.15 of 14pt: {source}"
+            source.contains("inset: (x: 0pt, y: 3.360pt)"),
+            "a level-two fill keeps 0.24 of 14pt: {source}"
         );
     }
 

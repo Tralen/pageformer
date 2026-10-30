@@ -71,38 +71,20 @@ impl Session {
 
     /// Accepts a Markdown file or a confidential INI file.
     fn accept_path(&mut self, path: PathBuf) -> bool {
-        match path
-            .extension()
-            .and_then(OsStr::to_str)
-            .map(str::to_ascii_lowercase)
-            .as_deref()
-        {
-            Some("md") => {
-                self.output_directory = path
-                    .parent()
-                    .filter(|parent| !parent.as_os_str().is_empty())
-                    .unwrap_or_else(|| Path::new("."))
-                    .display()
-                    .to_string();
-                self.input = Some(path);
-                true
-            }
-            Some("ini") => {
-                self.confidential_file = path.display().to_string();
-                true
-            }
-            _ => false,
+        if is_markdown_file(&path) {
+            self.output_directory = source_directory(&path).display().to_string();
+            self.input = Some(path);
+            true
+        } else if is_confidential_file(&path) {
+            self.confidential_file = path.display().to_string();
+            true
+        } else {
+            false
         }
     }
 
     fn source_root(&self) -> Option<PathBuf> {
-        self.input.as_ref().map(|input| {
-            input
-                .parent()
-                .filter(|parent| !parent.as_os_str().is_empty())
-                .unwrap_or_else(|| Path::new("."))
-                .to_path_buf()
-        })
+        self.input.as_ref().map(|input| source_directory(input))
     }
 
     fn output_path(&self, format: Format) -> Option<PathBuf> {
@@ -156,7 +138,6 @@ impl Session {
 /// The eframe application.
 pub struct Publisher {
     session: Session,
-    input_field: String,
     template_label: String,
     template_path: Option<PathBuf>,
     message: Option<String>,
@@ -166,12 +147,10 @@ pub struct Publisher {
 impl Publisher {
     pub fn new(context: &eframe::CreationContext<'_>) -> Self {
         context.egui_ctx.all_styles_mut(|style| {
-            style.visuals.window_fill = egui::Color32::from_gray(220);
-            style.visuals.window_stroke = egui::Stroke::new(1.0, egui::Color32::from_gray(120));
+            style.spacing.tooltip_width = 320.0;
         });
         Self {
             session: Session::new(),
-            input_field: String::new(),
             template_label: "not selected".to_owned(),
             template_path: None,
             message: None,
@@ -184,24 +163,10 @@ impl Publisher {
             self.message = Some(format!("{} is not a Markdown or INI file", path.display()));
             return;
         }
-        let is_markdown = path
-            .extension()
-            .and_then(OsStr::to_str)
-            .is_some_and(|extension| extension.eq_ignore_ascii_case("md"));
-        if is_markdown {
-            self.input_field = path.display().to_string();
+        if is_markdown_file(&path) {
             self.refresh_template();
         }
         self.message = None;
-    }
-
-    fn accept_input_field(&mut self) {
-        let path = PathBuf::from(self.input_field.trim());
-        if path.as_os_str().is_empty() {
-            self.message = Some("Enter a Markdown path or drop a file".to_owned());
-            return;
-        }
-        self.accept_input(path);
     }
 
     fn refresh_template(&mut self) {
@@ -362,7 +327,7 @@ impl Publisher {
             );
             let response = with_tooltip(
                 response,
-                "Drop a Markdown file here, or click to choose one. On i3, zzzFM may not deliver the drop; use the picker.",
+                "Drop a Markdown file, or click to choose one. Use the picker if dragging does not work.",
             );
             if !working && response.clicked() {
                 self.choose_markdown();
@@ -377,10 +342,7 @@ impl Publisher {
                         .min_size(egui::vec2(button_width, 36.0));
                     let response = with_tooltip(
                         ui.add_enabled(enabled, button),
-                        &format!(
-                            "Render the selected document as {}.",
-                            format.name().to_uppercase()
-                        ),
+                        &format!("Export the selected document as {}.", format.name().to_uppercase()),
                     );
                     if response.clicked() {
                         self.start(format);
@@ -393,57 +355,38 @@ impl Publisher {
             ui.add_space(4.0);
             with_tooltip(
                 ui.label(format!("Selected: {}", input.display())),
-                "The Markdown file that will be rendered.",
+                "The Markdown file to export.",
             );
         }
 
         ui.add_space(8.0);
-        ui.horizontal(|ui| {
-            with_tooltip(
-                ui.label("Output:"),
-                "Folder for the generated file. It is prefilled with the Markdown folder; a document with confidential fields needs a folder outside its source tree.",
-            );
-            let width = (ui.available_width() - 90.0).max(120.0);
-            let field = ui.add(
-                egui::TextEdit::singleline(&mut self.session.output_directory)
-                    .desired_width(width),
-            );
-            with_tooltip(
-                field,
-                "Folder for the generated file. It is prefilled with the Markdown folder; a document with confidential fields needs a folder outside its source tree.",
-            );
-            let choose = with_tooltip(
-                ui.button("Choose"),
-                "Choose the output folder with the platform dialog.",
-            );
-            if choose.clicked() {
-                self.choose_output();
-            }
-        });
-
         let advanced = egui::CollapsingHeader::new("Advanced").show(ui, |ui| {
             ui.horizontal(|ui| {
                 with_tooltip(
-                    ui.label("Markdown path:"),
-                    "Type or paste a Markdown path when dropping or choosing a file is not available.",
+                    ui.label("Output:"),
+                    "Folder for the generated file. It starts as the Markdown folder; documents with confidential fields need a folder outside the source tree.",
                 );
-                let field = ui.text_edit_singleline(&mut self.input_field);
+                let width = (ui.available_width() - 90.0).max(120.0);
+                let field = ui.add(
+                    egui::TextEdit::singleline(&mut self.session.output_directory)
+                        .desired_width(width),
+                );
                 with_tooltip(
                     field,
-                    "Type or paste a Markdown path when dropping or choosing a file is not available.",
+                    "Folder for the generated file. It starts as the Markdown folder; documents with confidential fields need a folder outside the source tree.",
                 );
-                let use_path = with_tooltip(
-                    ui.button("Use path"),
-                    "Use the typed Markdown path.",
+                let choose = with_tooltip(
+                    ui.button("Choose"),
+                    "Choose the output folder with the platform dialog.",
                 );
-                if use_path.clicked() {
-                    self.accept_input_field();
+                if choose.clicked() {
+                    self.choose_output();
                 }
             });
             ui.horizontal(|ui| {
                 with_tooltip(
                     ui.label("Confidential:"),
-                    "INI file with the confidential {NAME} values. It must be outside the source tree, with mode 600.",
+                    "INI file with the confidential {NAME} values. Keep it outside the source tree, with mode 600.",
                 );
                 let field = ui.add(
                     egui::TextEdit::singleline(&mut self.session.confidential_file)
@@ -451,7 +394,7 @@ impl Publisher {
                 );
                 with_tooltip(
                     field,
-                    "INI file with the confidential {NAME} values. It must be outside the source tree, with mode 600.",
+                    "INI file with the confidential {NAME} values. Keep it outside the source tree, with mode 600.",
                 );
                 let choose = with_tooltip(
                     ui.button("Choose"),
@@ -464,7 +407,7 @@ impl Publisher {
         });
         with_tooltip(
             advanced.header_response,
-            "Manual Markdown path and confidential values.",
+            "Output folder and confidential values.",
         );
 
         ui.add_space(8.0);
@@ -551,14 +494,55 @@ impl eframe::App for Publisher {
 }
 
 fn with_tooltip(response: egui::Response, text: &str) -> egui::Response {
+    let mut tooltip = if response.enabled() {
+        egui::Tooltip::for_enabled(&response)
+    } else {
+        egui::Tooltip::for_disabled(&response)
+    };
+    tooltip.popup = tooltip.popup.frame(tooltip_frame());
+    tooltip.show(|ui| show_tooltip(ui, text));
     response
-        .on_hover_ui(|ui| show_tooltip(ui, text))
-        .on_disabled_hover_ui(|ui| show_tooltip(ui, text))
+}
+
+/// The tooltip frame, painted explicitly so it stays light and readable on
+/// every theme and does not inherit the window fill.
+fn tooltip_frame() -> egui::Frame {
+    egui::Frame::new()
+        .fill(egui::Color32::from_gray(232))
+        .stroke(egui::Stroke::new(1.0, egui::Color32::from_gray(120)))
+        .corner_radius(4)
+        .inner_margin(egui::Margin::symmetric(9, 7))
+        .shadow(egui::Shadow {
+            offset: [0, 2],
+            blur: 6,
+            spread: 0,
+            color: egui::Color32::from_black_alpha(48),
+        })
 }
 
 fn show_tooltip(ui: &mut egui::Ui, text: &str) {
-    ui.set_max_width(320.0);
-    ui.label(egui::RichText::new(text).color(egui::Color32::BLACK));
+    ui.label(egui::RichText::new(text).color(egui::Color32::from_gray(16)));
+}
+
+/// A source path is the parent of the input, or the current directory when the
+/// input has no parent component.
+fn source_directory(path: &Path) -> PathBuf {
+    path.parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."))
+        .to_path_buf()
+}
+
+fn is_markdown_file(path: &Path) -> bool {
+    path.extension()
+        .and_then(OsStr::to_str)
+        .is_some_and(|extension| extension.eq_ignore_ascii_case("md"))
+}
+
+fn is_confidential_file(path: &Path) -> bool {
+    path.extension()
+        .and_then(OsStr::to_str)
+        .is_some_and(|extension| extension.eq_ignore_ascii_case("ini"))
 }
 
 fn run_export(request: ExportRequest) -> Result<Completed, String> {
@@ -607,6 +591,23 @@ mod tests {
         assert!(session.can_export());
         assert_eq!(session.input, Some(PathBuf::from("docs/A.md")));
         assert_eq!(session.output_directory, "docs");
+    }
+
+    #[test]
+    fn the_output_directory_follows_a_new_markdown_selection() {
+        let mut session = session_with_input("docs/A.md");
+
+        assert!(session.accept_path(PathBuf::from("other/B.md")));
+
+        assert_eq!(session.output_directory, "other");
+    }
+
+    #[test]
+    fn a_bare_file_name_uses_the_current_directory() {
+        let session = session_with_input("A.md");
+
+        assert_eq!(session.source_root(), Some(PathBuf::from(".")));
+        assert_eq!(session.output_directory, ".");
     }
 
     #[test]

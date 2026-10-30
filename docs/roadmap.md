@@ -172,7 +172,7 @@ A phase is closed only when all of the following hold:
 
 **Goal.** Expose the pipeline in a minimal egui converter without duplicating any of it. The WYSIWYG editor, Pageweaver, is a separate project; it calls the same library for export and starts only after 1.0.0.
 
-**Status.** Started in 0.31.0. In 0.31.1 the window followed `SKETCH.md`, with the format buttons in a column on the right, a clickable drop box backed by zenity on Linux, and the output folder prefilled from the source. In 0.31.3 Confidential moved under Advanced, every label, field and button gained a tooltip, and Output gained a folder picker. The state machine and paths are tested; the windowed smoke test is manual, and Pageweaver starts after 1.0.0.
+**Status.** Started in 0.31.0. In 0.31.1 the window followed `SKETCH.md`, with the format buttons in a column on the right, a clickable drop box backed by zenity on Linux, and the output folder prefilled from the source. In 0.31.3 Confidential moved under Advanced, every label, field and button gained a tooltip, and Output gained a folder picker. In 0.31.4 Output also moved under Advanced and keeps the automatic fill from the selected file, the redundant manual Markdown path was removed, and the tooltips got their own compact high-contrast frame. The state machine and paths are tested; the windowed smoke test is manual, and Pageweaver starts after 1.0.0.
 
 **Work.**
 

@@ -4,6 +4,13 @@
 
 *Major updates and feature releases.*
 
+### 0.31.4
+
+- Moved the Output folder into the Advanced section of `pageformer-publisher`, keeping the automatic fill from the selected Markdown file.
+- Removed the manual Markdown path from Advanced: the drop box and the platform picker already cover file selection, so the typed path was redundant.
+- Gave the `pageformer-publisher` tooltips a dedicated compact frame with a light-gray fill, black text, a thin border and its own shadow, instead of borrowing the window fill; the texts are shorter.
+- Regenerates the ODT examples for the version in `meta:generator`.
+
 ### 0.31.3
 
 - Moved the Confidential file into the Advanced section of `pageformer-publisher`, next to the manual Markdown path.

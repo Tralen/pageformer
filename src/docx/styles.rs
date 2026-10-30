@@ -2,7 +2,9 @@
 
 use crate::document::Document;
 use crate::metrics;
-use crate::template::{FontSlant, Length, ParagraphAlignment, RuleStyle, Template, TextFace};
+use crate::template::{
+    Color, FontSlant, Length, ParagraphAlignment, PartialTextStyle, RuleStyle, Template, TextFace,
+};
 use crate::xml;
 
 /// Generates the styles part.
@@ -100,14 +102,53 @@ pub(crate) fn styles_xml(document: &Document, template: &Template) -> String {
         );
     }
 
+    if let Some(background) = paragraph.background() {
+        xml::push_fmt(
+            &mut output,
+            format_args!(
+                "<w:style w:type=\"paragraph\" w:styleId=\"BodyParagraph\"><w:name w:val=\"Body Paragraph\"/><w:basedOn w:val=\"Normal\"/><w:qFormat/><w:pPr>{}</w:pPr></w:style>\n",
+                shading(Some(background))
+            ),
+        );
+    }
+
+    let quote = template.formatting().quote();
+    let quote_shading = shading(quote.and_then(PartialTextStyle::background));
+    let quote_rpr = rpr(partial_properties(quote, None, false));
+    xml::push_fmt(
+        &mut output,
+        format_args!(
+            "<w:style w:type=\"paragraph\" w:styleId=\"Quote\"><w:name w:val=\"Quote\"/><w:basedOn w:val=\"Normal\"/><w:pPr><w:ind w:left=\"567\" w:right=\"567\"/>{quote_shading}</w:pPr>{quote_rpr}</w:style>\n"
+        ),
+    );
+    let code_block = template.formatting().code_block();
+    let code_shading = shading(code_block.and_then(PartialTextStyle::background));
+    let code_rpr = rpr(partial_properties(
+        code_block,
+        Some("<w:rFonts w:ascii=\"Consolas\" w:hAnsi=\"Consolas\" w:cs=\"Consolas\"/>"),
+        false,
+    ));
+    xml::push_fmt(
+        &mut output,
+        format_args!(
+            "<w:style w:type=\"paragraph\" w:styleId=\"Code\"><w:name w:val=\"Code\"/><w:basedOn w:val=\"Normal\"/><w:pPr><w:suppressAutoHyphens/>{code_shading}</w:pPr>{code_rpr}</w:style>\n"
+        ),
+    );
     xml::push(
         &mut output,
-        "<w:style w:type=\"paragraph\" w:styleId=\"Quote\"><w:name w:val=\"Quote\"/><w:basedOn w:val=\"Normal\"/><w:pPr><w:ind w:left=\"567\" w:right=\"567\"/></w:pPr></w:style>\n\
-         <w:style w:type=\"paragraph\" w:styleId=\"Code\"><w:name w:val=\"Code\"/><w:basedOn w:val=\"Normal\"/><w:pPr><w:suppressAutoHyphens/></w:pPr><w:rPr><w:rFonts w:ascii=\"Consolas\" w:hAnsi=\"Consolas\" w:cs=\"Consolas\"/></w:rPr></w:style>\n\
-         <w:style w:type=\"paragraph\" w:styleId=\"FootnoteText\"><w:name w:val=\"footnote text\"/><w:basedOn w:val=\"Normal\"/></w:style>\n\
+        "<w:style w:type=\"paragraph\" w:styleId=\"FootnoteText\"><w:name w:val=\"footnote text\"/><w:basedOn w:val=\"Normal\"/></w:style>\n\
          <w:style w:type=\"character\" w:styleId=\"FootnoteReference\"><w:name w:val=\"footnote reference\"/><w:rPr><w:vertAlign w:val=\"superscript\"/></w:rPr></w:style>\n\
-         <w:style w:type=\"character\" w:styleId=\"Hyperlink\"><w:name w:val=\"Hyperlink\"/><w:rPr><w:color w:val=\"0563C1\"/><w:u w:val=\"single\"/></w:rPr></w:style>\n\
-         <w:style w:type=\"character\" w:styleId=\"CodeChar\"><w:name w:val=\"Code Char\"/><w:rPr><w:rFonts w:ascii=\"Consolas\" w:hAnsi=\"Consolas\" w:cs=\"Consolas\"/></w:rPr></w:style>\n",
+         <w:style w:type=\"character\" w:styleId=\"Hyperlink\"><w:name w:val=\"Hyperlink\"/><w:rPr><w:color w:val=\"0563C1\"/><w:u w:val=\"single\"/></w:rPr></w:style>\n",
+    );
+    let code_char = partial_rpr(
+        template.formatting().paragraph().code(),
+        Some("<w:rFonts w:ascii=\"Consolas\" w:hAnsi=\"Consolas\" w:cs=\"Consolas\"/>"),
+    );
+    xml::push_fmt(
+        &mut output,
+        format_args!(
+            "<w:style w:type=\"character\" w:styleId=\"CodeChar\"><w:name w:val=\"Code Char\"/>{code_char}</w:style>\n"
+        ),
     );
     xml::push(&mut output, "</w:styles>\n");
     output
@@ -122,6 +163,90 @@ fn run_fonts(face: &TextFace) -> String {
     format!(
         "<w:rFonts w:ascii=\"{name}\" w:hAnsi=\"{name}\" w:eastAsia=\"{name}\" w:cs=\"{name}\"/>"
     )
+}
+
+/// A run property block for a partial style, with the default font kept when the
+/// template does not declare families.
+fn partial_rpr(style: Option<&PartialTextStyle>, default_fonts: Option<&str>) -> String {
+    let properties = partial_properties(style, default_fonts, true);
+    if properties.is_empty() {
+        String::new()
+    } else {
+        format!("<w:rPr>{properties}</w:rPr>")
+    }
+}
+
+/// Wraps run properties in `w:rPr` when there is anything to declare.
+fn rpr(properties: String) -> String {
+    if properties.is_empty() {
+        String::new()
+    } else {
+        format!("<w:rPr>{properties}</w:rPr>")
+    }
+}
+
+/// The run properties of a partial style, without the `w:rPr` wrapper.
+pub(crate) fn partial_properties(
+    style: Option<&PartialTextStyle>,
+    default_fonts: Option<&str>,
+    include_shading: bool,
+) -> String {
+    let mut properties = String::new();
+    match style
+        .and_then(PartialTextStyle::font_families)
+        .and_then(|families| families.first())
+    {
+        Some(family) => {
+            properties.push_str(&run_fonts_named(family.as_str()));
+        }
+        None => {
+            if let Some(default_fonts) = default_fonts {
+                properties.push_str(default_fonts);
+            }
+        }
+    }
+    if let Some(size) = style.and_then(PartialTextStyle::size) {
+        let half = metrics::half_points(size.points());
+        properties.push_str(&format!(
+            "<w:sz w:val=\"{half}\"/><w:szCs w:val=\"{half}\"/>"
+        ));
+    }
+    if let Some(font_weight) = style.and_then(PartialTextStyle::weight)
+        && font_weight.get() >= 600
+    {
+        properties.push_str("<w:b/>");
+    }
+    if let Some(slant) = style.and_then(PartialTextStyle::slant)
+        && slant == FontSlant::Italic
+    {
+        properties.push_str("<w:i/>");
+    }
+    if let Some(color) = style.and_then(PartialTextStyle::foreground) {
+        properties.push_str(&format!(
+            "<w:color w:val=\"{}\"/>",
+            color.hex().trim_start_matches('#')
+        ));
+    }
+    if include_shading && let Some(color) = style.and_then(PartialTextStyle::background) {
+        properties.push_str(&shading(Some(color)));
+    }
+    properties
+}
+
+fn run_fonts_named(family: &str) -> String {
+    let name = xml::escape_attribute(family);
+    format!(
+        "<w:rFonts w:ascii=\"{name}\" w:hAnsi=\"{name}\" w:eastAsia=\"{name}\" w:cs=\"{name}\"/>"
+    )
+}
+
+fn shading(background: Option<Color>) -> String {
+    background.map_or_else(String::new, |color| {
+        format!(
+            "<w:shd w:val=\"clear\" w:color=\"auto\" w:fill=\"{}\"/>",
+            color.hex().trim_start_matches('#')
+        )
+    })
 }
 
 fn foreground(face: &TextFace) -> String {

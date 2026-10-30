@@ -4,6 +4,14 @@
 
 *Major updates and feature releases.*
 
+### 0.23.0
+
+- Added `background` to `formatting.paragraph`, to `emphasis` and `strong`, and to the new `formatting.quote` and `formatting.code_block` sections, so every text format now takes a `foreground` and a `background`.
+- Added `formatting.paragraph.code` and `formatting.paragraph.strikethrough`, which style inline code and strikethrough with the same keys as `emphasis` and `strong`. They patch the renderer defaults, so a map with only `foreground` keeps the monospace face of code.
+- Added `formatting.quote` and `formatting.code_block`, the first entries outside `paragraph`, with face, color and fill; both change nothing while undeclared.
+- A body fill applies to body paragraphs only: quotes, lists and table cells keep the background their own style declares. Inline fills cover the span itself.
+- Regenerated the ODT examples, which carry the version in `meta:generator`; page counts stay 4, 4 and 3.
+
 ### 0.22.0
 
 - Every color field now accepts the 148 CSS named colors and the `#rgb` short form, besides `#rrggbb`, in any case: `foreground: navy`, `border_color: "#123"`. Names resolve to an RGB triple when the template loads, so no backend changed. `transparent` is rejected because the model has no alpha; `none` stays the way to clear an inherited value.

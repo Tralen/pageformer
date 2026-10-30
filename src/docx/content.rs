@@ -13,6 +13,7 @@ use crate::template::Template;
 use crate::xml;
 
 use super::numbering::{Numbering, NumberingKind};
+use super::styles::partial_properties;
 
 /// A packaged image and the relationship that points to it.
 pub(crate) struct Media {
@@ -43,16 +44,24 @@ enum Span {
 
 fn foreground_run(template: &Template, span: Span) -> String {
     let paragraph = template.formatting().paragraph();
-    let face = match span {
+    let inline = match span {
         Span::Emphasis => paragraph.emphasis(),
         Span::Strong => paragraph.strong(),
     };
-    face.foreground().map_or_else(String::new, |color| {
-        format!(
+    let mut output = String::new();
+    if let Some(color) = inline.face().foreground() {
+        output.push_str(&format!(
             "<w:color w:val=\"{}\"/>",
             color.hex().trim_start_matches('#')
-        )
-    })
+        ));
+    }
+    if let Some(color) = inline.background() {
+        output.push_str(&format!(
+            "<w:shd w:val=\"clear\" w:color=\"auto\" w:fill=\"{}\"/>",
+            color.hex().trim_start_matches('#')
+        ));
+    }
+    output
 }
 
 fn file_name(virtual_name: &str) -> &str {
@@ -183,13 +192,13 @@ impl<'a> Builder<'a> {
             }
             Block::Paragraph(inlines) => {
                 let runs = self.runs(inlines, "");
-                let paragraph = self.paragraph(None, "", &runs);
+                let paragraph = self.paragraph(self.body_style(), "", &runs);
                 self.document.push_str(&paragraph);
             }
             Block::NumberedParagraph(paragraph) => {
                 let mut runs = self.run(&format!("{}. ", paragraph.number()), "");
                 runs.push_str(&self.runs(paragraph.content(), ""));
-                let output = self.paragraph(None, "", &runs);
+                let output = self.paragraph(self.body_style(), "", &runs);
                 self.document.push_str(&output);
             }
             Block::List(list) => self.list(list, depth),
@@ -225,6 +234,22 @@ impl<'a> Builder<'a> {
             output.push_str(&format!("<w:spacing{before}{after}/>"));
         }
         output
+    }
+
+    /// Body paragraphs take the fill through their own style, so quotes and lists
+    /// keep the background their own style declares.
+    fn body_style(&self) -> Option<&'static str> {
+        if self
+            .template
+            .formatting()
+            .paragraph()
+            .background()
+            .is_some()
+        {
+            Some("BodyParagraph")
+        } else {
+            None
+        }
     }
 
     fn paragraph(&self, style: Option<&str>, extra: &str, runs: &str) -> String {
@@ -287,6 +312,11 @@ impl<'a> Builder<'a> {
             }
             Inline::Strikethrough(content) => {
                 let mut merged = String::from("<w:strike/>");
+                merged.push_str(&partial_properties(
+                    self.template.formatting().paragraph().strikethrough(),
+                    None,
+                    true,
+                ));
                 merged.push_str(properties);
                 self.runs(content, &merged)
             }

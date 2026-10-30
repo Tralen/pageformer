@@ -290,6 +290,77 @@ formatting:
 }
 
 #[test]
+fn the_paragraph_and_block_styles_reach_the_package() {
+    let document = markdown::parse(
+        "# Título\n\nTexto com `código` e ~~riscado~~.\n\n> Citação.\n\n```rust\nfn main() {}\n```\n",
+    )
+    .expect("the document must parse");
+    let template = Template::from_yaml(
+        r##"
+version: "0.5"
+formatting:
+  paragraph:
+    background: "#fafafa"
+    code:
+      foreground: navy
+      background: "#eeeeee"
+    strikethrough:
+      foreground: crimson
+  quote:
+    background: "#f0f0f0"
+  code_block:
+    background: "#111111"
+    foreground: "#eeeeee"
+"##,
+    )
+    .expect("the template must be valid");
+
+    let bytes = docx::render(&document, &template, &Assets::default()).expect("the package");
+    let mut archive = ZipArchive::new(Cursor::new(bytes)).expect("the package must be a ZIP");
+    let styles = entry(&mut archive, "word/styles.xml");
+    let content = entry(&mut archive, "word/document.xml");
+
+    assert!(
+        styles.contains(
+            "<w:style w:type=\"paragraph\" w:styleId=\"BodyParagraph\"><w:name w:val=\"Body Paragraph\"/><w:basedOn w:val=\"Normal\"/><w:qFormat/><w:pPr><w:shd w:val=\"clear\" w:color=\"auto\" w:fill=\"fafafa\"/></w:pPr></w:style>"
+        ),
+        "the body paragraph carries the fill through its own style: {styles}"
+    );
+    let code_char = styles
+        .split("w:styleId=\"CodeChar\"")
+        .nth(1)
+        .expect("the inline code style");
+    assert!(
+        code_char.contains("<w:color w:val=\"000080\"/>"),
+        "{styles}"
+    );
+    assert!(
+        code_char.contains("<w:shd w:val=\"clear\" w:color=\"auto\" w:fill=\"eeeeee\"/>"),
+        "{styles}"
+    );
+    let quote = styles
+        .split("w:styleId=\"Quote\"")
+        .nth(1)
+        .expect("the quote style");
+    assert!(
+        quote.contains("<w:shd w:val=\"clear\" w:color=\"auto\" w:fill=\"f0f0f0\"/>"),
+        "{styles}"
+    );
+    let code = styles
+        .split("w:styleId=\"Code\"")
+        .nth(1)
+        .expect("the code style");
+    assert!(
+        code.contains("<w:shd w:val=\"clear\" w:color=\"auto\" w:fill=\"111111\"/>"),
+        "{styles}"
+    );
+    assert!(
+        content.contains("<w:strike/><w:color w:val=\"dc143c\"/>"),
+        "the strikethrough run takes the color: {content}"
+    );
+}
+
+#[test]
 fn a_heading_rule_is_a_bottom_border_of_its_level() {
     let document = markdown::parse("## Escopo\n\nTexto.\n").expect("the document must parse");
     let template = Template::from_yaml(

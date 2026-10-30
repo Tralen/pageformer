@@ -46,8 +46,8 @@ fn a_minimal_template_uses_the_documented_defaults() {
     assert_eq!(paragraph.leading().points(), 7.8);
     assert_eq!(paragraph.spacing(), None);
     assert_eq!(paragraph.alignment(), ParagraphAlignment::Justified);
-    assert_eq!(paragraph.emphasis().slant(), FontSlant::Italic);
-    assert_eq!(paragraph.strong().weight(), FontWeight::BOLD);
+    assert_eq!(paragraph.emphasis().face().slant(), FontSlant::Italic);
+    assert_eq!(paragraph.strong().face().weight(), FontWeight::BOLD);
 
     let heading = template.formatting().heading().levels();
     assert_eq!(heading[0].face().size().points(), 18.0);
@@ -122,10 +122,10 @@ formatting:
     assert_eq!(paragraph.spacing().map(Length::points), Some(6.0));
     assert_eq!(paragraph.alignment(), ParagraphAlignment::Left);
     assert_eq!(paragraph.face().font_families().len(), 2);
-    assert_eq!(paragraph.emphasis().weight(), FontWeight::BOLD);
-    assert_eq!(paragraph.emphasis().slant(), FontSlant::Italic);
-    assert_eq!(paragraph.strong().weight(), FontWeight::BOLD);
-    assert_eq!(paragraph.strong().slant(), FontSlant::Italic);
+    assert_eq!(paragraph.emphasis().face().weight(), FontWeight::BOLD);
+    assert_eq!(paragraph.emphasis().face().slant(), FontSlant::Italic);
+    assert_eq!(paragraph.strong().face().weight(), FontWeight::BOLD);
+    assert_eq!(paragraph.strong().face().slant(), FontSlant::Italic);
 
     let heading = template.formatting().heading().levels();
     assert_eq!(heading[0].face().font_families().len(), 1);
@@ -766,8 +766,8 @@ formatting:
     let paragraph = template.formatting().paragraph();
     let hex = |face: &pageformer::template::TextFace| face.foreground().map(|color| color.hex());
     assert_eq!(hex(paragraph.face()), Some("#112233".to_owned()));
-    assert_eq!(hex(paragraph.emphasis()), Some("#445566".to_owned()));
-    assert_eq!(hex(paragraph.strong()), Some("#667788".to_owned()));
+    assert_eq!(hex(paragraph.emphasis().face()), Some("#445566".to_owned()));
+    assert_eq!(hex(paragraph.strong().face()), Some("#667788".to_owned()));
     for level in template.formatting().heading().levels() {
         assert_eq!(hex(level.face()), Some("#778899".to_owned()));
     }
@@ -775,13 +775,13 @@ formatting:
     let plain = parse("version: \"0.5\"\n");
     let paragraph = plain.formatting().paragraph();
     assert_eq!(hex(paragraph.face()), None);
-    assert_eq!(hex(paragraph.strong()), None);
+    assert_eq!(hex(paragraph.strong().face()), None);
     assert_eq!(hex(plain.formatting().heading().levels()[0].face()), None);
 
     let inherited =
         parse("version: \"0.5\"\nformatting:\n  paragraph:\n    foreground: \"#112233\"\n");
     assert_eq!(
-        hex(inherited.formatting().paragraph().strong()),
+        hex(inherited.formatting().paragraph().strong().face()),
         None,
         "an inline span inherits the color instead of copying it, so it keeps a heading color"
     );
@@ -828,6 +828,130 @@ fn an_invalid_foreground_names_its_field() {
             value_error_is(&error, field, ValueError::InvalidColor),
             "{field}: {error}"
         );
+    }
+}
+
+#[test]
+fn the_paragraph_and_block_styles_are_read() {
+    let template = parse(
+        r##"
+version: "0.5"
+formatting:
+  paragraph:
+    background: "#fafafa"
+    code:
+      font_families:
+        - DejaVu Sans Mono
+      size: 10
+      weight: semibold
+      style: italic
+      foreground: navy
+      background: "#eeeeee"
+    strikethrough:
+      foreground: crimson
+  quote:
+    foreground: "#334455"
+    background: "#f0f0f0"
+  code_block:
+    font_families:
+      - Liberation Mono
+    size: 9
+    background: "#111111"
+"##,
+    );
+    let paragraph = template.formatting().paragraph();
+    assert_eq!(
+        paragraph.background().map(|color| color.hex()),
+        Some("#fafafa".to_owned())
+    );
+
+    let code = paragraph.code().expect("inline code");
+    assert_eq!(
+        code.font_families()
+            .and_then(|families| families.first())
+            .map(|family| family.as_str()),
+        Some("DejaVu Sans Mono")
+    );
+    assert_eq!(code.size().map(Length::points), Some(10.0));
+    assert_eq!(code.weight().map(|weight| weight.get()), Some(600));
+    assert_eq!(code.slant(), Some(FontSlant::Italic));
+    assert_eq!(
+        code.foreground().map(|color| color.hex()),
+        Some("#000080".to_owned())
+    );
+    assert_eq!(
+        code.background().map(|color| color.hex()),
+        Some("#eeeeee".to_owned())
+    );
+
+    let strike = paragraph.strikethrough().expect("strikethrough");
+    assert_eq!(
+        strike.foreground().map(|color| color.hex()),
+        Some("#dc143c".to_owned())
+    );
+    assert_eq!(strike.size(), None, "an undeclared key changes nothing");
+
+    let quote = template.formatting().quote().expect("quote");
+    assert_eq!(
+        quote.background().map(|color| color.hex()),
+        Some("#f0f0f0".to_owned())
+    );
+    let block = template.formatting().code_block().expect("code block");
+    assert_eq!(block.size().map(Length::points), Some(9.0));
+    assert_eq!(
+        block.background().map(|color| color.hex()),
+        Some("#111111".to_owned())
+    );
+}
+
+#[test]
+fn the_new_styles_are_absent_by_default() {
+    let template = parse("version: \"0.5\"\n");
+    let paragraph = template.formatting().paragraph();
+    assert_eq!(paragraph.background(), None);
+    assert!(paragraph.code().is_none());
+    assert!(paragraph.strikethrough().is_none());
+    assert!(template.formatting().quote().is_none());
+    assert!(template.formatting().code_block().is_none());
+    assert_eq!(paragraph.emphasis().background(), None);
+}
+
+#[test]
+fn an_invalid_color_in_a_new_style_names_its_field() {
+    for (yaml, field) in [
+        (
+            "version: \"0.5\"\nformatting:\n  paragraph:\n    background: notacolor\n",
+            "formatting.paragraph.background",
+        ),
+        (
+            "version: \"0.5\"\nformatting:\n  paragraph:\n    code:\n      foreground: notacolor\n",
+            "formatting.paragraph.code.foreground",
+        ),
+        (
+            "version: \"0.5\"\nformatting:\n  quote:\n    background: notacolor\n",
+            "formatting.quote.background",
+        ),
+        (
+            "version: \"0.5\"\nformatting:\n  code_block:\n    foreground: notacolor\n",
+            "formatting.code_block.foreground",
+        ),
+    ] {
+        let error = Template::from_yaml(yaml).expect_err("an invalid color");
+        assert!(
+            value_error_is(&error, field, ValueError::InvalidColor),
+            "{field}: {error}"
+        );
+    }
+}
+
+#[test]
+fn an_unknown_key_in_a_new_style_is_rejected() {
+    for yaml in [
+        "version: \"0.5\"\nformatting:\n  quote:\n    align: left\n",
+        "version: \"0.5\"\nformatting:\n  paragraph:\n    code:\n      colors: red\n",
+    ] {
+        let error = Template::from_yaml(yaml).expect_err("an unknown key");
+        assert!(matches!(error, TemplateError::Yaml { .. }), "{error}");
     }
 }
 

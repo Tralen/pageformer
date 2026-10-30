@@ -10,6 +10,8 @@ use crate::document::{
 use crate::template::Template;
 
 use super::picture_name;
+use super::styles::{background_attribute, partial_properties};
+use crate::template::PartialTextStyle;
 use crate::xml;
 
 const PREFIX: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
@@ -23,9 +25,7 @@ const PREFIX: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
 <style:style style:name="Heading4Break" style:family="paragraph" style:parent-style-name="Heading4"><style:paragraph-properties fo:break-before="page"/></style:style>
 <style:style style:name="Heading5Break" style:family="paragraph" style:parent-style-name="Heading5"><style:paragraph-properties fo:break-before="page"/></style:style>
 <style:style style:name="Heading6Break" style:family="paragraph" style:parent-style-name="Heading6"><style:paragraph-properties fo:break-before="page"/></style:style>
-<style:style style:name="Code" style:family="paragraph" style:parent-style-name="Standard"><style:text-properties fo:font-family="'Liberation Mono', monospace"/></style:style>
-<style:style style:name="CodeBreak" style:family="paragraph" style:parent-style-name="Code"><style:paragraph-properties fo:break-before="page"/></style:style>
-<style:style style:name="QuoteParagraph" style:family="paragraph" style:parent-style-name="Standard"><style:paragraph-properties fo:margin-left="1cm" fo:margin-right="1cm"/></style:style>
+
 <style:style style:name="ListItem" style:family="paragraph" style:parent-style-name="Standard"><style:paragraph-properties fo:margin-bottom="0cm"/></style:style>
 "#;
 
@@ -37,6 +37,7 @@ pub fn content_xml(document: &Document, template: &Template, assets: &Assets) ->
 
     let mut output = String::new();
     xml::push(&mut output, PREFIX);
+    block_styles(&mut output, template);
     cell_paragraph_styles(&mut output, template);
     horizontal_line_style(&mut output, template);
     xml::push(&mut output, &builder.generated);
@@ -130,7 +131,7 @@ impl<'a> Builder<'a> {
             }
             Block::Paragraph(inlines) => self.paragraph(inlines),
             Block::NumberedParagraph(paragraph) => {
-                let style = self.style_with_break("Standard");
+                let style = self.style_with_break(self.body_style());
                 self.open_paragraph(&style);
                 self.text(&format!("{}. ", paragraph.number()));
                 self.inlines(paragraph.content());
@@ -167,8 +168,24 @@ impl<'a> Builder<'a> {
     }
 
     fn paragraph(&mut self, inlines: &[Inline]) {
-        let style = self.style_with_break("Standard");
+        let style = self.style_with_break(self.body_style());
         self.paragraph_with(&style, inlines);
+    }
+
+    /// Body paragraphs take the fill through their own style, so quotes, lists and
+    /// cells keep the background their own style declares.
+    fn body_style(&self) -> &'static str {
+        if self
+            .template
+            .formatting()
+            .paragraph()
+            .background()
+            .is_some()
+        {
+            "BodyParagraph"
+        } else {
+            "Standard"
+        }
     }
 
     fn paragraph_with(&mut self, style: &str, inlines: &[Inline]) {
@@ -541,6 +558,43 @@ fn cell_paragraph_styles(output: &mut String, template: &Template) {
             ),
         );
     }
+}
+
+/// The code and quote paragraph styles, patched by the template where it declares one.
+fn block_styles(output: &mut String, template: &Template) {
+    let formatting = template.formatting();
+    let code_style = formatting.code_block();
+    let code = partial_properties(
+        code_style,
+        Some("fo:font-family=\"'Liberation Mono', monospace\""),
+    );
+    let code_background = background_attribute(code_style.and_then(PartialTextStyle::background));
+    xml::push_fmt(
+        output,
+        format_args!(
+            "<style:style style:name=\"Code\" style:family=\"paragraph\" style:parent-style-name=\"Standard\"><style:paragraph-properties{code_background}/><style:text-properties {code}/></style:style>\n<style:style style:name=\"CodeBreak\" style:family=\"paragraph\" style:parent-style-name=\"Code\"><style:paragraph-properties fo:break-before=\"page\"/></style:style>\n"
+        ),
+    );
+    if formatting.paragraph().background().is_some() {
+        xml::push(
+            output,
+            "<style:style style:name=\"BodyParagraphBreak\" style:family=\"paragraph\" style:parent-style-name=\"BodyParagraph\"><style:paragraph-properties fo:break-before=\"page\"/></style:style>\n",
+        );
+    }
+    let quote_style = formatting.quote();
+    let quote = partial_properties(quote_style, None);
+    let quote_background = background_attribute(quote_style.and_then(PartialTextStyle::background));
+    let text = if quote.is_empty() {
+        String::new()
+    } else {
+        format!("<style:text-properties {quote}/>")
+    };
+    xml::push_fmt(
+        output,
+        format_args!(
+            "<style:style style:name=\"QuoteParagraph\" style:family=\"paragraph\" style:parent-style-name=\"Standard\"><style:paragraph-properties fo:margin-left=\"1cm\" fo:margin-right=\"1cm\"{quote_background}/>{text}</style:style>\n"
+        ),
+    );
 }
 
 fn horizontal_line_style(output: &mut String, template: &Template) {

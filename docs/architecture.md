@@ -55,7 +55,9 @@ The library is the pure core. File reading, the environment and the terminal liv
 
 Colors accept `#rrggbb`, `#rgb` and the 148 CSS named colors, resolved to an RGB triple when the template loads, so every backend reads the same numeric value and never a name.
 
-Every format shares the semantic template. The current schema defines page size, orientation, margins, running header and footer content, paragraph and heading styles, heading backgrounds and rules that the base map can carry and a level can clear with `none`, the thematic break, weight, style, text color, leading, spacing, inline emphasis and strong overrides, alignment, the letterhead image and table borders, header fill and cell padding.
+Every format shares the semantic template. The current schema defines page size, orientation, margins, running header and footer content, paragraph and heading styles, a body fill, heading backgrounds and rules that the base map can carry and a level can clear with `none`, the thematic break, weight, style, text color, leading, spacing, inline emphasis, strong, code and strikethrough overrides, quote and code block styles, alignment, the letterhead image and table borders, header fill and cell padding.
+
+A body fill belongs to body paragraphs only. Each format applies it through a body paragraph style, so a quote, a list item or a table cell keeps the background its own style declares, and an inline background fills the span itself.
 
 The promise is consistency of presentation, not identical content distribution. Pagination differs between paged formats, such as PDF, and reflowable formats, such as ODT, DOCX and EPUB. The project does not try to force the same distribution. Widows and orphans must be avoided where the engine allows it. Typst already avoids them through its paragraph costs, so the template exposes no widow or orphan field until a fixture needs one.
 

@@ -12,9 +12,16 @@ use crate::document::{
     TaskState,
 };
 use crate::template::{
-    HeadingStyle, Length, ParagraphAlignment, RuleStyle, RunningText, TableStyle, Template,
-    TextFace, is_lowercase_token,
+    Color, HeadingStyle, InlineStyle, Length, ParagraphAlignment, PartialTextStyle, RuleStyle,
+    RunningText, TableStyle, Template, TextFace, is_lowercase_token,
 };
+
+/// Whether a styled element is a block or an inline span.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Element {
+    Block,
+    Inline,
+}
 
 use super::assets::AssetMap;
 use super::{FIXED_DAY, FIXED_MONTH, FIXED_YEAR, PdfError};
@@ -37,6 +44,9 @@ struct SourceBuilder<'a> {
     assets: &'a AssetMap,
     table: &'a TableStyle,
     rule: &'a RuleStyle,
+    paragraph_fill: Option<Color>,
+    paragraph_spacing: String,
+    nested: bool,
     footnotes: BTreeMap<String, Vec<Block>>,
     footnote_stack: Vec<String>,
 }
@@ -50,6 +60,13 @@ impl<'a> SourceBuilder<'a> {
             assets,
             table: template.table(),
             rule: template.formatting().rule(),
+            paragraph_fill: template.formatting().paragraph().background(),
+            paragraph_spacing: template
+                .formatting()
+                .paragraph()
+                .spacing()
+                .map_or_else(|| "1.2em".to_owned(), typst_length),
+            nested: false,
             footnotes,
             footnote_stack: Vec::new(),
         }
@@ -162,7 +179,70 @@ impl<'a> SourceBuilder<'a> {
 
         self.inline_style("emph", paragraph.emphasis());
         self.inline_style("strong", paragraph.strong());
+
+        if let Some(style) = paragraph.code() {
+            self.partial_style("raw.where(block: false)", style, Element::Inline);
+        }
+        if let Some(style) = paragraph.strikethrough() {
+            self.partial_style("strike", style, Element::Inline);
+        }
+        if let Some(style) = template.formatting().quote() {
+            self.partial_style("quote.where(block: true)", style, Element::Block);
+        }
+        if let Some(style) = template.formatting().code_block() {
+            self.partial_style("raw.where(block: true)", style, Element::Block);
+        }
         self.output.push('\n');
+    }
+
+    /// Applies the declared keys of a partial style, leaving the rest untouched.
+    fn partial_style(&mut self, selector: &str, style: &PartialTextStyle, element: Element) {
+        let mut properties = Vec::new();
+        if let Some(families) = style.font_families() {
+            let mut list = String::from("(");
+            for family in families {
+                let _ = write!(list, "{}, ", typst_string(family.as_str()));
+            }
+            list.push(')');
+            properties.push(format!("font: {list}"));
+        }
+        if let Some(size) = style.size() {
+            properties.push(format!("size: {}", typst_length(size)));
+        }
+        if let Some(weight) = style.weight() {
+            properties.push(format!("weight: {}", weight.get()));
+        }
+        if let Some(slant) = style.slant() {
+            properties.push(format!("style: {}", typst_string(slant.as_str())));
+        }
+        if let Some(foreground) = style.foreground() {
+            properties.push(format!("fill: rgb(\"{}\")", foreground.hex()));
+        }
+        if !properties.is_empty() {
+            let _ = writeln!(
+                self.output,
+                "#show {selector}: set text({})",
+                properties.join(", ")
+            );
+        }
+        if let Some(background) = style.background() {
+            match element {
+                Element::Block => {
+                    let _ = writeln!(
+                        self.output,
+                        "#show {selector}: set block(fill: rgb(\"{}\"), width: 100%)",
+                        background.hex()
+                    );
+                }
+                Element::Inline => {
+                    let _ = writeln!(
+                        self.output,
+                        "#show {selector}: it => box(fill: rgb(\"{}\"), inset: 0pt)[#it]",
+                        background.hex()
+                    );
+                }
+            }
+        }
     }
 
     fn language_rules(&mut self, language: &Language) {
@@ -173,7 +253,8 @@ impl<'a> SourceBuilder<'a> {
         }
     }
 
-    fn inline_style(&mut self, element: &str, face: &TextFace) {
+    fn inline_style(&mut self, element: &str, inline: &InlineStyle) {
+        let face = inline.face();
         let _ = write!(self.output, "#show {element}: set text(font: (");
         for family in face.font_families() {
             let _ = write!(self.output, "{}, ", typst_string(family.as_str()));
@@ -186,6 +267,13 @@ impl<'a> SourceBuilder<'a> {
             typst_string(face.slant().as_str()),
             fill_argument(face)
         );
+        if let Some(background) = inline.background() {
+            let _ = writeln!(
+                self.output,
+                "#show {element}: it => highlight(fill: rgb(\"{}\"), extent: 0pt, it)",
+                background.hex()
+            );
+        }
     }
 
     fn running(
@@ -325,6 +413,29 @@ impl<'a> SourceBuilder<'a> {
         self.output.push('\n');
     }
 
+    /// Opens a paragraph, adding the body fill when the template declares one.
+    /// Quotes and lists keep their own background.
+    fn open_paragraph(&mut self) {
+        if !self.nested && self.paragraph_fill.is_some() {
+            let spacing = self.paragraph_spacing.clone();
+            if let Some(fill) = self.paragraph_fill {
+                let _ = write!(
+                    self.output,
+                    "#block(width: 100%, fill: rgb(\"{}\"), inset: 0pt, above: {spacing}, below: {spacing})[",
+                    fill.hex()
+                );
+            }
+        }
+        self.output.push_str("#par[");
+    }
+
+    fn close_paragraph(&mut self) {
+        self.output.push(']');
+        if !self.nested && self.paragraph_fill.is_some() {
+            self.output.push(']');
+        }
+    }
+
     fn blocks(&mut self, blocks: &[Block]) -> Result<(), PdfError> {
         for block in blocks {
             self.block(block)?;
@@ -341,22 +452,24 @@ impl<'a> SourceBuilder<'a> {
                 self.output.push(']');
             }
             Block::Paragraph(inlines) => {
-                self.output.push_str("#par[");
+                self.open_paragraph();
                 self.inlines(inlines)?;
-                self.output.push(']');
+                self.close_paragraph();
             }
             Block::NumberedParagraph(paragraph) => {
-                self.output.push_str("#par[");
+                self.open_paragraph();
                 self.output
                     .push_str(&escape_markup(&format!("{}. ", paragraph.number())));
                 self.inlines(paragraph.content())?;
-                self.output.push(']');
+                self.close_paragraph();
             }
             Block::List(list) => self.list(list)?,
             Block::Table(table) => self.table(table)?,
             Block::Quote(quote) => {
                 self.output.push_str("#quote(block: true)[\n");
+                let nested = std::mem::replace(&mut self.nested, true);
                 self.blocks(quote.blocks())?;
+                self.nested = nested;
                 self.output.push(']');
             }
             Block::CodeBlock(code) => self.code_block(code),
@@ -470,6 +583,7 @@ impl<'a> SourceBuilder<'a> {
                 );
             }
         }
+        let outer = std::mem::replace(&mut self.nested, true);
         for item in list.items() {
             self.output.push_str("  [");
             match item.task() {
@@ -480,6 +594,7 @@ impl<'a> SourceBuilder<'a> {
             self.item_blocks(item.blocks())?;
             self.output.push_str("],\n");
         }
+        self.nested = outer;
         self.output.push(')');
         Ok(())
     }
@@ -1426,6 +1541,148 @@ mod tests {
         assert!(
             source.contains("  fill: rgb(\"#112233\"),"),
             "the document text sets the color: {source}"
+        );
+    }
+
+    #[test]
+    fn the_paragraph_background_wraps_a_paragraph_with_its_own_spacing() {
+        let template = Template::from_yaml(
+            "version: \"0.5\"\nformatting:\n  paragraph:\n    background: \"#fafafa\"\n    spacing: 12\n",
+        )
+        .expect("the template");
+        let source =
+            typst_source(&paragraph("Texto"), &template, &AssetMap::new()).expect("the source");
+        assert!(
+            source.contains(
+                "#block(width: 100%, fill: rgb(\"#fafafa\"), inset: 0pt, above: 12.000pt, below: 12.000pt)[#par[Texto]]"
+            ),
+            "{source}"
+        );
+    }
+
+    #[test]
+    fn a_paragraph_background_skips_quotes_and_lists() {
+        let template = Template::from_yaml(
+            "version: \"0.5\"\nformatting:\n  paragraph:\n    background: \"#fafafa\"\n",
+        )
+        .expect("the template");
+        let document = Document::new(
+            Metadata::default(),
+            vec![
+                Block::Quote(crate::document::Quote::new(
+                    crate::document::QuoteKind::Plain,
+                    vec![Block::Paragraph(vec![Inline::Text("Citação".to_owned())])],
+                )),
+                Block::List(List::new(
+                    ListStart::Unordered,
+                    vec![ListItem::new(
+                        None,
+                        vec![Block::Paragraph(vec![Inline::Text("Item".to_owned())])],
+                    )],
+                    true,
+                )),
+            ],
+        );
+        let source = typst_source(&document, &template, &AssetMap::new()).expect("the source");
+        assert!(
+            source.contains("#quote(block: true)[\n#par[Citação]"),
+            "a quote paragraph keeps its own background: {source}"
+        );
+        assert!(
+            !source.contains("#block(width: 100%, fill: rgb(\"#fafafa\"), inset: 0pt, above: 1.2em, below: 1.2em)[#par[Citação]]"),
+            "{source}"
+        );
+    }
+
+    #[test]
+    fn a_paragraph_background_keeps_the_default_spacing() {
+        let template = Template::from_yaml(
+            "version: \"0.5\"\nformatting:\n  paragraph:\n    background: \"#fafafa\"\n",
+        )
+        .expect("the template");
+        let source =
+            typst_source(&paragraph("Texto"), &template, &AssetMap::new()).expect("the source");
+        assert!(
+            source.contains("above: 1.2em, below: 1.2em)[#par[Texto]]"),
+            "the default paragraph spacing is kept: {source}"
+        );
+    }
+
+    #[test]
+    fn an_inline_background_is_a_zero_extent_highlight() {
+        let template = Template::from_yaml(
+            "version: \"0.5\"\nformatting:\n  paragraph:\n    emphasis:\n      background: \"#eeeeee\"\n    strong:\n      background: navy\n",
+        )
+        .expect("the template");
+        let source =
+            typst_source(&paragraph("Texto"), &template, &AssetMap::new()).expect("the source");
+        assert!(
+            source.contains("#show emph: it => highlight(fill: rgb(\"#eeeeee\"), extent: 0pt, it)"),
+            "{source}"
+        );
+        assert!(
+            source
+                .contains("#show strong: it => highlight(fill: rgb(\"#000080\"), extent: 0pt, it)"),
+            "{source}"
+        );
+    }
+
+    #[test]
+    fn a_partial_style_emits_only_the_declared_keys() {
+        let template = Template::from_yaml(
+            "version: \"0.5\"\nformatting:\n  paragraph:\n    code:\n      foreground: navy\n",
+        )
+        .expect("the template");
+        let source =
+            typst_source(&paragraph("Texto"), &template, &AssetMap::new()).expect("the source");
+        assert!(
+            source.contains("#show raw.where(block: false): set text(fill: rgb(\"#000080\"))\n"),
+            "{source}"
+        );
+        assert!(
+            !source.contains("raw.where(block: false): set text(font:"),
+            "an undeclared font is not emitted: {source}"
+        );
+    }
+
+    #[test]
+    fn a_partial_background_wraps_inline_content_in_a_box() {
+        let template = Template::from_yaml(
+            "version: \"0.5\"\nformatting:\n  paragraph:\n    strikethrough:\n      background: \"#eeeeee\"\n",
+        )
+        .expect("the template");
+        let source =
+            typst_source(&paragraph("Texto"), &template, &AssetMap::new()).expect("the source");
+        assert!(
+            source.contains("#show strike: it => box(fill: rgb(\"#eeeeee\"), inset: 0pt)[#it]"),
+            "{source}"
+        );
+    }
+
+    #[test]
+    fn the_quote_and_code_block_styles_reach_typst() {
+        let template = Template::from_yaml(
+            "version: \"0.5\"\nformatting:\n  quote:\n    background: \"#f0f0f0\"\n  code_block:\n    font_families:\n      - Liberation Mono\n    background: \"#111111\"\n",
+        )
+        .expect("the template");
+        let source =
+            typst_source(&paragraph("Texto"), &template, &AssetMap::new()).expect("the source");
+        assert!(
+            source.contains(
+                "#show quote.where(block: true): set block(fill: rgb(\"#f0f0f0\"), width: 100%)"
+            ),
+            "{source}"
+        );
+        assert!(
+            source
+                .contains("#show raw.where(block: true): set text(font: (\"Liberation Mono\", ))"),
+            "{source}"
+        );
+        assert!(
+            source.contains(
+                "#show raw.where(block: true): set block(fill: rgb(\"#111111\"), width: 100%)"
+            ),
+            "{source}"
         );
     }
 

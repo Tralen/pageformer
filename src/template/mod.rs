@@ -1040,26 +1040,36 @@ pub struct ParagraphStyle {
     leading: Length,
     spacing: Option<Length>,
     alignment: ParagraphAlignment,
-    emphasis: TextFace,
-    strong: TextFace,
+    background: Option<Color>,
+    emphasis: InlineStyle,
+    strong: InlineStyle,
+    code: Option<PartialTextStyle>,
+    strikethrough: Option<PartialTextStyle>,
 }
 
 impl ParagraphStyle {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         face: TextFace,
         leading: Length,
         spacing: Option<Length>,
         alignment: ParagraphAlignment,
-        emphasis: TextFace,
-        strong: TextFace,
+        background: Option<Color>,
+        emphasis: InlineStyle,
+        strong: InlineStyle,
+        code: Option<PartialTextStyle>,
+        strikethrough: Option<PartialTextStyle>,
     ) -> Self {
         Self {
             face,
             leading,
             spacing,
             alignment,
+            background,
             emphasis,
             strong,
+            code,
+            strikethrough,
         }
     }
 
@@ -1079,12 +1089,85 @@ impl ParagraphStyle {
         self.alignment
     }
 
-    pub fn emphasis(&self) -> &TextFace {
+    /// The fill behind each body paragraph, across the text width.
+    pub fn background(&self) -> Option<Color> {
+        self.background
+    }
+
+    pub fn emphasis(&self) -> &InlineStyle {
         &self.emphasis
     }
 
-    pub fn strong(&self) -> &TextFace {
+    pub fn strong(&self) -> &InlineStyle {
         &self.strong
+    }
+
+    /// The inline code style, when the template declares one.
+    pub fn code(&self) -> Option<&PartialTextStyle> {
+        self.code.as_ref()
+    }
+
+    /// The strikethrough style, when the template declares one.
+    pub fn strikethrough(&self) -> Option<&PartialTextStyle> {
+        self.strikethrough.as_ref()
+    }
+}
+
+/// A paragraph decoration that inherits the paragraph face and can add a fill.
+#[derive(Debug, Clone, PartialEq)]
+pub struct InlineStyle {
+    face: TextFace,
+    background: Option<Color>,
+}
+
+impl InlineStyle {
+    pub fn new(face: TextFace, background: Option<Color>) -> Self {
+        Self { face, background }
+    }
+
+    pub fn face(&self) -> &TextFace {
+        &self.face
+    }
+
+    pub fn background(&self) -> Option<Color> {
+        self.background
+    }
+}
+
+/// A style that patches the backend defaults: an undeclared key changes nothing.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct PartialTextStyle {
+    font_families: Option<Vec<FontFamily>>,
+    size: Option<Length>,
+    weight: Option<FontWeight>,
+    slant: Option<FontSlant>,
+    foreground: Option<Color>,
+    background: Option<Color>,
+}
+
+impl PartialTextStyle {
+    pub fn font_families(&self) -> Option<&[FontFamily]> {
+        self.font_families.as_deref()
+    }
+
+    pub fn size(&self) -> Option<Length> {
+        self.size
+    }
+
+    pub fn weight(&self) -> Option<FontWeight> {
+        self.weight
+    }
+
+    pub fn slant(&self) -> Option<FontSlant> {
+        self.slant
+    }
+
+    pub fn foreground(&self) -> Option<Color> {
+        self.foreground
+    }
+
+    pub fn background(&self) -> Option<Color> {
+        self.background
     }
 }
 
@@ -1209,15 +1292,35 @@ pub struct Formatting {
     paragraph: ParagraphStyle,
     heading: HeadingStyles,
     rule: RuleStyle,
+    quote: Option<PartialTextStyle>,
+    code_block: Option<PartialTextStyle>,
 }
 
 impl Formatting {
-    pub fn new(paragraph: ParagraphStyle, heading: HeadingStyles, rule: RuleStyle) -> Self {
+    pub fn new(
+        paragraph: ParagraphStyle,
+        heading: HeadingStyles,
+        rule: RuleStyle,
+        quote: Option<PartialTextStyle>,
+        code_block: Option<PartialTextStyle>,
+    ) -> Self {
         Self {
             paragraph,
             heading,
             rule,
+            quote,
+            code_block,
         }
+    }
+
+    /// The block quote style, when the template declares one.
+    pub fn quote(&self) -> Option<&PartialTextStyle> {
+        self.quote.as_ref()
+    }
+
+    /// The fenced code block style, when the template declares one.
+    pub fn code_block(&self) -> Option<&PartialTextStyle> {
+        self.code_block.as_ref()
     }
 
     pub fn paragraph(&self) -> &ParagraphStyle {
@@ -1366,6 +1469,8 @@ struct RawFormatting {
     paragraph: Option<RawParagraph>,
     heading: Option<RawHeading>,
     rule: Option<RawRule>,
+    quote: Option<RawInlineStyle>,
+    code_block: Option<RawInlineStyle>,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -1376,11 +1481,14 @@ struct RawParagraph {
     weight: Option<String>,
     style: Option<FontSlant>,
     foreground: Option<String>,
+    background: Option<String>,
     leading: Option<String>,
     spacing: Option<String>,
     alignment: Option<ParagraphAlignment>,
     emphasis: Option<RawInlineStyle>,
     strong: Option<RawInlineStyle>,
+    code: Option<RawInlineStyle>,
+    strikethrough: Option<RawInlineStyle>,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -1391,6 +1499,7 @@ struct RawInlineStyle {
     weight: Option<String>,
     style: Option<FontSlant>,
     foreground: Option<String>,
+    background: Option<String>,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -1546,7 +1655,37 @@ fn convert_formatting(raw: RawFormatting) -> Result<Formatting, TemplateError> {
         convert_paragraph(raw.paragraph.unwrap_or_default())?,
         convert_headings(raw.heading.unwrap_or_default())?,
         convert_rule(raw.rule.unwrap_or_default(), "formatting.rule")?,
+        raw.quote
+            .map(|raw| convert_partial(raw, "formatting.quote"))
+            .transpose()?,
+        raw.code_block
+            .map(|raw| convert_partial(raw, "formatting.code_block"))
+            .transpose()?,
     ))
+}
+
+fn convert_partial(raw: RawInlineStyle, prefix: &str) -> Result<PartialTextStyle, TemplateError> {
+    let size = raw
+        .size
+        .map(|text| parse_length_field(&text, &format!("{prefix}.size")))
+        .transpose()?;
+    if size.is_some_and(|size| size.points() <= 0.0) {
+        return Err(value_error(format!("{prefix}.size"), ValueError::Zero));
+    }
+    Ok(PartialTextStyle {
+        font_families: raw
+            .font_families
+            .map(|values| parse_families(values, &format!("{prefix}.font_families")))
+            .transpose()?,
+        size,
+        weight: raw
+            .weight
+            .map(|text| parse_weight(&text, &format!("{prefix}.weight")))
+            .transpose()?,
+        slant: raw.style,
+        foreground: parse_optional_color(raw.foreground, &format!("{prefix}.foreground"))?,
+        background: parse_optional_color(raw.background, &format!("{prefix}.background"))?,
+    })
 }
 
 fn convert_rule(raw: RawRule, prefix: &str) -> Result<RuleStyle, TemplateError> {
@@ -1596,6 +1735,7 @@ fn convert_paragraph(raw: RawParagraph) -> Result<ParagraphStyle, TemplateError>
     )?;
     let slant = raw.style.unwrap_or(FontSlant::Normal);
     let foreground = parse_optional_color(raw.foreground, "formatting.paragraph.foreground")?;
+    let background = parse_optional_color(raw.background, "formatting.paragraph.background")?;
     let face = TextFace::new(families, size, weight, slant)
         .map_err(|problem| value_error("formatting.paragraph", problem))?
         .with_foreground(foreground);
@@ -1616,8 +1756,24 @@ fn convert_paragraph(raw: RawParagraph) -> Result<ParagraphStyle, TemplateError>
         None,
         Some(FontWeight::BOLD),
     )?;
+    let code = raw
+        .code
+        .map(|raw| convert_partial(raw, "formatting.paragraph.code"))
+        .transpose()?;
+    let strikethrough = raw
+        .strikethrough
+        .map(|raw| convert_partial(raw, "formatting.paragraph.strikethrough"))
+        .transpose()?;
     Ok(ParagraphStyle::new(
-        face, leading, spacing, alignment, emphasis, strong,
+        face,
+        leading,
+        spacing,
+        alignment,
+        background,
+        emphasis,
+        strong,
+        code,
+        strikethrough,
     ))
 }
 
@@ -1627,7 +1783,7 @@ fn convert_inline(
     prefix: &str,
     semantic_slant: Option<FontSlant>,
     semantic_weight: Option<FontWeight>,
-) -> Result<TextFace, TemplateError> {
+) -> Result<InlineStyle, TemplateError> {
     let mut families = base.font_families().to_vec();
     let mut size = base.size();
     let mut weight = semantic_weight.unwrap_or(base.weight());
@@ -1635,6 +1791,7 @@ fn convert_inline(
     // Only a declared color is stored: without one, the span inherits the
     // surrounding color, so emphasis inside a heading keeps the heading color.
     let mut foreground = None;
+    let mut background = None;
     if let Some(raw) = raw {
         if let Some(values) = raw.font_families {
             families = parse_families(values, &format!("{prefix}.font_families"))?;
@@ -1654,13 +1811,14 @@ fn convert_inline(
                     .map_err(|problem| value_error(format!("{prefix}.foreground"), problem))?,
             );
         }
+        background = parse_optional_color(raw.background, &format!("{prefix}.background"))?;
     }
     if size.points() <= 0.0 {
         return Err(value_error(format!("{prefix}.size"), ValueError::Zero));
     }
     TextFace::new(families, size, weight, slant)
         .map_err(|problem| value_error(prefix, problem))
-        .map(|face| face.with_foreground(foreground))
+        .map(|face| InlineStyle::new(face.with_foreground(foreground), background))
 }
 
 fn parse_optional_color(
@@ -2125,8 +2283,8 @@ mod tests {
         assert_eq!(paragraph.face().weight(), FontWeight::NORMAL);
         assert_eq!(paragraph.face().slant(), FontSlant::Normal);
         assert_eq!(paragraph.leading().points(), 7.8);
-        assert_eq!(paragraph.emphasis().slant(), FontSlant::Italic);
-        assert_eq!(paragraph.strong().weight(), FontWeight::BOLD);
+        assert_eq!(paragraph.emphasis().face().slant(), FontSlant::Italic);
+        assert_eq!(paragraph.strong().face().weight(), FontWeight::BOLD);
 
         let heading = template.formatting().heading().levels();
         assert_eq!(heading[0].face().size().points(), 18.0);

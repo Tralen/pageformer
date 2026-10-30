@@ -45,6 +45,7 @@ formatting:
     weight: normal
     style: normal
     foreground: "#222222"
+    background: "#fdfdfd"
     leading: 7.8
     spacing: 24
     alignment: justified
@@ -52,6 +53,16 @@ formatting:
       style: italic
     strong:
       weight: bold
+    code:
+      foreground: "#7a2a5a"
+      background: "#f2eef6"
+    strikethrough:
+      foreground: "#7a2a2a"
+  quote:
+    foreground: "#2a4d7a"
+    background: "#eef4fb"
+  code_block:
+    background: "#f4f4f4"
   heading:
     font_families:
       - Linux Biolinum O
@@ -168,13 +179,16 @@ The header and footer use the paragraph face. Their content sits inside the top 
 - `weight`: `thin`, `extralight`, `light`, `normal`, `medium`, `semibold`, `bold`, `extrabold` or `black`, or a number from 100 to 900. The default is `normal`.
 - `style`: `normal` or `italic`. The default is `normal`.
 - `foreground`: the text color, as a [color](#colors). When omitted, the text is black.
+- `background`: the fill behind each body paragraph, as a [color](#colors). It covers the text width and applies to body paragraphs only: quotes, lists and table cells keep the background their own style declares. When omitted, there is no fill.
 - `leading`: extra space between lines, as a length. The default is `7.8pt`.
 - `spacing`: space between paragraphs. When omitted, Typst's default spacing applies (`1.2em`).
 - `alignment`: `justified` or `left`. The default is `justified`.
 - `emphasis`: a map of overrides for `*...*` and `_..._`. It inherits from `paragraph`; its `style` defaults to `italic`.
 - `strong`: a map of overrides for `**...**` and `__...__`. It inherits from `paragraph`; its `weight` defaults to `bold`.
 
-Inside `emphasis` and `strong`, the allowed keys are `font_families`, `size`, `weight`, `style` and `foreground`. Only the declared keys override the paragraph values, so an empty map is valid and changes nothing beyond the semantic default. Without its own `foreground`, an inline span keeps the surrounding color: the paragraph color in body text, and the heading color inside a heading.
+Inside `emphasis` and `strong`, the allowed keys are `font_families`, `size`, `weight`, `style`, `foreground` and `background`. Only the declared keys override the paragraph values, so an empty map is valid and changes nothing beyond the semantic default. Without its own `foreground`, an inline span keeps the surrounding color: the paragraph color in body text, and the heading color inside a heading. A `background` fills the span itself.
+
+`code` and `strikethrough` style inline code spans and strikethrough text. They accept the same keys and are optional: while a key stays undeclared, the renderer keeps what it already does, so a map with only `foreground` changes the color and leaves the monospace font alone. For `code`, the monospace family the office formats already use stays the default until `font_families` is declared.
 
 ### `formatting.heading`
 
@@ -200,6 +214,10 @@ A level may declare `rule`, a line drawn below its text, with the keys of [`form
 Below a heading, `spacing_before` is the gap between the text and the line, which defaults to zero, and the line takes the heading's `spacing_after` below it, unless the rule declares its own `spacing_after`.
 
 The template sets explicit values for each level. There is no hidden multiplier per level: what the YAML declares is what the PDF uses.
+
+### `formatting.quote` and `formatting.code_block`
+
+Block quotes and fenced code blocks are paragraphs with their own style, outside `paragraph`. Both accept `font_families`, `size`, `weight`, `style`, `foreground` and `background`, and both change nothing while undeclared. A quote keeps the body face and the one centimeter indent; a code block keeps its monospace face.
 
 ### `formatting.rule`
 

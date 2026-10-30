@@ -328,6 +328,73 @@ formatting:
 }
 
 #[test]
+fn the_paragraph_and_block_styles_reach_the_package() {
+    let document = markdown::parse(
+        "# Título\n\nTexto com `código` e ~~riscado~~.\n\n> Citação.\n\n```rust\nfn main() {}\n```\n",
+    )
+    .expect("the document must parse");
+    let template = Template::from_yaml(
+        r##"
+version: "0.5"
+formatting:
+  paragraph:
+    background: "#fafafa"
+    code:
+      foreground: navy
+      background: "#eeeeee"
+    strikethrough:
+      foreground: crimson
+  quote:
+    background: "#f0f0f0"
+  code_block:
+    background: "#111111"
+    foreground: "#eeeeee"
+"##,
+    )
+    .expect("the template must be valid");
+
+    let bytes = odt::render(&document, &template, &Assets::default()).expect("the package");
+    let mut archive = ZipArchive::new(Cursor::new(bytes)).expect("the package must be a ZIP");
+    let styles = entry(&mut archive, "styles.xml");
+    let content = entry(&mut archive, "content.xml");
+    for (name, text) in [("styles.xml", &styles), ("content.xml", &content)] {
+        roxmltree::Document::parse(text)
+            .unwrap_or_else(|error| panic!("{name} is not well formed: {error}"));
+    }
+
+    assert!(
+        styles.contains(
+            "style:name=\"BodyParagraph\" style:family=\"paragraph\" style:parent-style-name=\"Standard\""
+        ) && styles.contains("<style:paragraph-properties fo:background-color=\"#fafafa\"/>"),
+        "the body paragraph carries the fill through its own style: {styles}"
+    );
+    let code_inline = styles
+        .split("style:name=\"CodeInline\"")
+        .nth(1)
+        .expect("the inline code style");
+    assert!(code_inline.contains("fo:color=\"#000080\""), "{styles}");
+    assert!(
+        code_inline.contains("fo:background-color=\"#eeeeee\""),
+        "{styles}"
+    );
+    let strike = styles
+        .split("style:name=\"Strikethrough\"")
+        .nth(1)
+        .expect("the strikethrough style");
+    assert!(strike.contains("fo:color=\"#dc143c\""), "{styles}");
+    assert!(
+        content.contains("style:name=\"QuoteParagraph\"")
+            && content.contains("fo:background-color=\"#f0f0f0\""),
+        "the quote paragraph carries the fill: {content}"
+    );
+    assert!(
+        content.contains("style:name=\"Code\"")
+            && content.contains("fo:background-color=\"#111111\""),
+        "the code block carries the fill: {content}"
+    );
+}
+
+#[test]
 fn a_heading_fill_scales_with_the_heading_size() {
     let document =
         markdown::parse("# Um\n\nTexto.\n\n## Dois\n\nTexto.\n").expect("the document must parse");

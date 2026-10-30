@@ -5,7 +5,8 @@ use std::collections::BTreeSet;
 use crate::assets::Assets;
 use crate::document::Document;
 use crate::template::{
-    FontSlant, Length, Orientation, ParagraphAlignment, RuleStyle, RunningText, Template, TextFace,
+    Color, FontSlant, InlineStyle, Length, Orientation, ParagraphAlignment, PartialTextStyle,
+    RuleStyle, RunningText, Template, TextFace,
 };
 
 use super::picture_name;
@@ -62,15 +63,31 @@ pub fn styles_xml(document: &Document, template: &Template, assets: &Assets) -> 
         ),
     );
 
+    if let Some(background) = paragraph.background() {
+        xml::push_fmt(
+            &mut output,
+            format_args!(
+                "<style:style style:name=\"BodyParagraph\" style:family=\"paragraph\" style:parent-style-name=\"Standard\" style:next-style-name=\"BodyParagraph\"><style:paragraph-properties fo:background-color=\"{}\"/></style:style>\n",
+                background.hex()
+            ),
+        );
+    }
+
     character_style(&mut output, "Emphasis", paragraph.emphasis());
     character_style(&mut output, "Strong", paragraph.strong());
-    xml::push(
+    partial_character_style(
         &mut output,
-        "<style:style style:name=\"Strikethrough\" style:family=\"text\"><style:text-properties style:text-line-through-style=\"solid\"/></style:style>\n",
+        "Strikethrough",
+        paragraph.strikethrough(),
+        "style:text-line-through-style=\"solid\"",
+        None,
     );
-    xml::push(
+    partial_character_style(
         &mut output,
-        "<style:style style:name=\"CodeInline\" style:family=\"text\"><style:text-properties fo:font-family=\"'Liberation Mono', monospace\"/></style:style>\n",
+        "CodeInline",
+        paragraph.code(),
+        "",
+        Some("fo:font-family=\"'Liberation Mono', monospace\""),
     );
 
     for (index, heading) in template.formatting().heading().levels().iter().enumerate() {
@@ -135,18 +152,96 @@ pub fn styles_xml(document: &Document, template: &Template, assets: &Assets) -> 
     output
 }
 
-fn character_style(output: &mut String, name: &str, face: &TextFace) {
+fn character_style(output: &mut String, name: &str, inline: &InlineStyle) {
+    let face = inline.face();
     xml::push_fmt(
         output,
         format_args!(
-            "<style:style style:name=\"{name}\" style:family=\"text\"><style:text-properties style:font-name=\"{family}\" fo:font-size=\"{size}\" fo:font-weight=\"{weight}\" fo:font-style=\"{slant}\"{color}/></style:style>\n",
+            "<style:style style:name=\"{name}\" style:family=\"text\"><style:text-properties style:font-name=\"{family}\" fo:font-size=\"{size}\" fo:font-weight=\"{weight}\" fo:font-style=\"{slant}\"{color}{background}/></style:style>\n",
             family = xml::escape_attribute(first_family(face)),
             size = xml::points(face.size()),
             weight = weight(face.weight().get()),
             slant = slant(face.slant()),
             color = foreground_attribute(face),
+            background = background_attribute(inline.background()),
         ),
     );
+}
+
+/// A character style built from a partial style: undeclared keys keep the default.
+fn partial_character_style(
+    output: &mut String,
+    name: &str,
+    style: Option<&PartialTextStyle>,
+    extra: &str,
+    default_family: Option<&str>,
+) {
+    let properties = partial_properties(style, default_family);
+    let background = background_attribute(style.and_then(PartialTextStyle::background));
+    let mut all = String::from(extra);
+    if !properties.is_empty() {
+        if !all.is_empty() {
+            all.push(' ');
+        }
+        all.push_str(&properties);
+    }
+    if !background.is_empty() {
+        if !all.is_empty() && !all.ends_with(' ') {
+            all.push(' ');
+        }
+        all.push_str(background.trim_start());
+    }
+    xml::push_fmt(
+        output,
+        format_args!(
+            "<style:style style:name=\"{}\" style:family=\"text\"><style:text-properties {all}/></style:style>\n",
+            xml::escape_attribute(name)
+        ),
+    );
+}
+
+/// The text properties of a partial style, with the first declared family winning
+/// over the default one. The background is not included here: a paragraph
+/// background belongs to the paragraph properties, a character one to the text.
+pub(crate) fn partial_properties(
+    style: Option<&PartialTextStyle>,
+    default_family: Option<&str>,
+) -> String {
+    let mut output = String::new();
+    if let Some(family) = style
+        .and_then(PartialTextStyle::font_families)
+        .and_then(|families| families.first())
+    {
+        output.push_str(&format!(
+            "style:font-name=\"{}\" ",
+            xml::escape_attribute(family.as_str())
+        ));
+    } else if let Some(default_family) = default_family {
+        output.push_str(default_family);
+        output.push(' ');
+    }
+    if let Some(size) = style.and_then(PartialTextStyle::size) {
+        output.push_str(&format!("fo:font-size=\"{}\" ", xml::points(size)));
+    }
+    if let Some(font_weight) = style.and_then(PartialTextStyle::weight) {
+        output.push_str(&format!(
+            "fo:font-weight=\"{}\" ",
+            weight(font_weight.get())
+        ));
+    }
+    if let Some(font_slant) = style.and_then(PartialTextStyle::slant) {
+        output.push_str(&format!("fo:font-style=\"{}\" ", slant(font_slant)));
+    }
+    if let Some(color) = style.and_then(PartialTextStyle::foreground) {
+        output.push_str(&format!("fo:color=\"{}\" ", color.hex()));
+    }
+    output.trim_end().to_owned()
+}
+
+pub(crate) fn background_attribute(background: Option<Color>) -> String {
+    background.map_or_else(String::new, |color| {
+        format!(" fo:background-color=\"{}\"", color.hex())
+    })
 }
 
 fn foreground_attribute(face: &TextFace) -> String {
@@ -158,13 +253,30 @@ fn foreground_attribute(face: &TextFace) -> String {
 fn font_families(template: &Template) -> BTreeSet<String> {
     let paragraph = template.formatting().paragraph();
     let mut families = BTreeSet::new();
-    for face in [paragraph.face(), paragraph.emphasis(), paragraph.strong()] {
+    for face in [
+        paragraph.face(),
+        paragraph.emphasis().face(),
+        paragraph.strong().face(),
+    ] {
         if let Some(family) = face.font_families().first() {
             families.insert(family.as_str().to_owned());
         }
     }
     for heading in template.formatting().heading().levels() {
         if let Some(family) = heading.face().font_families().first() {
+            families.insert(family.as_str().to_owned());
+        }
+    }
+    for style in [
+        paragraph.code(),
+        paragraph.strikethrough(),
+        template.formatting().quote(),
+        template.formatting().code_block(),
+    ]
+    .into_iter()
+    .flatten()
+    {
+        if let Some(family) = style.font_families().and_then(|families| families.first()) {
             families.insert(family.as_str().to_owned());
         }
     }

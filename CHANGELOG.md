@@ -4,6 +4,14 @@
 
 *Major updates and feature releases.*
 
+### 0.32.1
+
+- Renamed the Advanced template field to `Template:`.
+- The confirmed `Selected:` line in `pageformer-publisher` is now baby blue and quieter than the surrounding text.
+- Tooltips no longer take pointer input, so they never block the control under the cursor.
+- The window height now follows the content, including the status footer and the Advanced body when it is open, so the scroll area is gone and no empty band remains below the content.
+- Regenerates the ODT examples for the version in `meta:generator`.
+
 ### 0.32.0
 
 - Added a template override to the Advanced section of `pageformer-publisher`, wired to `DocumentJob::with_template`; an empty field keeps automatic resolution. The Choose button accepts `.yaml` and `.yml`.

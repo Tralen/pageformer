@@ -364,7 +364,10 @@ impl Publisher {
         if let Some(input) = self.session.input.clone() {
             ui.add_space(4.0);
             with_tooltip(
-                ui.label(format!("Selected: {}", input.display())),
+                ui.colored_label(
+                    egui::Color32::from_rgb(0xa7, 0xc7, 0xe7),
+                    format!("Selected: {}", input.display()),
+                ),
                 "The Markdown file to export.",
             );
         }
@@ -373,7 +376,7 @@ impl Publisher {
         let advanced = egui::CollapsingHeader::new("Advanced").show(ui, |ui| {
             let template_row = path_row(
                 ui,
-                "Template file:",
+                "Template:",
                 "Explicit YAML template to use instead of resolving one; leave it empty for automatic resolution.",
                 &mut self.session.template_file,
                 "Explicit YAML template. Leave it empty to use the nearest local file, then the global file, then the embedded fallback.",
@@ -489,15 +492,38 @@ impl eframe::App for Publisher {
         if matches!(self.session.state, State::Working { .. }) {
             ui.ctx().request_repaint_after(Duration::from_millis(100));
         }
+        let mut content_height = 0.0;
         egui::CentralPanel::default().show(ui, |ui| {
-            egui::ScrollArea::vertical()
-                .auto_shrink([false, false])
-                .show(ui, |ui| {
-                    self.render(ui);
-                });
+            let response = ui.vertical(|ui| {
+                self.render(ui);
+            });
+            content_height = response.response.rect.height();
         });
+        let current = ui
+            .ctx()
+            .input(|input| input.viewport().inner_rect.map(|rect| rect.size()))
+            .unwrap_or_else(|| ui.max_rect().size());
+        let target_height = (content_height + CENTRAL_PANEL_MARGIN)
+            .ceil()
+            .max(MIN_INNER_HEIGHT);
+        if (target_height - current.y).abs() >= 1.0 {
+            ui.ctx()
+                .send_viewport_cmd(egui::ViewportCommand::InnerSize(egui::vec2(
+                    current.x,
+                    target_height,
+                )));
+        }
     }
 }
+
+/// The minimum inner width of the window, shared with `main`.
+pub const MIN_INNER_WIDTH: f32 = 520.0;
+
+/// The minimum inner height of the window, shared with `main`.
+pub const MIN_INNER_HEIGHT: f32 = 260.0;
+
+/// The `CentralPanel` inner margin on both sides of the content.
+const CENTRAL_PANEL_MARGIN: f32 = 16.0;
 
 fn with_tooltip(response: egui::Response, text: &str) -> egui::Response {
     let mut tooltip = if response.enabled() {
@@ -505,7 +531,7 @@ fn with_tooltip(response: egui::Response, text: &str) -> egui::Response {
     } else {
         egui::Tooltip::for_disabled(&response)
     };
-    tooltip.popup = tooltip.popup.frame(tooltip_frame());
+    tooltip.popup = tooltip.popup.frame(tooltip_frame()).interactable(false);
     tooltip.show(|ui| show_tooltip(ui, text));
     response
 }

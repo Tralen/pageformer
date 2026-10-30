@@ -4,6 +4,11 @@
 
 *Major updates and feature releases.*
 
+### 0.26.1
+
+- Links are underlined only when the template declares `underline: true`; the default is now `false`, so the default and example templates state the underline explicitly and no backend supplies a hidden one.
+- Regenerates the ODT examples for the version in `meta:generator`. The PDF, DOCX and TXT examples stay byte-identical.
+
 ### 0.26.0
 
 - Added `formatting.paragraph.link`, so links take their face, foreground, background and underline from the template instead of a backend default. The map inherits the paragraph face, `underline` defaults to `true`, and the color stays declared-only; the default and both example templates declare a blue link.

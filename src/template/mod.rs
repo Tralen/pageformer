@@ -1142,8 +1142,8 @@ impl InlineStyle {
     }
 }
 
-/// The link decoration: it inherits the paragraph face and adds an underline by
-/// default, because a link must stay recognizable without a declared color.
+/// The link decoration: it inherits the paragraph face, and both the color and
+/// the underline must be declared by the template.
 #[derive(Debug, Clone, PartialEq)]
 pub struct LinkStyle {
     text: PartialTextStyle,
@@ -2017,9 +2017,8 @@ fn convert_paragraph(raw: RawParagraph) -> Result<ParagraphStyle, TemplateError>
     ))
 }
 
-/// The link style: it always inherits the paragraph face, and its underline is
-/// on unless the template turns it off. A color stays declared-only, like every
-/// other inline style.
+/// The link style: it always inherits the paragraph face, while its underline
+/// and color stay declared-only, like every other inline override.
 fn convert_link(raw: Option<RawLinkStyle>, base: &TextFace) -> Result<LinkStyle, TemplateError> {
     let (raw, underline) = match raw {
         Some(raw) => (
@@ -2031,9 +2030,9 @@ fn convert_link(raw: Option<RawLinkStyle>, base: &TextFace) -> Result<LinkStyle,
                 foreground: raw.foreground,
                 background: raw.background,
             },
-            raw.underline.unwrap_or(true),
+            raw.underline.unwrap_or(false),
         ),
-        None => (RawInlineStyle::default(), true),
+        None => (RawInlineStyle::default(), false),
     };
     let text = convert_partial(raw, "formatting.paragraph.link", base)?;
     Ok(LinkStyle::new(text, underline))
@@ -2567,17 +2566,20 @@ mod tests {
             link.text().foreground().map(Color::hex),
             Some("#112233".to_owned())
         );
-        assert!(link.underline(), "an underline is the semantic default");
+        assert!(
+            !link.underline(),
+            "the underline must be declared, never assumed"
+        );
     }
 
     #[test]
-    fn a_link_underline_can_be_cleared() {
+    fn a_link_underline_is_declared_explicitly() {
         let template = Template::from_yaml(
-            "version: \"0.5\"\nformatting:\n  paragraph:\n    link:\n      underline: false\n",
+            "version: \"0.5\"\nformatting:\n  paragraph:\n    link:\n      underline: true\n",
         )
         .expect("the template");
         let link = template.formatting().paragraph().link();
-        assert!(!link.underline());
+        assert!(link.underline());
         assert!(link.text().foreground().is_none());
     }
 

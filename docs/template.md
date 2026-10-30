@@ -197,13 +197,13 @@ The header and footer use the paragraph face. Their content sits inside the top 
 - `alignment`: `justified` or `left`. The default is `justified`.
 - `emphasis`: a map of overrides for `*...*` and `_..._`. It inherits from `paragraph`; its `style` defaults to `italic`.
 - `strong`: a map of overrides for `**...**` and `__...__`. It inherits from `paragraph`; its `weight` defaults to `bold`.
-- `link`: a map of overrides for links. It inherits from `paragraph`; its `underline` defaults to `true`.
+- `link`: a map of overrides for links. It inherits from `paragraph`; its `underline` defaults to `false`.
 
 Inside `emphasis` and `strong`, the allowed keys are `font_families`, `size`, `weight`, `style`, `foreground` and `background`. Only the declared keys override the paragraph values, so an empty map is valid and changes nothing beyond the semantic default. Without its own `foreground`, an inline span keeps the surrounding color: the paragraph color in body text, and the heading color inside a heading. A `background` fills the span itself.
 
 `code` and `strikethrough` style inline code spans and strikethrough text. They accept the same keys as `emphasis` and `strong`, including `font_families`, and every undeclared key inherits the paragraph face: there is no hidden renderer default. A map with only `foreground` changes the color and keeps the paragraph font.
 
-`link` styles every link, including autolinks and reference links. It accepts the same keys as the other inline styles plus `underline`, a boolean that defaults to `true`. The color and the fill stay declared-only, so a link with no declared color is underlined in the surrounding color; the destination never changes the label.
+`link` styles every link, including autolinks and reference links. It accepts the same keys as the other inline styles plus `underline`, a boolean that defaults to `false`. The color, the fill and the underline stay declared-only, so a link with no declaration keeps the surrounding face and color without an underline; the destination never changes the label.
 
 Because of that, code is monospaced only when the template says so. The default template declares a monospace family for `code`, so the different font has a visible reason in the file instead of being a surprise.
 

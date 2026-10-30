@@ -4,8 +4,8 @@ use std::collections::BTreeMap;
 
 use crate::assets::Assets;
 use crate::document::{
-    Alert, Block, CodeBlock, ColumnAlignment, Destination, Document, FootnoteDefinition,
-    FootnoteId, Inline, List, ListItem, ListStart, Quote, QuoteKind, Table, TableCell, TaskState,
+    Block, CodeBlock, ColumnAlignment, Destination, Document, FootnoteDefinition, FootnoteId,
+    Inline, List, ListItem, ListStart, Quote, QuoteKind, Table, TableCell, TaskState,
 };
 use crate::template::Template;
 
@@ -365,7 +365,7 @@ impl<'a> Builder<'a> {
         if let QuoteKind::Alert(alert) = quote.kind() {
             self.paragraph_with(
                 "QuoteParagraph",
-                &[Inline::Text(format!("[{}]", alert_label(alert)))],
+                &[Inline::Text(format!("[{}]", alert.label()))],
             );
         }
         for block in quote.blocks() {
@@ -439,7 +439,7 @@ impl<'a> Builder<'a> {
                 xml::push_fmt(
                     &mut self.body,
                     format_args!(
-                        "<text:a xlink:type=\"simple\" xlink:href=\"{}\">",
+                        "<text:a text:style-name=\"Link\" xlink:type=\"simple\" xlink:href=\"{}\">",
                         xml::escape_attribute(destination.as_str())
                     ),
                 );
@@ -620,16 +620,6 @@ fn horizontal_line_style(output: &mut String, template: &Template) {
     );
 }
 
-fn alert_label(alert: Alert) -> &'static str {
-    match alert {
-        Alert::Note => "!NOTE",
-        Alert::Tip => "!TIP",
-        Alert::Important => "!IMPORTANT",
-        Alert::Warning => "!WARNING",
-        Alert::Caution => "!CAUTION",
-    }
-}
-
 fn plain_text(inlines: &[Inline]) -> String {
     let mut output = String::new();
     for inline in inlines {
@@ -651,11 +641,6 @@ fn plain_text(inlines: &[Inline]) -> String {
 mod tests {
     use super::*;
     use crate::document::Metadata;
-
-    #[test]
-    fn alert_labels_are_uppercase() {
-        assert_eq!(alert_label(Alert::Warning), "!WARNING");
-    }
 
     #[test]
     fn an_empty_document_still_has_a_body() {

@@ -39,6 +39,9 @@ formatting:
       background: "#f2eef6"
     strikethrough:
       foreground: "#7a2a2a"
+    link:
+      foreground: "#336699"
+      underline: true
   quote:
     foreground: "#2a4d7a"
     background: "#f7fafd"

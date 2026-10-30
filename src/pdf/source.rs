@@ -8,12 +8,12 @@ use std::collections::BTreeMap;
 use std::fmt::Write;
 
 use crate::document::{
-    Block, CodeBlock, ColumnAlignment, Document, Inline, Language, List, ListStart, Table,
-    TaskState,
+    Block, CodeBlock, ColumnAlignment, Document, Inline, Language, List, ListStart, QuoteKind,
+    Table, TaskState,
 };
 use crate::template::{
-    BlockStyle, Color, HeadingStyle, InlineStyle, Length, ParagraphAlignment, PartialTextStyle,
-    RuleStyle, RunningText, TableStyle, Template, TextFace, is_lowercase_token,
+    BlockStyle, Color, HeadingStyle, InlineStyle, Length, LinkStyle, ParagraphAlignment,
+    PartialTextStyle, RuleStyle, RunningText, TableStyle, Template, TextFace, is_lowercase_token,
 };
 
 use super::assets::AssetMap;
@@ -175,6 +175,7 @@ impl<'a> SourceBuilder<'a> {
 
         self.inline_partial("raw.where(block: false)", paragraph.code());
         self.inline_partial("strike", paragraph.strikethrough());
+        self.link_style(paragraph.link());
         self.block_style("quote.where(block: true)", template.formatting().quote());
         self.block_style("raw.where(block: true)", template.formatting().code_block());
         self.output.push('\n');
@@ -192,13 +193,41 @@ impl<'a> SourceBuilder<'a> {
         }
     }
 
+    /// Applies the link decoration: the face, the optional fill, the color and
+    /// the underline the template declares.
+    fn link_style(&mut self, link: &LinkStyle) {
+        self.text_partial("link", link.text());
+        let mut body = String::from("it");
+        if let Some(background) = link.text().background() {
+            body = format!(
+                "highlight(fill: rgb(\"{}\"), extent: 0pt, {body})",
+                background.hex()
+            );
+        }
+        if link.underline() {
+            body = format!("underline({body})");
+        }
+        if body != "it" {
+            let _ = writeln!(self.output, "#show link: it => {body}");
+        }
+    }
+
     /// Applies a block style: text, alignment, and a wrapper that carries the
-    /// fill, the border and the padding of the bordered sides.
+    /// fill, the border and the padding of the bordered sides. A fill adds the
+    /// font-box padding on the top and bottom, the same way a heading fill does,
+    /// so the text does not touch the edges of the band.
     fn block_style(&mut self, selector: &str, style: &BlockStyle) {
         self.text_partial(selector, style.text());
         let justify = matches!(style.alignment(), ParagraphAlignment::Justified);
         let _ = writeln!(self.output, "#show {selector}: set par(justify: {justify})");
         let border = style.border();
+        let fill_inset = match style.text().background() {
+            Some(_) => style
+                .text()
+                .size()
+                .map_or(0.0, |size| size.points() * FILL_PADDING),
+            None => 0.0,
+        };
         let mut arguments = Vec::new();
         if let Some(background) = style.text().background() {
             arguments.push(format!("fill: rgb(\"{}\")", background.hex()));
@@ -211,15 +240,23 @@ impl<'a> SourceBuilder<'a> {
             ("top", border.top()),
             ("bottom", border.bottom()),
         ] {
-            if let Some(thickness) = thickness {
-                strokes.push(format!(
-                    "{side}: {} + rgb(\"{}\")",
-                    typst_length(thickness),
-                    border.color().hex()
-                ));
-                if border.padding().points() > 0.0 {
-                    insets.push(format!("{side}: {}", typst_length(border.padding())));
+            let border_padding = match thickness {
+                Some(thickness) => {
+                    strokes.push(format!(
+                        "{side}: {} + rgb(\"{}\")",
+                        typst_length(thickness),
+                        border.color().hex()
+                    ));
+                    border.padding().points()
                 }
+                None => 0.0,
+            };
+            let padding = match side {
+                "top" | "bottom" => border_padding.max(fill_inset),
+                _ => border_padding,
+            };
+            if padding > 0.0 {
+                insets.push(format!("{side}: {padding:.3}pt"));
             }
         }
         if !strokes.is_empty() {
@@ -491,6 +528,13 @@ impl<'a> SourceBuilder<'a> {
             Block::Quote(quote) => {
                 self.output.push_str("#quote(block: true)[\n");
                 let nested = std::mem::replace(&mut self.nested, true);
+                if let QuoteKind::Alert(alert) = quote.kind() {
+                    self.block(&Block::Paragraph(vec![Inline::Text(format!(
+                        "[{}]",
+                        alert.label()
+                    ))]))?;
+                    self.output.push_str("\n\n");
+                }
                 self.blocks(quote.blocks())?;
                 self.nested = nested;
                 self.output.push(']');
@@ -804,11 +848,12 @@ fn rule_line(rule: &RuleStyle) -> String {
 /// Typst measures a zero-inset block by its cap height and baseline, about 0.667
 /// of the size, while the DOCX fill covers the font's line box, about 1.15 of
 /// the size. The padding of 0.24 on each side makes the PDF band match the DOCX
-/// one, which is the reference for the other formats.
-const HEADING_FILL_PADDING: f64 = 0.24;
+/// one, which is the reference for the other formats. Headings and block fills
+/// share it.
+const FILL_PADDING: f64 = 0.24;
 
 fn fill_padding(size: Length) -> String {
-    format!("{:.3}pt", size.points() * HEADING_FILL_PADDING)
+    format!("{:.3}pt", size.points() * FILL_PADDING)
 }
 
 /// The text of a styled heading, with its fill and the rule drawn below it.
@@ -1232,7 +1277,48 @@ mod tests {
     }
 
     #[test]
-    fn alerts_still_render_as_block_quotes() {
+    fn links_take_the_template_face_color_and_underline() {
+        let document = Document::new(
+            Metadata::default(),
+            vec![Block::Paragraph(vec![Inline::Link {
+                destination: Destination::new("https://example.org"),
+                title: None,
+                content: vec![Inline::Text("site".to_owned())],
+            }])],
+        );
+        let template = Template::embedded().expect("the embedded template");
+        let source = typst_source(&document, &template, &AssetMap::new()).expect("the source");
+        assert!(
+            source.contains("#show link: set text(") && source.contains("fill: rgb(\"#0563c1\")"),
+            "the link takes the template color: {source}"
+        );
+        assert!(
+            source.contains("#show link: it => underline(it)"),
+            "the link keeps the default underline: {source}"
+        );
+    }
+
+    #[test]
+    fn a_link_without_an_underline_is_not_wrapped() {
+        let template = Template::from_yaml(
+            "version: \"0.5\"\nformatting:\n  paragraph:\n    link:\n      underline: false\n      foreground: \"#112233\"\n",
+        )
+        .expect("the template");
+        let document = Document::new(
+            Metadata::default(),
+            vec![Block::Paragraph(vec![Inline::Link {
+                destination: Destination::new("https://example.org"),
+                title: None,
+                content: vec![Inline::Text("site".to_owned())],
+            }])],
+        );
+        let source = typst_source(&document, &template, &AssetMap::new()).expect("the source");
+        assert!(source.contains("fill: rgb(\"#112233\")"), "{source}");
+        assert!(!source.contains("underline("), "{source}");
+    }
+
+    #[test]
+    fn alerts_show_their_label_inside_the_quote() {
         let document = Document::new(
             Metadata::default(),
             vec![Block::Quote(Quote::new(
@@ -1242,7 +1328,28 @@ mod tests {
         );
         let source = source(&document, &AssetMap::new());
         assert!(source.contains("#quote(block: true)["), "{source}");
+        assert!(source.contains("#par[\\[!WARNING\\]]"), "{source}");
         assert!(source.contains("#par[Cuidado\\.]"), "{source}");
+    }
+
+    #[test]
+    fn a_block_fill_pads_the_font_box_on_the_vertical_sides() {
+        let template = Template::from_yaml(
+            "version: \"0.5\"\nformatting:\n  quote:\n    background: \"#eeeeee\"\n    border:\n      left: 3pt\n      color: \"#cccccc\"\n      padding: 8\n",
+        )
+        .expect("the template");
+        let document = Document::new(
+            Metadata::default(),
+            vec![Block::Quote(Quote::new(
+                QuoteKind::Plain,
+                vec![Block::Paragraph(vec![Inline::Text("Citação.".to_owned())])],
+            ))],
+        );
+        let source = typst_source(&document, &template, &AssetMap::new()).expect("the source");
+        assert!(
+            source.contains("inset: (left: 8.000pt, top: 2.880pt, bottom: 2.880pt)"),
+            "the fill keeps the font box and the border keeps its own padding: {source}"
+        );
     }
 
     #[test]
@@ -1694,7 +1801,7 @@ mod tests {
         );
         assert!(
             source.contains(
-                "#show quote.where(block: true): it => block(width: 100%, fill: rgb(\"#f0f0f0\"))[#it]"
+                "#show quote.where(block: true): it => block(width: 100%, fill: rgb(\"#f0f0f0\"), inset: (top: 2.880pt, bottom: 2.880pt))[#it]"
             ),
             "{source}"
         );
@@ -1706,7 +1813,7 @@ mod tests {
         );
         assert!(
             source.contains(
-                "#show raw.where(block: true): it => block(width: 100%, fill: rgb(\"#111111\"))[#it]"
+                "#show raw.where(block: true): it => block(width: 100%, fill: rgb(\"#111111\"), inset: (top: 2.880pt, bottom: 2.880pt))[#it]"
             ),
             "{source}"
         );

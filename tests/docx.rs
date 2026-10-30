@@ -455,6 +455,42 @@ fn footnotes_and_links_are_packaged() {
 }
 
 #[test]
+fn links_take_the_template_style() {
+    let document =
+        markdown::parse("Veja [o site](https://example.org).\n").expect("the document must parse");
+    let template = Template::from_yaml(
+        r##"
+version: "0.5"
+formatting:
+  paragraph:
+    link:
+      foreground: "#112233"
+      underline: true
+"##,
+    )
+    .expect("the template must be valid");
+
+    let bytes = docx::render(&document, &template, &Assets::default()).expect("the package");
+    let mut archive = ZipArchive::new(Cursor::new(bytes)).expect("the package must be a ZIP");
+    let styles = entry(&mut archive, "word/styles.xml");
+    let content = entry(&mut archive, "word/document.xml");
+    let hyperlink = styles
+        .split("w:styleId=\"Hyperlink\"")
+        .nth(1)
+        .expect("the hyperlink character style");
+
+    assert!(
+        hyperlink.contains("<w:color w:val=\"112233\"/>"),
+        "{styles}"
+    );
+    assert!(hyperlink.contains("<w:u w:val=\"single\"/>"), "{styles}");
+    assert!(
+        content.contains("<w:rStyle w:val=\"Hyperlink\"/>"),
+        "{content}"
+    );
+}
+
+#[test]
 fn an_inline_image_is_packaged_and_referenced() {
     let project = TempDir::new().expect("a temporary project");
     fs::write(project.path().join("logo.png"), minimal_png()).expect("the image must be written");

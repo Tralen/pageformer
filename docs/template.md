@@ -58,6 +58,9 @@ formatting:
       background: "#f2eef6"
     strikethrough:
       foreground: "#7a2a2a"
+    link:
+      foreground: "#0563c1"
+      underline: true
   quote:
     foreground: "#2a4d7a"
     background: "#eef4fb"
@@ -125,7 +128,7 @@ Every section and every key is optional except `version`. Missing keys take the 
 
 ### `version`
 
-The schema version is a string in the form `major.minor`, quoted so YAML cannot turn it into a float. This build accepts `"0.5"` and rejects every other value. Version 0.5 replaced the `text` section with `formatting`, made `paragraph` and `heading` explicit, added `weight` and `style`, and added the `emphasis` and `strong` inline overrides. The optional `page.header`, `page.footer` and `table` sections and the frontmatter `date`, `subject` and `keywords` were added inside version 0.5, because omitting them preserves the output of an existing template.
+The schema version is a string in the form `major.minor`, quoted so YAML cannot turn it into a float. This build accepts `"0.5"` and rejects every other value. Version 0.5 replaced the `text` section with `formatting`, made `paragraph` and `heading` explicit, added `weight` and `style`, and added the `emphasis` and `strong` inline overrides. The optional `page.header`, `page.footer`, `table` and `formatting.paragraph.link` sections and the frontmatter `date`, `subject` and `keywords` were added inside version 0.5, because omitting them keeps a valid template.
 
 ### Document metadata
 
@@ -194,10 +197,13 @@ The header and footer use the paragraph face. Their content sits inside the top 
 - `alignment`: `justified` or `left`. The default is `justified`.
 - `emphasis`: a map of overrides for `*...*` and `_..._`. It inherits from `paragraph`; its `style` defaults to `italic`.
 - `strong`: a map of overrides for `**...**` and `__...__`. It inherits from `paragraph`; its `weight` defaults to `bold`.
+- `link`: a map of overrides for links. It inherits from `paragraph`; its `underline` defaults to `true`.
 
 Inside `emphasis` and `strong`, the allowed keys are `font_families`, `size`, `weight`, `style`, `foreground` and `background`. Only the declared keys override the paragraph values, so an empty map is valid and changes nothing beyond the semantic default. Without its own `foreground`, an inline span keeps the surrounding color: the paragraph color in body text, and the heading color inside a heading. A `background` fills the span itself.
 
 `code` and `strikethrough` style inline code spans and strikethrough text. They accept the same keys as `emphasis` and `strong`, including `font_families`, and every undeclared key inherits the paragraph face: there is no hidden renderer default. A map with only `foreground` changes the color and keeps the paragraph font.
+
+`link` styles every link, including autolinks and reference links. It accepts the same keys as the other inline styles plus `underline`, a boolean that defaults to `true`. The color and the fill stay declared-only, so a link with no declared color is underlined in the surrounding color; the destination never changes the label.
 
 Because of that, code is monospaced only when the template says so. The default template declares a monospace family for `code`, so the different font has a visible reason in the file instead of being a surprise.
 
@@ -291,7 +297,7 @@ Images in the Markdown body resolve relative to the Markdown file, not to the te
 
 ## Current backend
 
-Every format reads the text colors: the body, the headings, emphasis and strong. TXT has no color and ignores them. The PDF backend applies the paragraph face, leading, spacing and alignment. It emits one show rule per heading level with the resolved font, size, weight, style and spacing, and show rules for `emph` and `strong` from the inline overrides. A level with `page_break_before` also gets a weak page-break show rule. The backend draws the running header and footer, expands their tokens, applies the table style and explicit page breaks, and writes the frontmatter title, author, subject, keywords, language and date into the PDF metadata. The thematic break follows `formatting.rule`. A heading background and a heading rule are drawn as one block: the fill wraps the text across the full width with a vertical padding of 0.24 of the heading size, so the fill does not hug the glyphs, and the rule sits below it. Typst measures a zero-inset block by its cap height and baseline, while the DOCX fill covers the font's line box, so the padding makes up the difference; the DOCX fill is the reference for the other formats.
+Every format reads the text colors: the body, the headings, emphasis, strong, code, strikethrough and links. TXT has no color and ignores them. The PDF backend applies the paragraph face, leading, spacing and alignment. It emits one show rule per heading level with the resolved font, size, weight, style and spacing, show rules for `emph`, `strong`, `code` and `strike` from the inline overrides, and a `link` rule that carries the face, color, fill and underline. The ODT and DOCX writers map the same keys to their character styles. A level with `page_break_before` also gets a weak page-break show rule. The backend draws the running header and footer, expands their tokens, applies the table style and explicit page breaks, and writes the frontmatter title, author, subject, keywords, language and date into the PDF metadata. The thematic break follows `formatting.rule`. A heading background and a heading rule are drawn as one block: the fill wraps the text across the full width with a vertical padding of 0.24 of the heading size, so the fill does not hug the glyphs, and the rule sits below it. A quote or code block fill uses the same vertical padding, unless a top or bottom border already declares a larger padding for that side. Typst measures a zero-inset block by its cap height and baseline, while the DOCX fill covers the font's line box, so the padding makes up the difference; the DOCX fill is the reference for the other formats.
 
 ## Example
 

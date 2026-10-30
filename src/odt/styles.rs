@@ -83,6 +83,18 @@ pub fn styles_xml(document: &Document, template: &Template, assets: &Assets) -> 
         None,
     );
     partial_character_style(&mut output, "CodeInline", Some(paragraph.code()), "", None);
+    let link = paragraph.link();
+    partial_character_style(
+        &mut output,
+        "Link",
+        Some(link.text()),
+        if link.underline() {
+            "style:text-underline-style=\"solid\""
+        } else {
+            ""
+        },
+        None,
+    );
 
     for (index, heading) in template.formatting().heading().levels().iter().enumerate() {
         let level = index.saturating_add(1);

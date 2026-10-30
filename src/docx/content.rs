@@ -4,8 +4,8 @@ use std::collections::BTreeMap;
 
 use crate::assets::Assets;
 use crate::document::{
-    Alert, Block, CodeBlock, ColumnAlignment, Destination, Document, FootnoteDefinition,
-    FootnoteId, Inline, List, ListItem, ListStart, Quote, QuoteKind, Table, TableCell, TaskState,
+    Block, CodeBlock, ColumnAlignment, Destination, Document, FootnoteDefinition, FootnoteId,
+    Inline, List, ListItem, ListStart, Quote, QuoteKind, Table, TableCell, TaskState,
 };
 use crate::image;
 use crate::metrics;
@@ -583,7 +583,7 @@ impl<'a> Builder<'a> {
 
     fn quote(&mut self, quote: &Quote) {
         if let QuoteKind::Alert(alert) = quote.kind() {
-            let runs = self.run(&format!("[{}]", alert_label(alert)), "");
+            let runs = self.run(&format!("[{}]", alert.label()), "");
             let paragraph = self.paragraph(Some("Quote"), "", &runs);
             self.document.push_str(&paragraph);
         }
@@ -855,16 +855,6 @@ fn drawing_anchor(relationship: &str, width: f64, height: f64) -> String {
 
 pub(crate) fn hyperlink_relationship(media: usize, index: usize) -> String {
     format!("rId{}", 8_usize.saturating_add(media).saturating_add(index))
-}
-
-fn alert_label(alert: Alert) -> &'static str {
-    match alert {
-        Alert::Note => "!NOTE",
-        Alert::Tip => "!TIP",
-        Alert::Important => "!IMPORTANT",
-        Alert::Warning => "!WARNING",
-        Alert::Caution => "!CAUTION",
-    }
 }
 
 fn plain_text(inlines: &[Inline]) -> String {

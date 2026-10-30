@@ -97,7 +97,7 @@ The LibreOffice smoke test converts the examples headlessly; the conversion must
 soffice --headless --convert-to pdf --outdir /tmp/odt-check assets/examples/publicacao/Contrato.odt assets/examples/publicacao/Embargos.odt assets/examples/tecnico/Relatorio.odt
 ```
 
-The three examples match the PDF page counts (4, 4 and 3). Editor rendering can still break a line differently, so treat the count as a regression guard, not as a byte target.
+The three examples match the PDF page counts (4, 4 and 4). Editor rendering can still break a line differently, so treat the count as a regression guard, not as a byte target.
 
 ## DOCX packages
 

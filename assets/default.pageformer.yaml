@@ -35,6 +35,11 @@ formatting:
       font_families:
         - Liberation Mono
         - DejaVu Sans Mono
+    # Links inherit this face. Without a declared color a link is only
+    # underlined, so the template states both here.
+    link:
+      foreground: "#0563c1"
+      underline: true
   code_block:
     font_families:
       - Liberation Mono

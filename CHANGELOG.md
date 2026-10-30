@@ -4,6 +4,13 @@
 
 *Major updates and feature releases.*
 
+### 0.26.0
+
+- Added `formatting.paragraph.link`, so links take their face, foreground, background and underline from the template instead of a backend default. The map inherits the paragraph face, `underline` defaults to `true`, and the color stays declared-only; the default and both example templates declare a blue link.
+- The PDF now shows the `[!KIND]` label of an alert block quote, the same way ODT and DOCX already did, so the three paged formats agree with the documented behavior and the technical fixture.
+- A block fill in the PDF now adds the font-box padding at the top and bottom, the same 0.24 of the size used by heading fills, so a quote fill no longer hugs the text. A top or bottom border keeps its own larger padding.
+- Regenerates the PDF, ODT, DOCX and TXT examples; the PDFs stay deterministic, pass veraPDF as PDF/A-2b and keep their page counts.
+
 ### 0.25.0
 
 - Inline code and fenced code blocks now inherit the paragraph face when a key is undeclared, like every other inline style. There is no hidden monospace default left in the renderers, so a template can explain every font it sees.

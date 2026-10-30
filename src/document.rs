@@ -678,6 +678,19 @@ pub enum Alert {
     Caution,
 }
 
+impl Alert {
+    /// The label shown in brackets at the top of an alert quote.
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Note => "!NOTE",
+            Self::Tip => "!TIP",
+            Self::Important => "!IMPORTANT",
+            Self::Warning => "!WARNING",
+            Self::Caution => "!CAUTION",
+        }
+    }
+}
+
 /// A fenced or indented code block.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CodeBlock {
@@ -829,6 +842,12 @@ mod tests {
                 "`{tag}` should not be a valid language"
             );
         }
+    }
+
+    #[test]
+    fn alert_labels_are_uppercase() {
+        assert_eq!(Alert::Warning.label(), "!WARNING");
+        assert_eq!(Alert::Caution.label(), "!CAUTION");
     }
 
     #[test]

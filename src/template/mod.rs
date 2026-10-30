@@ -1045,6 +1045,7 @@ pub struct ParagraphStyle {
     strong: InlineStyle,
     code: PartialTextStyle,
     strikethrough: PartialTextStyle,
+    link: LinkStyle,
 }
 
 impl ParagraphStyle {
@@ -1059,6 +1060,7 @@ impl ParagraphStyle {
         strong: InlineStyle,
         code: PartialTextStyle,
         strikethrough: PartialTextStyle,
+        link: LinkStyle,
     ) -> Self {
         Self {
             face,
@@ -1070,6 +1072,7 @@ impl ParagraphStyle {
             strong,
             code,
             strikethrough,
+            link,
         }
     }
 
@@ -1111,6 +1114,11 @@ impl ParagraphStyle {
     pub fn strikethrough(&self) -> &PartialTextStyle {
         &self.strikethrough
     }
+
+    /// The link style, resolved from the paragraph face.
+    pub fn link(&self) -> &LinkStyle {
+        &self.link
+    }
 }
 
 /// A paragraph decoration that inherits the paragraph face and can add a fill.
@@ -1131,6 +1139,28 @@ impl InlineStyle {
 
     pub fn background(&self) -> Option<Color> {
         self.background
+    }
+}
+
+/// The link decoration: it inherits the paragraph face and adds an underline by
+/// default, because a link must stay recognizable without a declared color.
+#[derive(Debug, Clone, PartialEq)]
+pub struct LinkStyle {
+    text: PartialTextStyle,
+    underline: bool,
+}
+
+impl LinkStyle {
+    pub fn new(text: PartialTextStyle, underline: bool) -> Self {
+        Self { text, underline }
+    }
+
+    pub fn text(&self) -> &PartialTextStyle {
+        &self.text
+    }
+
+    pub fn underline(&self) -> bool {
+        self.underline
     }
 }
 
@@ -1610,6 +1640,7 @@ struct RawParagraph {
     strong: Option<RawInlineStyle>,
     code: Option<RawInlineStyle>,
     strikethrough: Option<RawInlineStyle>,
+    link: Option<RawLinkStyle>,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -1621,6 +1652,18 @@ struct RawInlineStyle {
     style: Option<FontSlant>,
     foreground: Option<String>,
     background: Option<String>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawLinkStyle {
+    font_families: Option<Vec<String>>,
+    size: Option<String>,
+    weight: Option<String>,
+    style: Option<FontSlant>,
+    foreground: Option<String>,
+    background: Option<String>,
+    underline: Option<bool>,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -1959,6 +2002,7 @@ fn convert_paragraph(raw: RawParagraph) -> Result<ParagraphStyle, TemplateError>
         "formatting.paragraph.strikethrough",
         &face,
     )?;
+    let link = convert_link(raw.link, &face)?;
     Ok(ParagraphStyle::new(
         face,
         leading,
@@ -1969,7 +2013,30 @@ fn convert_paragraph(raw: RawParagraph) -> Result<ParagraphStyle, TemplateError>
         strong,
         code,
         strikethrough,
+        link,
     ))
+}
+
+/// The link style: it always inherits the paragraph face, and its underline is
+/// on unless the template turns it off. A color stays declared-only, like every
+/// other inline style.
+fn convert_link(raw: Option<RawLinkStyle>, base: &TextFace) -> Result<LinkStyle, TemplateError> {
+    let (raw, underline) = match raw {
+        Some(raw) => (
+            RawInlineStyle {
+                font_families: raw.font_families,
+                size: raw.size,
+                weight: raw.weight,
+                style: raw.style,
+                foreground: raw.foreground,
+                background: raw.background,
+            },
+            raw.underline.unwrap_or(true),
+        ),
+        None => (RawInlineStyle::default(), true),
+    };
+    let text = convert_partial(raw, "formatting.paragraph.link", base)?;
+    Ok(LinkStyle::new(text, underline))
 }
 
 fn convert_inline(
@@ -2486,6 +2553,41 @@ mod tests {
         assert_eq!(heading[1].face().size().points(), 14.0);
         assert_eq!(heading[2].face().size().points(), 12.0);
         assert_eq!(heading[0].face().weight(), FontWeight::BOLD);
+    }
+
+    #[test]
+    fn the_link_style_inherits_the_paragraph_face() {
+        let template = Template::from_yaml(
+            "version: \"0.5\"\nformatting:\n  paragraph:\n    size: 11\n    link:\n      foreground: \"#112233\"\n",
+        )
+        .expect("the template");
+        let link = template.formatting().paragraph().link();
+        assert_eq!(link.text().size().map(|size| size.points()), Some(11.0));
+        assert_eq!(
+            link.text().foreground().map(Color::hex),
+            Some("#112233".to_owned())
+        );
+        assert!(link.underline(), "an underline is the semantic default");
+    }
+
+    #[test]
+    fn a_link_underline_can_be_cleared() {
+        let template = Template::from_yaml(
+            "version: \"0.5\"\nformatting:\n  paragraph:\n    link:\n      underline: false\n",
+        )
+        .expect("the template");
+        let link = template.formatting().paragraph().link();
+        assert!(!link.underline());
+        assert!(link.text().foreground().is_none());
+    }
+
+    #[test]
+    fn an_unknown_link_key_is_rejected() {
+        let error = Template::from_yaml(
+            "version: \"0.5\"\nformatting:\n  paragraph:\n    link:\n      colour: navy\n",
+        )
+        .expect_err("the typo must be rejected");
+        assert!(matches!(error, TemplateError::Yaml { .. }), "{error}");
     }
 
     #[test]

@@ -142,8 +142,18 @@ pub(crate) fn styles_xml(document: &Document, template: &Template) -> String {
     xml::push(
         &mut output,
         "<w:style w:type=\"paragraph\" w:styleId=\"FootnoteText\"><w:name w:val=\"footnote text\"/><w:basedOn w:val=\"Normal\"/></w:style>\n\
-         <w:style w:type=\"character\" w:styleId=\"FootnoteReference\"><w:name w:val=\"footnote reference\"/><w:rPr><w:vertAlign w:val=\"superscript\"/></w:rPr></w:style>\n\
-         <w:style w:type=\"character\" w:styleId=\"Hyperlink\"><w:name w:val=\"Hyperlink\"/><w:rPr><w:color w:val=\"0563C1\"/><w:u w:val=\"single\"/></w:rPr></w:style>\n",
+         <w:style w:type=\"character\" w:styleId=\"FootnoteReference\"><w:name w:val=\"footnote reference\"/><w:rPr><w:vertAlign w:val=\"superscript\"/></w:rPr></w:style>\n",
+    );
+    let link = template.formatting().paragraph().link();
+    let mut link_properties = partial_properties(Some(link.text()), None, true);
+    if link.underline() {
+        link_properties.push_str("<w:u w:val=\"single\"/>");
+    }
+    xml::push_fmt(
+        &mut output,
+        format_args!(
+            "<w:style w:type=\"character\" w:styleId=\"Hyperlink\"><w:name w:val=\"Hyperlink\"/><w:rPr>{link_properties}</w:rPr></w:style>\n"
+        ),
     );
     let code_char = partial_rpr(Some(template.formatting().paragraph().code()), None);
     xml::push_fmt(

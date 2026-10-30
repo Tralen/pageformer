@@ -41,6 +41,9 @@ formatting:
       font_families:
         - Liberation Mono
         - DejaVu Sans Mono
+    link:
+      foreground: "#0563c1"
+      underline: true
   code_block:
     font_families:
       - Liberation Mono

@@ -418,6 +418,42 @@ formatting:
 }
 
 #[test]
+fn links_take_the_template_style() {
+    let document =
+        markdown::parse("Veja [o site](https://example.org).\n").expect("the document must parse");
+    let template = Template::from_yaml(
+        r##"
+version: "0.5"
+formatting:
+  paragraph:
+    link:
+      foreground: "#112233"
+      underline: true
+"##,
+    )
+    .expect("the template must be valid");
+
+    let bytes = odt::render(&document, &template, &Assets::default()).expect("the package");
+    let mut archive = ZipArchive::new(Cursor::new(bytes)).expect("the package must be a ZIP");
+    let styles = entry(&mut archive, "styles.xml");
+    let content = entry(&mut archive, "content.xml");
+    let link = styles
+        .split("style:name=\"Link\"")
+        .nth(1)
+        .expect("the link character style");
+
+    assert!(link.contains("fo:color=\"#112233\""), "{styles}");
+    assert!(
+        link.contains("style:text-underline-style=\"solid\""),
+        "{styles}"
+    );
+    assert!(
+        content.contains("<text:a text:style-name=\"Link\" xlink:type=\"simple\""),
+        "{content}"
+    );
+}
+
+#[test]
 fn a_heading_fill_scales_with_the_heading_size() {
     let document =
         markdown::parse("# Um\n\nTexto.\n\n## Dois\n\nTexto.\n").expect("the document must parse");

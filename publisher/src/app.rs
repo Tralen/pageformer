@@ -150,6 +150,7 @@ impl Publisher {
         context.egui_ctx.all_styles_mut(|style| {
             style.spacing.tooltip_width = 340.0;
         });
+        install_fonts(&context.egui_ctx);
         Self {
             session: Session::new(),
             template_label: "not selected".to_owned(),
@@ -260,35 +261,53 @@ impl Publisher {
     }
 
     fn render(&mut self, ui: &mut egui::Ui) {
-        ui.horizontal(|ui| {
-            with_tooltip(
-                ui.label("Template:"),
-                "The template in use: the explicit file from Advanced, or the nearest local file, then the global file, then the embedded fallback.",
-            );
-            with_tooltip(
-                ui.label(egui::RichText::new(&self.template_label).small()),
-                "The resolved template path, or embedded when the binary fallback is used.",
-            );
-            if let Some(path) = self.template_path.clone() {
-                let edit = with_tooltip(
-                    ui.small_button("Edit"),
-                    "Open the template in the default editor.",
-                );
-                if edit.clicked() {
-                    self.open(&path);
-                }
-                if let Some(folder) = path.parent() {
-                    let folder = folder.to_path_buf();
-                    let open_folder = with_tooltip(
-                        ui.small_button("Folder"),
-                        "Open the folder that contains the template.",
+        let template_label = self.template_label.clone();
+        let template_path = self.template_path.clone();
+        let mut edit_template = false;
+        let mut open_template_folder = None;
+        egui::Sides::new()
+            .shrink_left()
+            .truncate()
+            .show(
+                ui,
+                |ui| {
+                    with_tooltip(
+                        ui.label("Template:"),
+                        "The template in use: the explicit file from Advanced, or the nearest local file, then the global file, then the embedded fallback.",
                     );
-                    if open_folder.clicked() {
-                        self.open(&folder);
+                    with_tooltip(
+                        ui.add(egui::Label::new(
+                            egui::RichText::new(&template_label).small(),
+                        )),
+                        &template_label,
+                    );
+                },
+                |ui| {
+                    if template_path.is_some() {
+                        edit_template = with_tooltip(
+                            ui.small_button("Edit"),
+                            "Open the template in the default editor.",
+                        )
+                        .clicked();
+                        if let Some(folder) = template_path.as_deref().and_then(Path::parent) {
+                            let folder = folder.to_path_buf();
+                            let open_folder = with_tooltip(
+                                ui.small_button("Folder"),
+                                "Open the folder that contains the template.",
+                            );
+                            if open_folder.clicked() {
+                                open_template_folder = Some(folder);
+                            }
+                        }
                     }
-                }
-            }
-        });
+                },
+            );
+        if edit_template && let Some(path) = &template_path {
+            self.open(path);
+        }
+        if let Some(folder) = open_template_folder {
+            self.open(&folder);
+        }
 
         ui.add_space(8.0);
 
@@ -296,7 +315,7 @@ impl Publisher {
         let gap = 12.0;
         let spacing = ui.spacing().item_spacing.x;
         let drop_height = 184.0;
-        let drop_width = (ui.available_width() - button_width - gap - spacing).max(220.0);
+        let drop_width = (ui.available_width() - button_width - gap - spacing).max(140.0);
         let working = matches!(self.session.state, State::Working { .. });
         ui.horizontal_top(|ui| {
             let (rect, response) =
@@ -503,13 +522,14 @@ impl eframe::App for Publisher {
             .ctx()
             .input(|input| input.viewport().inner_rect.map(|rect| rect.size()))
             .unwrap_or_else(|| ui.max_rect().size());
+        let target_width = current.x.max(MIN_INNER_WIDTH);
         let target_height = (content_height + CENTRAL_PANEL_MARGIN)
             .ceil()
             .max(MIN_INNER_HEIGHT);
-        if (target_height - current.y).abs() >= 1.0 {
+        if (target_width - current.x).abs() >= 1.0 || (target_height - current.y).abs() >= 1.0 {
             ui.ctx()
                 .send_viewport_cmd(egui::ViewportCommand::InnerSize(egui::vec2(
-                    current.x,
+                    target_width,
                     target_height,
                 )));
         }
@@ -556,8 +576,33 @@ fn show_tooltip(ui: &mut egui::Ui, text: &str) {
     ui.label(
         egui::RichText::new(text)
             .color(egui::Color32::BLACK)
-            .size(15.0),
+            .size(14.0)
+            .family(egui::FontFamily::Name("Tooltip".into())),
     );
+}
+
+/// Registers a regular-weight system sans as the `Tooltip` family, so black
+/// text on the light tooltip keeps crisp stems; the embedded proportional font
+/// remains the fallback when no system font is found.
+fn install_fonts(context: &egui::Context) {
+    let mut definitions = egui::FontDefinitions::default();
+    let fallback = definitions
+        .families
+        .get(&egui::FontFamily::Proportional)
+        .cloned()
+        .unwrap_or_default();
+    let mut family = fallback;
+    if let Some(bytes) = crate::fonts::tooltip_font() {
+        definitions.font_data.insert(
+            "tooltip".to_owned(),
+            std::sync::Arc::new(egui::FontData::from_owned(bytes)),
+        );
+        family.insert(0, "tooltip".to_owned());
+    }
+    definitions
+        .families
+        .insert(egui::FontFamily::Name("Tooltip".into()), family);
+    context.set_fonts(definitions);
 }
 
 /// What one path row reported in a frame.
@@ -581,7 +626,7 @@ fn path_row(
     let choose_width = 78.0;
     let spacing = ui.spacing().item_spacing.x;
     let height = ui.spacing().interact_size.y;
-    let field_width = (ui.available_width() - label_width - choose_width - spacing).max(120.0);
+    let field_width = (ui.available_width() - label_width - choose_width - spacing).max(80.0);
     let mut report = PathRow::default();
     ui.horizontal(|ui| {
         let label_response = with_tooltip(ui.label(label), label_tooltip);

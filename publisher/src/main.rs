@@ -3,6 +3,7 @@
 #![forbid(unsafe_code)]
 
 mod app;
+mod fonts;
 mod open;
 
 fn main() -> eframe::Result {

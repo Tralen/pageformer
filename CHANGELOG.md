@@ -4,6 +4,13 @@
 
 *Major updates and feature releases.*
 
+### 0.32.2
+
+- The `pageformer-publisher` tooltip text now uses a regular-weight system sans: Liberation Sans, DejaVu Sans, Noto Sans or FreeSans on Linux, Segoe UI or Arial on Windows, and Arial on macOS, with the embedded proportional font as the fallback. Black text on the light tooltip keeps crisp stems at 14 points.
+- The minimum inner width of `pageformer-publisher` is now enforced programmatically as well as through the window hint, so the window snaps back to 520 points instead of letting the format buttons clip.
+- The template path truncates with an ellipsis and keeps Edit and Folder visible; the drop box and the Advanced fields may shrink further before any button moves.
+- Regenerates the ODT examples for the version in `meta:generator`.
+
 ### 0.32.1
 
 - Renamed the Advanced template field to `Template:`.

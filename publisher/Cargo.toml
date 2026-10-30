@@ -9,3 +9,6 @@ publish = false
 [dependencies]
 eframe = { version = "0.37.0", default-features = false, features = ["clipboard", "default_fonts", "glow", "x11"] }
 pageformer = { path = ".." }
+
+[target.'cfg(not(target_os = "linux"))'.dependencies]
+rfd = { version = "0.17.2", default-features = false }

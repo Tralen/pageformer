@@ -78,6 +78,12 @@ impl Session {
             .as_deref()
         {
             Some("md") => {
+                self.output_directory = path
+                    .parent()
+                    .filter(|parent| !parent.as_os_str().is_empty())
+                    .unwrap_or_else(|| Path::new("."))
+                    .display()
+                    .to_string();
                 self.input = Some(path);
                 true
             }
@@ -257,67 +263,136 @@ impl Publisher {
         }
     }
 
-    fn render(&mut self, ui: &mut egui::Ui) {
-        ui.heading("Pageformer Publisher");
-        ui.label("Convert a Markdown file with its Pageformer template.");
-        ui.add_space(8.0);
-
-        ui.horizontal(|ui| {
-            ui.label("Markdown:");
-            ui.text_edit_singleline(&mut self.input_field);
-            if ui.button("Use path").clicked() {
-                self.accept_input_field();
-            }
-        });
-        if let Some(input) = self.session.input.clone() {
-            ui.label(format!("Selected: {}", input.display()));
+    fn choose_markdown(&mut self) {
+        if let Some(path) = open::choose_file("Choose a Markdown file", "Markdown", "md") {
+            self.accept_input(path);
         }
+    }
 
+    fn choose_confidential(&mut self) {
+        if let Some(path) = open::choose_file("Choose a confidential INI file", "INI", "ini") {
+            self.session.confidential_file = path.display().to_string();
+        }
+    }
+
+    fn render(&mut self, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
             ui.label("Template:");
-            ui.label(&self.template_label);
+            ui.label(egui::RichText::new(&self.template_label).small());
             if let Some(path) = self.template_path.clone() {
-                if ui.button("Open").clicked() {
+                if ui.small_button("Edit").clicked() {
                     self.open(&path);
                 }
                 if let Some(folder) = path.parent() {
                     let folder = folder.to_path_buf();
-                    if ui.button("Open folder").clicked() {
+                    if ui.small_button("Folder").clicked() {
                         self.open(&folder);
                     }
                 }
             }
         });
 
-        ui.horizontal(|ui| {
-            ui.label("Output directory:");
-            ui.text_edit_singleline(&mut self.session.output_directory);
-        });
-        ui.label("Leave it empty to write beside the source; a document with {NAME} fields needs a directory outside its source tree.");
+        ui.add_space(8.0);
 
-        ui.horizontal(|ui| {
-            ui.label("Confidential file:");
-            ui.text_edit_singleline(&mut self.session.confidential_file);
+        let button_width = 120.0;
+        let gap = 12.0;
+        let drop_height = 184.0;
+        let drop_width = (ui.available_width() - button_width - gap).max(220.0);
+        let working = matches!(self.session.state, State::Working { .. });
+        ui.horizontal_top(|ui| {
+            let (rect, response) =
+                ui.allocate_exact_size(egui::vec2(drop_width, drop_height), egui::Sense::click());
+            let visuals = ui.visuals().clone();
+            let fill = if response.hovered() {
+                visuals.widgets.hovered.bg_fill
+            } else {
+                visuals.extreme_bg_color
+            };
+            ui.painter().rect_filled(rect, 8.0, fill);
+            ui.painter().rect_stroke(
+                rect,
+                8.0,
+                visuals.widgets.inactive.bg_stroke,
+                egui::StrokeKind::Inside,
+            );
+            let font = egui::FontId::proportional(16.0);
+            let color = visuals.text_color();
+            let first = if self.session.input.is_some() {
+                "Drop another .md here"
+            } else {
+                "Drop your .md here"
+            };
+            ui.painter().text(
+                rect.center() + egui::vec2(0.0, -10.0),
+                egui::Align2::CENTER_CENTER,
+                first,
+                font.clone(),
+                color,
+            );
+            ui.painter().text(
+                rect.center() + egui::vec2(0.0, 12.0),
+                egui::Align2::CENTER_CENTER,
+                "or click to choose",
+                font,
+                color,
+            );
+            if !working && response.clicked() {
+                self.choose_markdown();
+            }
+
+            ui.add_space(gap);
+            ui.vertical(|ui| {
+                ui.set_width(button_width);
+                let enabled = self.session.can_export();
+                for format in Format::ALL {
+                    let button = egui::Button::new(format.name().to_uppercase())
+                        .min_size(egui::vec2(button_width, 36.0));
+                    if ui.add_enabled(enabled, button).clicked() {
+                        self.start(format);
+                    }
+                }
+            });
         });
+
+        if let Some(input) = self.session.input.clone() {
+            ui.add_space(4.0);
+            ui.label(format!("Selected: {}", input.display()));
+        }
 
         ui.add_space(8.0);
         ui.horizontal(|ui| {
-            ui.label("Export:");
-            let enabled = self.session.can_export();
-            for format in Format::ALL {
-                if ui
-                    .add_enabled(enabled, egui::Button::new(format.name().to_uppercase()))
-                    .clicked()
-                {
-                    self.start(format);
-                }
+            ui.label("Output:");
+            ui.add(
+                egui::TextEdit::singleline(&mut self.session.output_directory)
+                    .desired_width(f32::INFINITY),
+            );
+        });
+        ui.label("A document with {NAME} fields needs a folder outside the source tree.");
+        ui.horizontal(|ui| {
+            ui.label("Confidential:");
+            ui.add(
+                egui::TextEdit::singleline(&mut self.session.confidential_file)
+                    .desired_width(320.0),
+            );
+            if ui.button("Choose").clicked() {
+                self.choose_confidential();
             }
+        });
+
+        egui::CollapsingHeader::new("Advanced").show(ui, |ui| {
+            ui.horizontal(|ui| {
+                ui.label("Markdown path:");
+                ui.text_edit_singleline(&mut self.input_field);
+                if ui.button("Use path").clicked() {
+                    self.accept_input_field();
+                }
+            });
         });
 
         ui.add_space(8.0);
         match self.session.state.clone() {
             State::Idle => {
-                ui.label("Drop a Markdown file here or paste a path.");
+                ui.label("Drop a Markdown file or click the box to choose.");
             }
             State::Working { format } => {
                 ui.horizontal(|ui| {
@@ -331,12 +406,12 @@ impl Publisher {
                     format!("Wrote {}", output.display()),
                 );
                 ui.horizontal(|ui| {
-                    if ui.button("Open output").clicked() {
+                    if ui.button("Open").clicked() {
                         self.open(&output);
                     }
                     if let Some(folder) = output.parent() {
                         let folder = folder.to_path_buf();
-                        if ui.button("Open folder").clicked() {
+                        if ui.button("Folder").clicked() {
                             self.open(&folder);
                         }
                     }
@@ -415,6 +490,7 @@ mod tests {
 
         assert!(session.can_export());
         assert_eq!(session.input, Some(PathBuf::from("docs/A.md")));
+        assert_eq!(session.output_directory, "docs");
     }
 
     #[test]
@@ -478,7 +554,8 @@ mod tests {
 
     #[test]
     fn the_output_stays_beside_the_source_without_a_directory() {
-        let session = session_with_input("docs/A.md");
+        let mut session = session_with_input("docs/A.md");
+        session.output_directory.clear();
 
         assert_eq!(
             session.output_path(Format::Pdf),

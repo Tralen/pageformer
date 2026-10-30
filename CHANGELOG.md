@@ -4,6 +4,13 @@
 
 *Major updates and feature releases.*
 
+### 0.31.1
+
+- Reworked the `pageformer-publisher` window to follow the sketch: the format buttons sit in a column on the right of a large drop box, and the template label keeps the edit and folder actions at the top.
+- The drop box is clickable and opens a file chooser; on Linux it uses zenity, so it works on i3 without a desktop portal. Drag and drop remains available when the source supports XDND.
+- The output directory is filled with the Markdown file's folder when a file is selected, so the default is visible instead of implicit.
+- Regenerates the ODT examples for the version in `meta:generator`.
+
 ### 0.31.0
 
 - Added `pageformer-publisher`, a workspace member with the minimal egui converter: drop or paste a Markdown path, choose PDF, ODT, DOCX or TXT, export and open the output. It shows the resolved template, an optional output directory and an optional confidential INI file.

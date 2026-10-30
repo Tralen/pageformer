@@ -172,15 +172,15 @@ A phase is closed only when all of the following hold:
 
 **Goal.** Expose the pipeline in a minimal egui converter without duplicating any of it. The WYSIWYG editor, Pageweaver, is a separate project; it calls the same library for export and starts only after 1.0.0.
 
-**Status.** Started in 0.31.0: `pageformer-publisher` builds, its state machine and paths are tested, and it calls the shared pipeline on a worker thread. The windowed smoke test is manual; Pageweaver starts after 1.0.0.
+**Status.** Started in 0.31.0; in 0.31.1 the window follows `SKETCH.md`, with the format buttons in a column on the right, a clickable drop box backed by zenity on Linux, and the output folder prefilled from the source. The state machine and paths are tested; the windowed smoke test is manual, and Pageweaver starts after 1.0.0.
 
 **Work.**
 
 - The pipeline and the export API are in the library (`src/pipeline.rs`); the CLI, the minimal GUI and Pageweaver call the same functions.
-- Ship a small converter window, `pageformer-publisher`: a drop box, format buttons enabled only after a valid Markdown file, a template label with edit and open-folder actions, a status line and an open-output action. The CLI remains the main workflow.
+- Ship a small converter window, `pageformer-publisher`: a clickable drop box with the format buttons in a column on the right, a template label with edit and open-folder actions, a status line and an open-output action. The CLI remains the main workflow.
 - Model the window as a state machine with `Idle`, `Working`, `Succeeded` and `Failed`. Render on a worker thread and communicate through a channel, so the frame loop never blocks; a second request while working is disabled, not queued.
 - Call the same pipeline. The GUI never parses Markdown, resolves a template or writes a file itself.
-- Require an output directory outside the source tree when the document contains placeholders, and never display a confidential value.
+- Require an output directory outside the source tree when the document contains placeholders, default the field to the source folder, and never display a confidential value.
 - Show errors in the status line and never panic on a bad file, a missing template or a failed render.
 - Test the pure state transitions, input validation and button enablement. Keep the manual smoke test documented; use snapshot tests only if they stay deterministic.
 

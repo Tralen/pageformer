@@ -537,7 +537,7 @@ impl<'a> Builder<'a> {
         xml::push_fmt(
             &mut self.body,
             format_args!(
-                "<text:note text:note-class=\"footnote\" text:id=\"ftn{number}\"><text:note-citation>{number}</text:note-citation><text:note-body>"
+                "<text:note text:note-class=\"footnote\" text:id=\"ftn{number}\"><text:note-citation text:style-name=\"Footnote_20_anchor\">{number}</text:note-citation><text:note-body>"
             ),
         );
         self.active.push(key.to_owned());

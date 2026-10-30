@@ -292,6 +292,38 @@ fn every_inline_construct_renders() {
 }
 
 #[test]
+fn unicode_task_markers_are_embedded() {
+    let document =
+        markdown::parse("- [x] Feito\n- [ ] Pendente\n").expect("the document must parse");
+    let template = Template::from_yaml(
+        r##"
+version: "0.6"
+formatting:
+  paragraph:
+    font_families:
+      - DejaVu Sans
+  list:
+    task:
+      bullet: false
+      done:
+        marker: "☑"
+      todo:
+        marker: "☐"
+"##,
+    )
+    .expect("the template must be valid");
+
+    let output =
+        pdf::render(&document, &template, &Assets::default()).expect("the document must render");
+    assert!(
+        output.warnings().is_empty(),
+        "the document produced warnings: {:?}",
+        output.warnings()
+    );
+    assert!(contains(output.bytes(), b"pdfaid:part"), "no PDF/A marker");
+}
+
+#[test]
 fn local_images_are_loaded_and_named() {
     let project = TempDir::new().expect("a temporary project");
     fs::write(project.path().join("logo.png"), b"not a real png")

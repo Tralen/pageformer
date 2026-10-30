@@ -4,6 +4,12 @@
 
 *Major updates and feature releases.*
 
+### 0.28.1
+
+- ODT footnote citations are now superscript both in the text and in the note body, using the `Footnote anchor` and `Footnote Symbol` character styles at `super 58%`. The PDF and DOCX already did this.
+- Documented that a task `marker` accepts Unicode glyphs such as `☑`, `☐`, `✔` and `✗`, and that a monochrome symbol is the safe choice for PDF/A. The schema already carried the string; the tests now cover a Unicode pair.
+- Regenerates the ODT examples for the generator version and the new footnote styles. The PDF, DOCX and TXT examples stay byte-identical.
+
 ### 0.28.0
 
 - Added `formatting.list.task`, with `done` and `todo` marker strings, text overrides for each state, a `gap` in non-breaking spaces and a `bullet` flag. With `bullet: false`, a task-only unordered list drops the list bullet and lets the checkbox be the visible marker; mixed and ordered lists keep their marker.

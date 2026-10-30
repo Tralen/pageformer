@@ -83,6 +83,10 @@ pub fn styles_xml(document: &Document, template: &Template, assets: &Assets) -> 
         None,
     );
     partial_character_style(&mut output, "CodeInline", Some(paragraph.code()), "", None);
+    xml::push(
+        &mut output,
+        "<style:style style:name=\"Footnote_20_Symbol\" style:display-name=\"Footnote Symbol\" style:family=\"text\"><style:text-properties style:text-position=\"super 58%\"/></style:style>\n<style:style style:name=\"Footnote_20_anchor\" style:display-name=\"Footnote anchor\" style:family=\"text\"><style:text-properties style:text-position=\"super 58%\"/></style:style>\n",
+    );
     let task = template.formatting().list().task();
     for (name, marker) in [("TaskDone", task.done()), ("TaskTodo", task.todo())] {
         partial_character_style(&mut output, name, Some(marker.text()), "", None);

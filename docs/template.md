@@ -302,6 +302,8 @@ Task list items are a GFM extension, not CommonMark: the `[x]` and `[ ]` markers
 
 The marker is inline at the start of the item, so a wrapped line aligns with the item indent, not under the text after the checkbox. TXT ignores the template and keeps `[ ]` and `[x]` for copy-as-text.
 
+`marker` is a string, so it accepts any Unicode glyph, such as `☑`, `☐`, `✔` or `✗`. The PDF embeds it through Typst's font fallback; when the output must be deterministic, declare a `font_families` that contains the glyph. Prefer a monochrome symbol for PDF/A, because a color emoji may not embed with the required profile.
+
 ### `formatting.rule`
 
 The thematic break, written as `---`, `***` or `___` in the Markdown body, is drawn as a horizontal rule across the text width. The same keys declare the rule under a heading level, in `formatting.heading.h1` to `h6`, and every format reads them the same way:

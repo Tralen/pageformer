@@ -1018,6 +1018,16 @@ formatting:
 }
 
 #[test]
+fn task_markers_accept_unicode() {
+    let template = parse(
+        "version: \"0.6\"\nformatting:\n  list:\n    task:\n      done:\n        marker: \"☑\"\n      todo:\n        marker: \"☐\"\n",
+    );
+    let task = template.formatting().list().task();
+    assert_eq!(task.done().marker(), "☑");
+    assert_eq!(task.todo().marker(), "☐");
+}
+
+#[test]
 fn an_empty_task_marker_is_rejected() {
     for yaml in [
         "version: \"0.6\"\nformatting:\n  list:\n    task:\n      done:\n        marker: \"\"\n",

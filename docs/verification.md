@@ -89,7 +89,7 @@ A passing PDF/A run prints `PASS <path> 2b`. The tests also assert the PDF heade
 
 ## ODT packages
 
-`tests/odt.rs` unzips the package with the `zip` dev-dependency, parses every XML part with `roxmltree`, asserts that `mimetype` is first and stored, that the header fill, heading size, list markers, list formats, item styles and task marker styles follow the template, and that two renders are byte-identical. The same tests assert that a confidential value never reaches `meta.xml`.
+`tests/odt.rs` unzips the package with the `zip` dev-dependency, parses every XML part with `roxmltree`, asserts that `mimetype` is first and stored, that the header fill, heading size, list markers, list formats, item styles, task marker styles and superscript footnote citations follow the template, and that two renders are byte-identical. The same tests assert that a confidential value never reaches `meta.xml`.
 
 The LibreOffice smoke test converts the examples headlessly; the conversion must succeed without repair:
 

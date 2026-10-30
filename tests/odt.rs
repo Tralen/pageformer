@@ -226,14 +226,23 @@ fn footnotes_alerts_and_page_breaks_are_mapped() {
     let bytes = render(&document);
     let mut archive = ZipArchive::new(Cursor::new(bytes)).expect("the package must be a ZIP");
     let content = entry(&mut archive, "content.xml");
+    let styles = entry(&mut archive, "styles.xml");
 
     assert!(
         content.contains("<text:note text:note-class=\"footnote\""),
         "{content}"
     );
     assert!(
-        content.contains("<text:note-citation>1</text:note-citation>"),
-        "{content}"
+        content.contains(
+            "<text:note-citation text:style-name=\"Footnote_20_anchor\">1</text:note-citation>"
+        ),
+        "the citation takes the superscript anchor style: {content}"
+    );
+    assert!(
+        styles.contains("style:name=\"Footnote_20_Symbol\"")
+            && styles.contains("style:name=\"Footnote_20_anchor\"")
+            && styles.contains("style:text-position=\"super 58%\""),
+        "the footnote symbol and anchor are superscript: {styles}"
     );
     assert!(content.contains("[!WARNING]"), "{content}");
     assert!(

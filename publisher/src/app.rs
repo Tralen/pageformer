@@ -38,6 +38,7 @@ struct ExportRequest {
     output: PathBuf,
     format: Format,
     confidential_file: Option<PathBuf>,
+    template: Option<PathBuf>,
 }
 
 /// One finished export, with the warnings already redacted.
@@ -52,6 +53,7 @@ struct Session {
     input: Option<PathBuf>,
     output_directory: String,
     confidential_file: String,
+    template_file: String,
     state: State,
 }
 
@@ -61,6 +63,7 @@ impl Session {
             input: None,
             output_directory: String::new(),
             confidential_file: String::new(),
+            template_file: String::new(),
             state: State::Idle,
         }
     }
@@ -109,11 +112,8 @@ impl Session {
         let input = self.input.clone()?;
         let source_root = self.source_root()?;
         let output = self.output_path(format)?;
-        let confidential_file = if self.confidential_file.trim().is_empty() {
-            None
-        } else {
-            Some(PathBuf::from(self.confidential_file.trim()))
-        };
+        let confidential_file = explicit_path(&self.confidential_file);
+        let template = explicit_path(&self.template_file);
         self.state = State::Working { format };
         Some(ExportRequest {
             input,
@@ -121,6 +121,7 @@ impl Session {
             output,
             format,
             confidential_file,
+            template,
         })
     }
 
@@ -147,7 +148,7 @@ pub struct Publisher {
 impl Publisher {
     pub fn new(context: &eframe::CreationContext<'_>) -> Self {
         context.egui_ctx.all_styles_mut(|style| {
-            style.spacing.tooltip_width = 320.0;
+            style.spacing.tooltip_width = 340.0;
         });
         Self {
             session: Session::new(),
@@ -181,6 +182,7 @@ impl Publisher {
             return;
         };
         let job = DocumentJob::new(Source::File(input), source_root)
+            .with_template(explicit_path(&self.session.template_file))
             .with_global_template(loader::global_template_path());
         match pipeline::resolve_template(&job) {
             Ok(resolved) => {
@@ -233,13 +235,20 @@ impl Publisher {
     }
 
     fn choose_markdown(&mut self) {
-        if let Some(path) = open::choose_file("Choose a Markdown file", "Markdown", "md") {
+        if let Some(path) = open::choose_file("Choose a Markdown file", "Markdown", &["md"]) {
             self.accept_input(path);
         }
     }
 
+    fn choose_template(&mut self) {
+        if let Some(path) = open::choose_file("Choose a template", "YAML", &["yaml", "yml"]) {
+            self.session.template_file = path.display().to_string();
+            self.refresh_template();
+        }
+    }
+
     fn choose_confidential(&mut self) {
-        if let Some(path) = open::choose_file("Choose a confidential INI file", "INI", "ini") {
+        if let Some(path) = open::choose_file("Choose a confidential INI file", "INI", &["ini"]) {
             self.session.confidential_file = path.display().to_string();
         }
     }
@@ -254,7 +263,7 @@ impl Publisher {
         ui.horizontal(|ui| {
             with_tooltip(
                 ui.label("Template:"),
-                "The template resolved for the selected Markdown: the nearest local file, then the global file, then the embedded fallback.",
+                "The template in use: the explicit file from Advanced, or the nearest local file, then the global file, then the embedded fallback.",
             );
             with_tooltip(
                 ui.label(egui::RichText::new(&self.template_label).small()),
@@ -285,8 +294,9 @@ impl Publisher {
 
         let button_width = 120.0;
         let gap = 12.0;
+        let spacing = ui.spacing().item_spacing.x;
         let drop_height = 184.0;
-        let drop_width = (ui.available_width() - button_width - gap).max(220.0);
+        let drop_width = (ui.available_width() - button_width - gap - spacing).max(220.0);
         let working = matches!(self.session.state, State::Working { .. });
         ui.horizontal_top(|ui| {
             let (rect, response) =
@@ -361,53 +371,45 @@ impl Publisher {
 
         ui.add_space(8.0);
         let advanced = egui::CollapsingHeader::new("Advanced").show(ui, |ui| {
-            ui.horizontal(|ui| {
-                with_tooltip(
-                    ui.label("Output:"),
-                    "Folder for the generated file. It starts as the Markdown folder; documents with confidential fields need a folder outside the source tree.",
-                );
-                let width = (ui.available_width() - 90.0).max(120.0);
-                let field = ui.add(
-                    egui::TextEdit::singleline(&mut self.session.output_directory)
-                        .desired_width(width),
-                );
-                with_tooltip(
-                    field,
-                    "Folder for the generated file. It starts as the Markdown folder; documents with confidential fields need a folder outside the source tree.",
-                );
-                let choose = with_tooltip(
-                    ui.button("Choose"),
-                    "Choose the output folder with the platform dialog.",
-                );
-                if choose.clicked() {
-                    self.choose_output();
-                }
-            });
-            ui.horizontal(|ui| {
-                with_tooltip(
-                    ui.label("Confidential:"),
-                    "INI file with the confidential {NAME} values. Keep it outside the source tree, with mode 600.",
-                );
-                let field = ui.add(
-                    egui::TextEdit::singleline(&mut self.session.confidential_file)
-                        .desired_width(320.0),
-                );
-                with_tooltip(
-                    field,
-                    "INI file with the confidential {NAME} values. Keep it outside the source tree, with mode 600.",
-                );
-                let choose = with_tooltip(
-                    ui.button("Choose"),
-                    "Choose the confidential INI file with the platform dialog.",
-                );
-                if choose.clicked() {
-                    self.choose_confidential();
-                }
-            });
+            let template_row = path_row(
+                ui,
+                "Template file:",
+                "Explicit YAML template to use instead of resolving one; leave it empty for automatic resolution.",
+                &mut self.session.template_file,
+                "Explicit YAML template. Leave it empty to use the nearest local file, then the global file, then the embedded fallback.",
+                "Choose the template YAML file with the platform dialog.",
+            );
+            if template_row.chosen {
+                self.choose_template();
+            } else if template_row.lost_focus {
+                self.refresh_template();
+            }
+            let output_row = path_row(
+                ui,
+                "Output:",
+                "Folder for the generated file. It starts as the Markdown folder; documents with confidential fields need a folder outside the source tree.",
+                &mut self.session.output_directory,
+                "Folder for the generated file. It starts as the Markdown folder; documents with confidential fields need a folder outside the source tree.",
+                "Choose the output folder with the platform dialog.",
+            );
+            if output_row.chosen {
+                self.choose_output();
+            }
+            let confidential_row = path_row(
+                ui,
+                "Confidential:",
+                "INI file with the confidential {NAME} values. Keep it outside the source tree, with mode 600.",
+                &mut self.session.confidential_file,
+                "INI file with the confidential {NAME} values. Keep it outside the source tree, with mode 600.",
+                "Choose the confidential INI file with the platform dialog.",
+            );
+            if confidential_row.chosen {
+                self.choose_confidential();
+            }
         });
         with_tooltip(
             advanced.header_response,
-            "Output folder and confidential values.",
+            "Template override, output folder and confidential values.",
         );
 
         ui.add_space(8.0);
@@ -488,7 +490,11 @@ impl eframe::App for Publisher {
             ui.ctx().request_repaint_after(Duration::from_millis(100));
         }
         egui::CentralPanel::default().show(ui, |ui| {
-            self.render(ui);
+            egui::ScrollArea::vertical()
+                .auto_shrink([false, false])
+                .show(ui, |ui| {
+                    self.render(ui);
+                });
         });
     }
 }
@@ -508,10 +514,10 @@ fn with_tooltip(response: egui::Response, text: &str) -> egui::Response {
 /// every theme and does not inherit the window fill.
 fn tooltip_frame() -> egui::Frame {
     egui::Frame::new()
-        .fill(egui::Color32::from_gray(232))
-        .stroke(egui::Stroke::new(1.0, egui::Color32::from_gray(120)))
+        .fill(egui::Color32::from_gray(245))
+        .stroke(egui::Stroke::new(1.0, egui::Color32::from_gray(140)))
         .corner_radius(4)
-        .inner_margin(egui::Margin::symmetric(9, 7))
+        .inner_margin(egui::Margin::symmetric(10, 8))
         .shadow(egui::Shadow {
             offset: [0, 2],
             blur: 6,
@@ -521,7 +527,54 @@ fn tooltip_frame() -> egui::Frame {
 }
 
 fn show_tooltip(ui: &mut egui::Ui, text: &str) {
-    ui.label(egui::RichText::new(text).color(egui::Color32::from_gray(16)));
+    ui.label(
+        egui::RichText::new(text)
+            .color(egui::Color32::BLACK)
+            .size(15.0),
+    );
+}
+
+/// What one path row reported in a frame.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+struct PathRow {
+    lost_focus: bool,
+    chosen: bool,
+}
+
+/// Lays out a label, a text field and a Choose button with a fixed label and
+/// button width, so every path row in a section aligns.
+fn path_row(
+    ui: &mut egui::Ui,
+    label: &str,
+    label_tooltip: &str,
+    value: &mut String,
+    field_tooltip: &str,
+    choose_tooltip: &str,
+) -> PathRow {
+    let label_width = 100.0;
+    let choose_width = 78.0;
+    let spacing = ui.spacing().item_spacing.x;
+    let height = ui.spacing().interact_size.y;
+    let field_width = (ui.available_width() - label_width - choose_width - spacing).max(120.0);
+    let mut report = PathRow::default();
+    ui.horizontal(|ui| {
+        let label_response = with_tooltip(ui.label(label), label_tooltip);
+        let label_padding = (label_width - label_response.rect.width() - spacing).max(0.0);
+        ui.add_space(label_padding);
+        let field = ui.add(egui::TextEdit::singleline(value).desired_width(field_width));
+        report.lost_focus = field.lost_focus();
+        with_tooltip(field, field_tooltip);
+        let choose = ui.add_sized([choose_width, height], egui::Button::new("Choose"));
+        let choose = with_tooltip(choose, choose_tooltip);
+        report.chosen = choose.clicked();
+    });
+    report
+}
+
+/// An explicit path from a text field; blank means automatic resolution.
+fn explicit_path(value: &str) -> Option<PathBuf> {
+    let trimmed = value.trim();
+    (!trimmed.is_empty()).then(|| PathBuf::from(trimmed))
 }
 
 /// A source path is the parent of the input, or the current directory when the
@@ -552,6 +605,7 @@ fn run_export(request: ExportRequest) -> Result<Completed, String> {
         output,
         format,
         confidential_file,
+        template,
     } = request;
     let store = match confidential_file {
         Some(path) => {
@@ -561,6 +615,7 @@ fn run_export(request: ExportRequest) -> Result<Completed, String> {
         None => ConfidentialStore::default(),
     };
     let job = DocumentJob::new(Source::File(input), source_root)
+        .with_template(template)
         .with_global_template(loader::global_template_path());
     pipeline::export(&job, format, &output, &store)
         .map(|outcome| Completed {
@@ -702,6 +757,36 @@ mod tests {
         assert_eq!(request.source_root, PathBuf::from("docs"));
         assert_eq!(request.output, PathBuf::from("docs/A.docx"));
         assert_eq!(request.confidential_file, Some(PathBuf::from("values.ini")));
+        assert_eq!(request.template, None);
+    }
+
+    #[test]
+    fn the_request_keeps_an_explicit_template() {
+        let mut session = session_with_input("docs/A.md");
+        session.template_file = "  custom.yaml  ".to_owned();
+
+        let request = session.begin(Format::Pdf).expect("a request");
+
+        assert_eq!(request.template, Some(PathBuf::from("custom.yaml")));
+    }
+
+    #[test]
+    fn a_blank_template_falls_back_to_resolution() {
+        let mut session = session_with_input("docs/A.md");
+        session.template_file = "   ".to_owned();
+
+        let request = session.begin(Format::Pdf).expect("a request");
+
+        assert_eq!(request.template, None);
+    }
+
+    #[test]
+    fn the_explicit_path_trims_surrounding_whitespace() {
+        assert_eq!(
+            explicit_path("  a/b.yaml  "),
+            Some(PathBuf::from("a/b.yaml"))
+        );
+        assert_eq!(explicit_path(" \t "), None);
     }
 
     #[test]

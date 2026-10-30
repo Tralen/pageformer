@@ -371,7 +371,7 @@ The embargos declares confidential fields, so the command names the fictional va
 pageformer assets/examples/tecnico/Relatorio.md
 ```
 
-To use the same settings elsewhere, copy the file to the document directory as `.pageformer.yaml` or pass `--template`.
+To use the same settings elsewhere, copy the file to the document directory as `.pageformer.yaml`, pass `--template` in the terminal, or choose the file under Advanced in `pageformer-publisher`.
 
 ## Errors
 

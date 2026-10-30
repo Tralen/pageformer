@@ -27,8 +27,13 @@ fn command() -> Command {
 /// without a desktop portal; on Windows and macOS it is the native `rfd`
 /// dialog.
 #[cfg(target_os = "linux")]
-pub fn choose_file(title: &str, filter_name: &str, extension: &str) -> Option<PathBuf> {
-    let filter = format!("{filter_name} | *.{extension}");
+pub fn choose_file(title: &str, filter_name: &str, extensions: &[&str]) -> Option<PathBuf> {
+    let patterns = extensions
+        .iter()
+        .map(|extension| format!("*.{extension}"))
+        .collect::<Vec<_>>()
+        .join(" ");
+    let filter = format!("{filter_name} | {patterns}");
     let output = Command::new("zenity")
         .arg("--file-selection")
         .arg(format!("--title={title}"))
@@ -44,10 +49,10 @@ pub fn choose_file(title: &str, filter_name: &str, extension: &str) -> Option<Pa
 
 /// Chooses a file with the native platform dialog.
 #[cfg(not(target_os = "linux"))]
-pub fn choose_file(title: &str, filter_name: &str, extension: &str) -> Option<PathBuf> {
+pub fn choose_file(title: &str, filter_name: &str, extensions: &[&str]) -> Option<PathBuf> {
     rfd::FileDialog::new()
         .set_title(title)
-        .add_filter(filter_name, &[extension])
+        .add_filter(filter_name, extensions)
         .pick_file()
 }
 

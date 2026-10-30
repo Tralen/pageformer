@@ -4,6 +4,14 @@
 
 *Major updates and feature releases.*
 
+### 0.32.0
+
+- Added a template override to the Advanced section of `pageformer-publisher`, wired to `DocumentJob::with_template`; an empty field keeps automatic resolution. The Choose button accepts `.yaml` and `.yml`.
+- Aligned the Advanced path rows (template, output and confidential) with a fixed label column and a uniform field and Choose width, and added right padding to the format column and the rows.
+- Increased the tooltip text to 15 points, brightened the fill to near-white and kept black text, so the hint is legible at 1x.
+- The window starts at 720x400 with a 520x260 minimum and scrolls when the content does not fit, instead of reserving empty space below.
+- Regenerates the ODT examples for the version in `meta:generator`.
+
 ### 0.31.4
 
 - Moved the Output folder into the Advanced section of `pageformer-publisher`, keeping the automatic fill from the selected Markdown file.

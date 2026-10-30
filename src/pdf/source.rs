@@ -41,6 +41,7 @@ struct SourceBuilder<'a> {
     list_fill: Option<Color>,
     list_fill_padding: f64,
     list_fill_outset: f64,
+    list_depth: usize,
     paragraph_fill: Option<Color>,
     paragraph_spacing: String,
     nested: bool,
@@ -70,6 +71,7 @@ impl<'a> SourceBuilder<'a> {
             list_fill,
             list_fill_padding,
             list_fill_outset,
+            list_depth: 0,
             paragraph_fill: template.formatting().paragraph().background(),
             paragraph_spacing: template
                 .formatting()
@@ -707,14 +709,17 @@ impl<'a> SourceBuilder<'a> {
             }
         }
         let outer = std::mem::replace(&mut self.nested, true);
+        let nested_list = self.list_depth > 0;
+        self.list_depth = self.list_depth.saturating_add(1);
         let count = list.items().len();
         for (index, item) in list.items().iter().enumerate() {
             self.output.push_str("  [");
-            let first = index == 0;
-            let last = index.saturating_add(1) == count;
+            let first = index == 0 && !nested_list;
+            let last = index.saturating_add(1) == count && !nested_list;
             self.item(item, list.is_tight(), first, last)?;
             self.output.push_str("],\n");
         }
+        self.list_depth = self.list_depth.saturating_sub(1);
         self.nested = outer;
         self.output.push(')');
         Ok(())
@@ -1542,6 +1547,38 @@ mod tests {
         assert!(
             !source.contains("#list(tight: true, spacing:"),
             "a tight list keeps the Markdown spacing: {source}"
+        );
+    }
+
+    #[test]
+    fn a_nested_list_fill_merges_with_the_parent_band() {
+        let template = Template::from_yaml(
+            "version: \"0.6\"\nformatting:\n  list:\n    background: \"#eeeeee\"\n",
+        )
+        .expect("the template");
+        let nested = List::new(
+            ListStart::Unordered,
+            vec![ListItem::new(
+                None,
+                vec![Block::Paragraph(vec![Inline::Text("Nested".to_owned())])],
+            )],
+            true,
+        );
+        let parent = ListItem::new(
+            None,
+            vec![
+                Block::Paragraph(vec![Inline::Text("Parent".to_owned())]),
+                Block::List(nested),
+            ],
+        );
+        let list = List::new(ListStart::Unordered, vec![parent], true);
+        let document = Document::new(Metadata::default(), vec![Block::List(list)]);
+        let source = typst_source(&document, &template, &AssetMap::new()).expect("the source");
+        assert!(
+            source.contains(
+                "#block(width: 100%, fill: rgb(\"#eeeeee\"), inset: (x: 0pt, y: 2.880pt), outset: (top: 7.800pt, bottom: 7.800pt))[Nested]"
+            ),
+            "a nested item fills both boundaries: {source}"
         );
     }
 

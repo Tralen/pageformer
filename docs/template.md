@@ -280,7 +280,7 @@ The markers are declared as lists and cycled by nesting depth, so a two-entry li
 
 For example, `format: [decimal, lower-alpha]` and `suffix: "."` render `1.`, `2.` at the first level and `a.`, `b.` inside it. A third level cycles back to `1.` when only two formats are declared. Bullets follow the same rule: with `["•", "–"]`, the third level uses `•` again.
 
-`background` fills the first paragraph of each item. A later paragraph inside the same item keeps the normal body background. In a tight list, adjacent item fills meet, so the list reads as one band; in a loose list, `spacing` stays visible between the bands. The PDF starts a new band for a nested list, so a hairline can remain between a parent item and its nested list, while ODT and DOCX shade the paragraphs continuously.
+`background` fills the first paragraph of each item. A later paragraph inside the same item keeps the normal body background. In a tight list, adjacent item fills meet, so the list reads as one band; in a loose list, `spacing` stays visible between the bands. A nested list continues the parent band in every format.
 
 ### `formatting.rule`
 

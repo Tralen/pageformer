@@ -4,6 +4,11 @@
 
 *Major updates and feature releases.*
 
+### 0.27.1
+
+- A nested list fill in the PDF now continues the parent item band instead of starting a new one, removing the hairline that remained between a parent item and its nested list. ODT and DOCX already shaded the run continuously.
+- Regenerates the ODT examples for the version in `meta:generator` and the PDF example for the fill. The DOCX and TXT examples stay byte-identical.
+
 ### 0.27.0
 
 - Added `formatting.list`, which styles list item text (face, foreground, background and alignment), the marker indent and gap, per-level bullet characters, per-level numbering formats with a suffix, and the spacing between loose items. Markers and formats cycle by nesting depth, so the template declares the order instead of relying on a backend default.

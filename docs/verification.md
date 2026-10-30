@@ -59,11 +59,15 @@ Rust and the test suite:
 
 ```sh
 cargo fmt --check
-cargo clippy --all-targets --all-features -- -D warnings
-cargo test --all-features
+cargo clippy --workspace --all-targets --all-features -- -D warnings
+cargo test --workspace --all-features
 cargo test --doc
 cargo doc --no-deps
+cargo build -p pageformer-publisher
+cargo test -p pageformer-publisher
 ```
+
+`cargo test --workspace --all-features` runs the engine, CLI and GUI tests. `cargo test --doc` runs the library doctests. `cargo doc --no-deps` documents the library; the GUI is a binary. `cargo build -p pageformer-publisher` builds the window, and `cargo test -p pageformer-publisher` covers the pure state machine and the path rules.
 
 Markdown, using the repository `.markdownlint-cli2.jsonc`:
 
@@ -86,6 +90,12 @@ pdftotext assets/examples/publicacao/Contrato.pdf -
 ```
 
 A passing PDF/A run prints `PASS <path> 2b`. The tests also assert the PDF header, the PDF/A markers and that two renders produce identical bytes.
+
+## Publisher GUI
+
+`pageformer-publisher` is the minimal converter window in the `publisher/` workspace member. It calls `pipeline::export` on a worker thread and never parses, resolves or writes itself. The pure state machine, input acceptance, output paths and the source-root rule are covered by its unit tests.
+
+The window itself is the only manual part of the suite: run `cargo run -p pageformer-publisher`, drop a Markdown file, choose a format, export and open the output. A windowed smoke test still needs a desktop session.
 
 ## ODT packages
 

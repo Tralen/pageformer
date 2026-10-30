@@ -4,6 +4,13 @@
 
 *Major updates and feature releases.*
 
+### 0.31.0
+
+- Added `pageformer-publisher`, a workspace member with the minimal egui converter: drop or paste a Markdown path, choose PDF, ODT, DOCX or TXT, export and open the output. It shows the resolved template, an optional output directory and an optional confidential INI file.
+- The window runs `pipeline::export` on a worker thread with `Idle`, `Working`, `Succeeded` and `Failed`; a second request is disabled while working. It never parses, resolves or writes itself.
+- The workspace uses eframe with the glow and X11 features, so the Linux build does not need the Wayland development files. `cargo build -p pageformer` still builds only the engine and CLI.
+- Regenerates the ODT examples for the version in `meta:generator`.
+
 ### 0.30.0
 
 - Extracted the document pipeline into the library: `Format` in `src/format.rs`, and `DocumentJob`/`Source`, `check`/`export`, `CheckOutcome`/`ExportOutcome` and `ExportError` in `src/pipeline.rs`. The CLI is now a thin frontend, and Pageweaver can call the same API.

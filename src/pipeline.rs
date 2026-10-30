@@ -342,7 +342,8 @@ fn render_infallible(result: Result<Rendered, std::convert::Infallible>) -> Rend
     }
 }
 
-fn resolve_template(job: &DocumentJob) -> Result<ResolvedTemplate, ExportError> {
+/// Resolves the template for a source, without parsing the document.
+pub fn resolve_template(job: &DocumentJob) -> Result<ResolvedTemplate, ExportError> {
     match job.template.as_deref() {
         Some(path) => {
             let template = loader::load_file(path)?;

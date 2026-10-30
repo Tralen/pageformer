@@ -10,7 +10,7 @@ Rust with egui for the minimal `pageformer-publisher` converter window; the main
 
 ## Build
 
-The development profile keeps line tables for this crate and no debug info for dependencies, because every test binary links Typst and would otherwise weigh hundreds of megabytes; incremental compilation is off because its state reached several gigabytes for little gain in a crate this small. `cargo clean` reclaims the cache when it grows, at the cost of a full rebuild.
+The development profile keeps line tables for this crate and no debug info for dependencies, because every test binary links Typst and would otherwise weigh hundreds of megabytes; incremental compilation is off because its state reached several gigabytes for little gain in a crate this small. `cargo clean` reclaims the cache when it grows, at the cost of a full rebuild. The workspace also builds `pageformer-publisher`, the minimal egui converter; its eframe dependencies follow the same profile, and `cargo build -p pageformer` builds only the engine and CLI.
 
 ## Versioning
 
@@ -42,6 +42,12 @@ cargo run -- --format docx --confidential-file assets/examples/confidencial/emba
 ```
 
 The first command writes each PDF under `assets/examples/publicacao/`, which keeps it outside the source tree, and regenerates the versioned examples. A file or a directory can be given; a directory is walked recursively and only `.md` files are read. Hidden directories and `target/` are skipped, and directory symlinks are not followed. A paragraph that contains only `-pagebreak-` starts a new page, and `-!-` is its shorthand; a paragraph that contains only `-horizontal-` draws a rule, as `---`, `***` and `___` already do.
+
+The minimal converter window is a separate workspace member:
+
+```sh
+cargo run -p pageformer-publisher
+```
 
 `--output` writes under another directory; a directory input mirrors its relative tree there, while a direct file is written flat. `--check` parses the Markdown and validates the template without writing. A failure in one file does not stop the rest of the batch, and the exit code is `1` when any input fails.
 

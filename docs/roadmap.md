@@ -12,7 +12,7 @@ Pageformer reaches 1.0.0 through ten phases, in the order below. The order is a 
 | 4. TXT | Plain-text view and the renderer boundary | Done in 0.15.0: the renderer trait, `--format txt` and plain-text goldens | Confidentiality |
 | 5. ODT | Second-priority paged format | Done in 0.16.0: internal ODF writer, deterministic package, styles from the template | Renderer boundary |
 | 6. DOCX | Office format for review and exchange | Done in 0.17.0: internal OOXML writer, numbering instances, repeating table headers, footnotes and a deterministic package | ODT style mapping |
-| 7. Minimal GUI | Converter window over the pipeline; Pageweaver is separate | Not started | Every format it exposes |
+| 7. Minimal GUI | Converter window over the pipeline; Pageweaver is separate | Started in 0.31.0 | Every format it exposes |
 | 8. HTML | Self-contained semantic view | Not started | GUI and renderer boundary |
 | 9. EPUB | HTML packaged with chapters and metadata | Not started | HTML |
 | 10. Release 1.0.0 | Stability review and release | Not started | Every phase above |
@@ -171,6 +171,8 @@ A phase is closed only when all of the following hold:
 ## Phase 7: Minimal GUI
 
 **Goal.** Expose the pipeline in a minimal egui converter without duplicating any of it. The WYSIWYG editor, Pageweaver, is a separate project; it calls the same library for export and starts only after 1.0.0.
+
+**Status.** Started in 0.31.0: `pageformer-publisher` builds, its state machine and paths are tested, and it calls the shared pipeline on a worker thread. The windowed smoke test is manual; Pageweaver starts after 1.0.0.
 
 **Work.**
 

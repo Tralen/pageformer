@@ -361,13 +361,14 @@ impl Publisher {
 
         ui.add_space(8.0);
         ui.horizontal(|ui| {
-            ui.label("Output:");
+            ui.label("Output (?)").on_hover_text(
+                "A document with confidential fields must be exported to a folder outside its source tree.",
+            );
             ui.add(
                 egui::TextEdit::singleline(&mut self.session.output_directory)
                     .desired_width(f32::INFINITY),
             );
         });
-        ui.label("A document with {NAME} fields needs a folder outside the source tree.");
         ui.horizontal(|ui| {
             ui.label("Confidential:");
             ui.add(

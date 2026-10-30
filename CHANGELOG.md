@@ -4,6 +4,11 @@
 
 *Major updates and feature releases.*
 
+### 0.31.2
+
+- Moved the confidential-output rule in `pageformer-publisher` to a tooltip on the Output label: "A document with confidential fields must be exported to a folder outside its source tree." The permanent hint line is gone, and the window is closer to the sketch.
+- Regenerates the ODT examples for the version in `meta:generator`.
+
 ### 0.31.1
 
 - Reworked the `pageformer-publisher` window to follow the sketch: the format buttons sit in a column on the right of a large drop box, and the template label keeps the edit and folder actions at the top.

@@ -4,6 +4,12 @@
 
 *Major updates and feature releases.*
 
+### 0.20.0
+
+- `background` and `rule` may now be declared on the base `formatting.heading` map, where every level inherits them, and a level clears an inherited value with `none`, in any case: `rule: none` or `background: NONE`. An empty `rule: {}` stays a rule with the defaults, which is not the same as `none`.
+- The PDF heading fill gains a vertical padding of 0.15 of the heading size, so the bar no longer hugs the glyphs. At the 18pt level-one heading the band grows from 12.0pt to 17.8pt, next to the ODT 18.7pt and the DOCX 20.6pt.
+- The technical example declares its rule once on the base heading map and clears it on `h1`, so the bar replaces it there. Its PDF, ODT and DOCX are regenerated at three pages, and the TXT golden is unchanged.
+
 ### 0.19.0
 
 - Added `rule` to each heading level `h1` to `h6`: a line drawn below the heading text, styled with `thickness`, `color`, `spacing_before` (the gap above the line) and `spacing_after`. A rule is not inherited from the base heading map.

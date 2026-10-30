@@ -649,12 +649,22 @@ fn rule_line(rule: &RuleStyle) -> String {
     )
 }
 
+/// The vertical padding of a heading fill, as a fraction of the heading size,
+/// so the fill grows with the text instead of hugging the glyphs the way a
+/// zero-inset block does in Typst.
+const HEADING_FILL_PADDING: f64 = 0.15;
+
+fn fill_padding(size: Length) -> String {
+    format!("{:.3}pt", size.points() * HEADING_FILL_PADDING)
+}
+
 /// The text of a styled heading, with its fill and the rule drawn below it.
 fn heading_content(style: &HeadingStyle) -> String {
     let text = match style.background() {
         Some(background) => format!(
-            "#block(width: 100%, fill: rgb(\"{}\"), inset: 0pt)[#it]",
-            background.hex()
+            "#block(width: 100%, fill: rgb(\"{}\"), inset: (x: 0pt, y: {}))[#it]",
+            background.hex(),
+            fill_padding(style.face().size())
         ),
         None => "#it".to_owned(),
     };
@@ -1253,11 +1263,29 @@ mod tests {
         let source = typst_source(&document, &template, &AssetMap::new()).expect("the source");
         assert!(
             source.contains(
-                "#show heading.where(level: 1): set block(above: 0pt, below: 0pt)\n#show heading.where(level: 1): it => block(width: 100%, above: 18.000pt, below: 6.000pt, sticky: true)[\n#block(width: 100%, fill: rgb(\"#eeeeee\"), inset: 0pt)[#it]\n]\n#show heading.where(level: 1): it => {\n  pagebreak(weak: true)\n  it\n}"
+                "#show heading.where(level: 1): set block(above: 0pt, below: 0pt)\n#show heading.where(level: 1): it => block(width: 100%, above: 18.000pt, below: 6.000pt, sticky: true)[\n#block(width: 100%, fill: rgb(\"#eeeeee\"), inset: (x: 0pt, y: 2.700pt))[#it]\n]\n#show heading.where(level: 1): it => {\n  pagebreak(weak: true)\n  it\n}"
             ),
             "{source}"
         );
         assert_eq!(source.matches("fill: rgb(").count(), 1, "{source}");
+    }
+
+    #[test]
+    fn the_fill_padding_follows_the_heading_size() {
+        let template = Template::from_yaml(
+            "version: \"0.5\"\nformatting:\n  heading:\n    background: \"#eeeeee\"\n    h1:\n      size: 20\n",
+        )
+        .expect("the template");
+        let document = Document::new(Metadata::default(), Vec::new());
+        let source = typst_source(&document, &template, &AssetMap::new()).expect("the source");
+        assert!(
+            source.contains("inset: (x: 0pt, y: 3.000pt)"),
+            "a level-one fill keeps 0.15 of 20pt: {source}"
+        );
+        assert!(
+            source.contains("inset: (x: 0pt, y: 2.100pt)"),
+            "a level-two fill keeps 0.15 of 14pt: {source}"
+        );
     }
 
     #[test]

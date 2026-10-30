@@ -183,11 +183,15 @@ The `heading` map is the base for every heading level:
 - `style`: `normal` or `italic`. The default is `normal`.
 - `spacing_before` and `spacing_after`: lengths around the heading. They apply to every level that does not override them.
 - `page_break_before`: `true` starts the level on a new page. The break is weak: a heading already at the top of a page does not create a blank page. The default is `false`.
-- `background`: a solid fill behind the heading text, as `#rrggbb`. The fill spans the full text width with no horizontal margins, and the spacing stays outside it. When omitted, the heading has no fill.
+- `background`: a solid fill behind the heading text, as `#rrggbb`. The fill spans the full text width with no horizontal margins, and the spacing stays outside it. When omitted, the heading has no fill, or keeps the one inherited from the base map; `none` clears an inherited fill.
 
 The `h1` to `h6` maps are optional overrides with the same keys. Only declared keys replace the base values. The default sizes are `18pt` for `h1`, `14pt` for `h2` and `12pt` for `h3` to `h6`; the default spacing is 18/6 for `h1`, 12/4 for `h2`, 10/4 for `h3` and 8/2 for `h4` to `h6`.
 
-A level may declare `rule`, a line drawn below its text, with the keys of [`formatting.rule`](#formattingrule). A rule is not inherited from the base heading map: each level that needs one declares it, and a level without `rule` draws none. Below a heading, `spacing_before` is the gap between the text and the line, which defaults to zero, and the line takes the heading's `spacing_after` below it, unless the rule declares its own `spacing_after`.
+A level may declare `rule`, a line drawn below its text, with the keys of [`formatting.rule`](#formattingrule).
+
+`background` and `rule` may also be declared on the base heading map, where every level inherits them, the same way `size` and `spacing_before` are inherited. A level overrides an inherited value by declaring its own, and clears it with `none`, in any case: `rule: none`, `background: NONE`. A level that declares nothing keeps the base value. An empty `rule: {}` is a rule with the defaults and is not the same as `rule: none`.
+
+Below a heading, `spacing_before` is the gap between the text and the line, which defaults to zero, and the line takes the heading's `spacing_after` below it, unless the rule declares its own `spacing_after`.
 
 The template sets explicit values for each level. There is no hidden multiplier per level: what the YAML declares is what the PDF uses.
 
@@ -198,6 +202,8 @@ The thematic break, written as `---`, `***` or `___` in the Markdown body, is dr
 - `thickness`: the line thickness, as a length greater than zero. The default is `0.5pt`.
 - `color`: the line color, as `#rrggbb`. The default is `#000000`.
 - `spacing_before` and `spacing_after`: lengths around the line. For the thematic break, when omitted, each format keeps its own spacing for that side.
+
+Under `formatting.heading.h1` to `h6`, the same map declares the rule below a heading, and it also accepts `none` to clear a rule inherited from the base heading map.
 
 ### `table`
 
@@ -230,7 +236,7 @@ Images in the Markdown body resolve relative to the Markdown file, not to the te
 
 ## Current backend
 
-The PDF backend applies the paragraph face, leading, spacing and alignment. It emits one show rule per heading level with the resolved font, size, weight, style and spacing, and show rules for `emph` and `strong` from the inline overrides. A level with `page_break_before` also gets a weak page-break show rule. The backend draws the running header and footer, expands their tokens, applies the table style and explicit page breaks, and writes the frontmatter title, author, subject, keywords, language and date into the PDF metadata. The thematic break follows `formatting.rule`. A heading background and a heading rule are drawn as one block: the fill wraps the text across the full width, and the rule sits below it.
+The PDF backend applies the paragraph face, leading, spacing and alignment. It emits one show rule per heading level with the resolved font, size, weight, style and spacing, and show rules for `emph` and `strong` from the inline overrides. A level with `page_break_before` also gets a weak page-break show rule. The backend draws the running header and footer, expands their tokens, applies the table style and explicit page breaks, and writes the frontmatter title, author, subject, keywords, language and date into the PDF metadata. The thematic break follows `formatting.rule`. A heading background and a heading rule are drawn as one block: the fill wraps the text across the full width with a vertical padding of 0.15 of the heading size, so the fill does not hug the glyphs, and the rule sits below it. ODT and DOCX give their paragraphs the same padding natively, which keeps the three fills close in height.
 
 ## Example
 
@@ -240,7 +246,7 @@ The PDF backend applies the paragraph face, leading, spacing and alignment. It e
 pageformer --confidential-file assets/examples/confidencial/embargos.ini --output assets/examples/publicacao assets/examples/escritorio/
 ```
 
-The embargos declares confidential fields, so the command names the fictional values file and writes outside the source tree. `assets/examples/tecnico/.pageformer.yaml` is a second example, in a nested directory. It replaces the shared template for `Relatorio.md`, has no letterhead and demonstrates every running slot, the footer, the table style, a page break, a solid bar behind the level-one headings and a rule below the level-two headings:
+The embargos declares confidential fields, so the command names the fictional values file and writes outside the source tree. `assets/examples/tecnico/.pageformer.yaml` is a second example, in a nested directory. It replaces the shared template for `Relatorio.md`, has no letterhead and demonstrates every running slot, the footer, the table style, a page break, a solid bar behind the level-one headings and a rule below the level-two headings. The rule is declared once on the base heading map and cleared on `h1`, where the bar replaces it:
 
 ```sh
 pageformer assets/examples/tecnico/Relatorio.md

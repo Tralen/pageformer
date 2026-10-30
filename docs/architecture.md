@@ -53,7 +53,7 @@ The library is the pure core. File reading, the environment and the terminal liv
 
 ## Consistency
 
-Every format shares the semantic template. The current schema defines page size, orientation, margins, running header and footer content, paragraph and heading styles, heading backgrounds, heading rules and the thematic break, weight, style, leading, spacing, inline emphasis and strong overrides, alignment, the letterhead image and table borders, header fill and cell padding.
+Every format shares the semantic template. The current schema defines page size, orientation, margins, running header and footer content, paragraph and heading styles, heading backgrounds and rules that the base map can carry and a level can clear with `none`, the thematic break, weight, style, leading, spacing, inline emphasis and strong overrides, alignment, the letterhead image and table borders, header fill and cell padding.
 
 The promise is consistency of presentation, not identical content distribution. Pagination differs between paged formats, such as PDF, and reflowable formats, such as ODT, DOCX and EPUB. The project does not try to force the same distribution. Widows and orphans must be avoided where the engine allows it. Typst already avoids them through its paragraph costs, so the template exposes no widow or orphan field until a fixture needs one.
 
@@ -133,7 +133,7 @@ The crate is Apache-2.0, compatible with the project license.
 
 ### The current backend
 
-`src/pdf` turns the model into Typst source and compiles it with the same Typst 0.15.1 library the spike used. The template sets the page dimensions, orientation, margins, letterhead, running header and footer, paragraph face, leading, spacing, alignment, one heading style per level including a page break before the level, the heading backgrounds and rules, the inline emphasis and strong styles, the thematic break and the table style. The frontmatter supplies the title, author, subject, keywords, language and date. The date defaults to 2026-01-01, and the world reports the same date, so the same input produces the same bytes.
+`src/pdf` turns the model into Typst source and compiles it with the same Typst 0.15.1 library the spike used. The template sets the page dimensions, orientation, margins, letterhead, running header and footer, paragraph face, leading, spacing, alignment, one heading style per level including a page break before the level, the heading backgrounds and rules, the inline emphasis and strong styles, the thematic break and the table style. A heading background is a full-width block with a vertical padding of 0.15 of the heading size, so the fill does not hug the glyphs, and the rule sits below the fill. The frontmatter supplies the title, author, subject, keywords, language and date. The date defaults to 2026-01-01, and the world reports the same date, so the same input produces the same bytes.
 
 User text is escaped for Typst markup (`\`, `#`, `$`, `*`, `_`, `` ` ``, brackets, angle brackets, `@`, `~`, `-`, `+`, `/`, `=`, `:`, `&`, braces and periods; the period keeps `1.` from becoming an enum marker). Strings passed to Typst functions are escaped for Typst string literals. Local images are read at the edge, stored under a synthetic project path and served by the world; remote images are rejected. The letterhead resolves against the template file and the images resolve against the Markdown file.
 

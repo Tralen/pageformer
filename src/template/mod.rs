@@ -1074,6 +1074,62 @@ pub enum ParagraphAlignment {
     Left,
 }
 
+/// The value of a heading key that a level can inherit, set or clear.
+#[derive(Debug, Clone, Default, PartialEq)]
+enum Inherited<T> {
+    #[default]
+    Undeclared,
+    Cleared,
+    Set(T),
+}
+
+/// A heading rule written as a map of keys, or as `none` to clear it.
+#[derive(Debug)]
+enum RawRuleValue {
+    Text(String),
+    Map(RawRule),
+}
+
+impl<'de> Deserialize<'de> for RawRuleValue {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct RawRuleValueVisitor;
+
+        impl<'de> Visitor<'de> for RawRuleValueVisitor {
+            type Value = RawRuleValue;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("a map of rule keys or `none`")
+            }
+
+            fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                Ok(RawRuleValue::Text(value.to_owned()))
+            }
+
+            fn visit_string<E>(self, value: String) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                Ok(RawRuleValue::Text(value))
+            }
+
+            fn visit_map<A>(self, map: A) -> Result<Self::Value, A::Error>
+            where
+                A: MapAccess<'de>,
+            {
+                RawRule::deserialize(MapAccessDeserializer::new(map)).map(RawRuleValue::Map)
+            }
+        }
+
+        deserializer.deserialize_any(RawRuleValueVisitor)
+    }
+}
+
 #[derive(Debug, Deserialize)]
 struct VersionProbe {
     version: SchemaVersion,
@@ -1169,6 +1225,7 @@ struct RawHeading {
     spacing_after: Option<String>,
     page_break_before: Option<bool>,
     background: Option<String>,
+    rule: Option<RawRuleValue>,
     h1: Option<RawHeadingLevel>,
     h2: Option<RawHeadingLevel>,
     h3: Option<RawHeadingLevel>,
@@ -1188,7 +1245,7 @@ struct RawHeadingLevel {
     spacing_after: Option<String>,
     page_break_before: Option<bool>,
     background: Option<String>,
-    rule: Option<RawRule>,
+    rule: Option<RawRuleValue>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -1413,6 +1470,7 @@ fn convert_headings(raw: RawHeading) -> Result<HeadingStyles, TemplateError> {
         spacing_after,
         page_break_before,
         background,
+        rule,
         h1,
         h2,
         h3,
@@ -1430,19 +1488,15 @@ fn convert_headings(raw: RawHeading) -> Result<HeadingStyles, TemplateError> {
             spacing_after,
             page_break_before,
             background,
+            rule,
         },
         "formatting.heading",
     )?;
     let raw_levels = [h1, h2, h3, h4, h5, h6];
     let mut overrides: [Option<HeadingOverrides>; 6] = Default::default();
-    let mut rules: [Option<RuleStyle>; 6] = Default::default();
     for (index, raw_level) in raw_levels.into_iter().enumerate() {
         if let Some(raw_level) = raw_level {
             let prefix = format!("formatting.heading.h{}", index + 1);
-            rules[index] = raw_level
-                .rule
-                .map(|raw| convert_rule(raw, &format!("{prefix}.rule")))
-                .transpose()?;
             overrides[index] = Some(HeadingOverrides::parse(
                 RawHeadingOverrides {
                     font_families: raw_level.font_families,
@@ -1453,6 +1507,7 @@ fn convert_headings(raw: RawHeading) -> Result<HeadingStyles, TemplateError> {
                     spacing_after: raw_level.spacing_after,
                     page_break_before: raw_level.page_break_before,
                     background: raw_level.background,
+                    rule: raw_level.rule,
                 },
                 &prefix,
             )?);
@@ -1464,7 +1519,6 @@ fn convert_headings(raw: RawHeading) -> Result<HeadingStyles, TemplateError> {
         if let Some(overrides) = &overrides[index] {
             overrides.apply(&mut style);
         }
-        style.rule = rules[index].clone();
         style
     });
     Ok(HeadingStyles::new(levels))
@@ -1480,6 +1534,7 @@ struct RawHeadingOverrides {
     spacing_after: Option<String>,
     page_break_before: Option<bool>,
     background: Option<String>,
+    rule: Option<RawRuleValue>,
 }
 
 #[derive(Debug, Default)]
@@ -1491,7 +1546,8 @@ struct HeadingOverrides {
     spacing_before: Option<Length>,
     spacing_after: Option<Length>,
     page_break_before: Option<bool>,
-    background: Option<Color>,
+    background: Inherited<Color>,
+    rule: Inherited<RuleStyle>,
 }
 
 impl HeadingOverrides {
@@ -1505,6 +1561,7 @@ impl HeadingOverrides {
             spacing_after,
             page_break_before,
             background,
+            rule,
         } = raw;
         let size = size
             .map(|text| parse_length_field(&text, &format!("{prefix}.size")))
@@ -1530,12 +1587,8 @@ impl HeadingOverrides {
                 .map(|text| parse_length_field(&text, &format!("{prefix}.spacing_after")))
                 .transpose()?,
             page_break_before,
-            background: background
-                .map(|text| {
-                    Color::parse(&text)
-                        .map_err(|problem| value_error(format!("{prefix}.background"), problem))
-                })
-                .transpose()?,
+            background: inherited_color(background, &format!("{prefix}.background"))?,
+            rule: inherited_rule(rule, &format!("{prefix}.rule"))?,
         })
     }
 
@@ -1561,10 +1614,45 @@ impl HeadingOverrides {
         if let Some(page_break_before) = self.page_break_before {
             style.page_break_before = page_break_before;
         }
-        if let Some(background) = self.background {
-            style.background = Some(background);
+        match self.background {
+            Inherited::Undeclared => {}
+            Inherited::Cleared => style.background = None,
+            Inherited::Set(background) => style.background = Some(background),
+        }
+        match &self.rule {
+            Inherited::Undeclared => {}
+            Inherited::Cleared => style.rule = None,
+            Inherited::Set(rule) => style.rule = Some(rule.clone()),
         }
     }
+}
+
+fn inherited_color(value: Option<String>, field: &str) -> Result<Inherited<Color>, TemplateError> {
+    match value {
+        None => Ok(Inherited::Undeclared),
+        Some(text) if is_none(&text) => Ok(Inherited::Cleared),
+        Some(text) => Color::parse(&text)
+            .map(Inherited::Set)
+            .map_err(|problem| value_error(field, problem)),
+    }
+}
+
+fn inherited_rule(
+    value: Option<RawRuleValue>,
+    field: &str,
+) -> Result<Inherited<RuleStyle>, TemplateError> {
+    match value {
+        None => Ok(Inherited::Undeclared),
+        Some(RawRuleValue::Text(text)) if is_none(&text) => Ok(Inherited::Cleared),
+        Some(RawRuleValue::Text(_)) => Err(TemplateError::Yaml {
+            message: format!("{field}: a rule is a map of thickness, color and spacing, or `none`"),
+        }),
+        Some(RawRuleValue::Map(raw)) => convert_rule(raw, field).map(Inherited::Set),
+    }
+}
+
+fn is_none(text: &str) -> bool {
+    text.trim().eq_ignore_ascii_case("none")
 }
 
 fn parse_families(values: Vec<String>, field: &str) -> Result<Vec<FontFamily>, TemplateError> {

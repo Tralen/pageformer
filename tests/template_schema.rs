@@ -614,7 +614,7 @@ fn an_invalid_heading_background_names_its_level() {
 }
 
 #[test]
-fn a_heading_rule_is_declared_per_level_and_not_inherited() {
+fn a_heading_rule_is_declared_per_level() {
     let template = parse(
         r##"
 version: "0.5"
@@ -650,12 +650,71 @@ formatting:
 }
 
 #[test]
-fn a_rule_in_the_base_heading_is_rejected() {
+fn a_base_rule_and_background_are_inherited_by_every_level() {
+    let template = parse(
+        r##"
+version: "0.5"
+formatting:
+  heading:
+    background: "#eeeeee"
+    rule:
+      thickness: 1pt
+      color: "#112233"
+    h1:
+      size: 20
+"##,
+    );
+    for level in template.formatting().heading().levels() {
+        assert_eq!(
+            level.background().map(|color| color.hex()),
+            Some("#eeeeee".to_owned())
+        );
+        let rule = level.rule().expect("every level inherits the base rule");
+        assert_eq!(rule.thickness().points(), 1.0);
+        assert_eq!(rule.color().hex(), "#112233");
+    }
+}
+
+#[test]
+fn a_level_clears_an_inherited_rule_and_background_with_none() {
+    let template = parse(
+        r##"
+version: "0.5"
+formatting:
+  heading:
+    background: "#eeeeee"
+    rule:
+      thickness: 1pt
+    h2:
+      rule: none
+    h3:
+      background: "NONE"
+      rule: {}
+"##,
+    );
+    let levels = template.formatting().heading().levels();
+    assert!(levels[0].rule().is_some(), "h1 inherits the rule");
+    assert!(levels[1].rule().is_none(), "h2 clears the inherited rule");
+    assert_eq!(
+        levels[1].background().map(|color| color.hex()),
+        Some("#eeeeee".to_owned()),
+        "a cleared rule leaves the background alone"
+    );
+    assert!(
+        levels[2].background().is_none(),
+        "h3 clears the inherited background, in any case"
+    );
+    let empty = levels[2].rule().expect("an empty map is the default rule");
+    assert_eq!(empty.thickness().points(), 0.5);
+}
+
+#[test]
+fn a_heading_rule_written_as_text_is_rejected() {
     let error = Template::from_yaml(
-        "version: \"0.5\"\nformatting:\n  heading:\n    rule:\n      thickness: 1pt\n",
+        "version: \"0.5\"\nformatting:\n  heading:\n    h2:\n      rule: \"1pt\"\n",
     )
-    .expect_err("rules are declared per level");
-    assert!(matches!(error, TemplateError::Yaml { .. }), "{error}");
+    .expect_err("a rule is a map or none");
+    assert!(error.to_string().contains("a rule is a map"), "{error}");
 }
 
 #[test]

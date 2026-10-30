@@ -41,7 +41,7 @@ cargo run -- --format odt --confidential-file assets/examples/confidencial/embar
 cargo run -- --format docx --confidential-file assets/examples/confidencial/embargos.ini --output assets/examples/publicacao assets/examples/escritorio/
 ```
 
-The first command writes each PDF under `assets/examples/publicacao/`, which keeps it outside the source tree, and regenerates the versioned examples. A file or a directory can be given; a directory is walked recursively and only `.md` files are read. Hidden directories and `target/` are skipped, and directory symlinks are not followed. A paragraph that contains only `{pagebreak}` starts a new page.
+The first command writes each PDF under `assets/examples/publicacao/`, which keeps it outside the source tree, and regenerates the versioned examples. A file or a directory can be given; a directory is walked recursively and only `.md` files are read. Hidden directories and `target/` are skipped, and directory symlinks are not followed. A paragraph that contains only `-pagebreak-` starts a new page, and `-!-` is its shorthand; a paragraph that contains only `-horizontal-` draws a rule, as `---`, `***` and `___` already do.
 
 `--output` writes under another directory; a directory input mirrors its relative tree there, while a direct file is written flat. `--check` parses the Markdown and validates the template without writing. A failure in one file does not stop the rest of the batch, and the exit code is `1` when any input fails.
 

@@ -15,7 +15,7 @@ use serde::de::{self, Deserializer, MapAccess, Unexpected, Visitor};
 const MM_TO_POINTS: f64 = 72.0 / 25.4;
 
 /// The current schema version. A template for another version is rejected.
-pub const CURRENT_SCHEMA_VERSION: SchemaVersion = SchemaVersion { major: 0, minor: 6 };
+pub const CURRENT_SCHEMA_VERSION: SchemaVersion = SchemaVersion { major: 0, minor: 7 };
 
 const DEFAULT_MARGIN: Length = Length(20.0 * MM_TO_POINTS);
 const DEFAULT_FONT_SIZE: Length = Length(12.0);
@@ -1418,7 +1418,7 @@ impl Default for RuleStyle {
 pub struct Formatting {
     paragraph: ParagraphStyle,
     heading: HeadingStyles,
-    rule: RuleStyle,
+    horizontal_rule: RuleStyle,
     quote: BlockStyle,
     code_block: BlockStyle,
     list: ListStyle,
@@ -1430,7 +1430,7 @@ impl Formatting {
     pub fn new(
         paragraph: ParagraphStyle,
         heading: HeadingStyles,
-        rule: RuleStyle,
+        horizontal_rule: RuleStyle,
         quote: BlockStyle,
         code_block: BlockStyle,
         list: ListStyle,
@@ -1439,7 +1439,7 @@ impl Formatting {
         Self {
             paragraph,
             heading,
-            rule,
+            horizontal_rule,
             quote,
             code_block,
             list,
@@ -1465,8 +1465,9 @@ impl Formatting {
         &self.heading
     }
 
-    pub fn rule(&self) -> &RuleStyle {
-        &self.rule
+    /// The thematic break style; undeclared keys keep the defaults.
+    pub fn horizontal_rule(&self) -> &RuleStyle {
+        &self.horizontal_rule
     }
 
     /// The list style; undeclared text keys inherit the paragraph face.
@@ -1857,7 +1858,7 @@ struct RawMargins {
 struct RawFormatting {
     paragraph: Option<RawParagraph>,
     heading: Option<RawHeading>,
-    rule: Option<RawRule>,
+    horizontal_rule: Option<RawRule>,
     quote: Option<RawBlockStyle>,
     code_block: Option<RawBlockStyle>,
     list: Option<RawListStyle>,
@@ -2127,13 +2128,22 @@ fn margin(value: Option<String>, field: &'static str) -> Result<Option<Length>, 
 fn convert_formatting(raw: RawFormatting) -> Result<Formatting, TemplateError> {
     let paragraph = convert_paragraph(raw.paragraph.unwrap_or_default())?;
     let heading = convert_headings(raw.heading.unwrap_or_default())?;
-    let rule = convert_rule(raw.rule.unwrap_or_default(), "formatting.rule")?;
+    let horizontal_rule = convert_rule(
+        raw.horizontal_rule.unwrap_or_default(),
+        "formatting.horizontal_rule",
+    )?;
     let quote = convert_block(raw.quote, "formatting.quote", paragraph.face())?;
     let code_block = convert_block(raw.code_block, "formatting.code_block", paragraph.face())?;
     let list = convert_list(raw.list, paragraph.face())?;
     let table = convert_table(raw.table)?;
     Ok(Formatting::new(
-        paragraph, heading, rule, quote, code_block, list, table,
+        paragraph,
+        heading,
+        horizontal_rule,
+        quote,
+        code_block,
+        list,
+        table,
     ))
 }
 
@@ -2979,7 +2989,7 @@ mod tests {
 
     #[test]
     fn paragraph_and_heading_defaults_are_distinct() {
-        let template = Template::from_yaml("version: \"0.6\"\n").expect("the default template");
+        let template = Template::from_yaml("version: \"0.7\"\n").expect("the default template");
         let paragraph = template.formatting().paragraph();
         assert_eq!(paragraph.face().size().points(), 12.0);
         assert_eq!(paragraph.face().weight(), FontWeight::NORMAL);
@@ -2998,7 +3008,7 @@ mod tests {
     #[test]
     fn the_link_style_inherits_the_paragraph_face() {
         let template = Template::from_yaml(
-            "version: \"0.6\"\nformatting:\n  paragraph:\n    size: 11\n    link:\n      foreground: \"#112233\"\n",
+            "version: \"0.7\"\nformatting:\n  paragraph:\n    size: 11\n    link:\n      foreground: \"#112233\"\n",
         )
         .expect("the template");
         let link = template.formatting().paragraph().link();
@@ -3016,7 +3026,7 @@ mod tests {
     #[test]
     fn a_link_underline_is_declared_explicitly() {
         let template = Template::from_yaml(
-            "version: \"0.6\"\nformatting:\n  paragraph:\n    link:\n      underline: true\n",
+            "version: \"0.7\"\nformatting:\n  paragraph:\n    link:\n      underline: true\n",
         )
         .expect("the template");
         let link = template.formatting().paragraph().link();
@@ -3027,7 +3037,7 @@ mod tests {
     #[test]
     fn an_unknown_link_key_is_rejected() {
         let error = Template::from_yaml(
-            "version: \"0.6\"\nformatting:\n  paragraph:\n    link:\n      colour: navy\n",
+            "version: \"0.7\"\nformatting:\n  paragraph:\n    link:\n      colour: navy\n",
         )
         .expect_err("the typo must be rejected");
         assert!(matches!(error, TemplateError::Yaml { .. }), "{error}");

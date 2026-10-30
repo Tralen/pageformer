@@ -323,7 +323,7 @@ mod tests {
     #[test]
     fn an_explicit_page_break_becomes_a_form_feed() {
         assert_eq!(
-            rendered("Antes.\n\n{pagebreak}\n\nDepois.\n"),
+            rendered("Antes.\n\n-pagebreak-\n\nDepois.\n"),
             "Antes.\n\n\u{c}\n\nDepois.\n"
         );
     }

@@ -71,7 +71,7 @@ fn main() {
 
 Uma régua fecha esta seção.
 
----
+-horizontal-
 
 ## Resultados
 
@@ -90,11 +90,11 @@ A tabela abaixo resume o que cada formato preserva do template.
 
 O bloco seguinte força uma quebra de página explícita antes do anexo. Sem o marcador, o anexo continuaria na mesma página.
 
-{pagebreak}
+-pagebreak-
 
 # Anexo
 
-O anexo começa em uma página nova por causa do parágrafo que contém apenas o marcador de quebra de página. Qualquer outra ocorrência, como {pagebreak} nesta frase, permanece texto comum.
+O anexo começa em uma página nova por causa do parágrafo que contém apenas o marcador de quebra de página, escrito como `-pagebreak-` ou pelo atalho `-!-`. Qualquer outra ocorrência, como -!- nesta frase, permanece texto comum.
 
 # Apêndice
 

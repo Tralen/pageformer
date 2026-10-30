@@ -218,7 +218,7 @@ impl<'a> Builder<'a> {
 
     /// The bottom border that draws the rule, plus the spacing the template declares.
     fn thematic_break_properties(&self) -> String {
-        let rule = self.template.formatting().rule();
+        let rule = self.template.formatting().horizontal_rule();
         let mut output = format!(
             "<w:pBdr><w:bottom w:val=\"single\" w:sz=\"{}\" w:space=\"1\" w:color=\"{}\"/></w:pBdr>",
             metrics::eighths(rule.thickness().points()),

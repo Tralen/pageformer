@@ -154,11 +154,11 @@ fn the_shared_example_template_uses_its_letterhead() {
 
 #[test]
 fn running_content_tables_and_page_breaks_render() {
-    let source = "---\ntitle: Contrato\nauthor: Pageformer\ndate: 2026-03-05\nsubject: Teste\nkeywords:\n  - legal\n---\n\n# Título\n\n| A | B |\n|---|---|\n| 1 | 2 |\n\n{pagebreak}\n\nDepois.\n\n# Outra seção\n\nTexto.\n";
+    let source = "---\ntitle: Contrato\nauthor: Pageformer\ndate: 2026-03-05\nsubject: Teste\nkeywords:\n  - legal\n---\n\n# Título\n\n| A | B |\n|---|---|\n| 1 | 2 |\n\n-pagebreak-\n\nDepois.\n\n# Outra seção\n\nTexto.\n";
     let document = markdown::parse(source).expect("the document must parse");
     let template = Template::from_yaml(
         r##"
-version: "0.6"
+version: "0.7"
 page:
   header:
     left: "{title}"
@@ -199,7 +199,7 @@ fn rules_and_heading_backgrounds_render_deterministically() {
             .expect("the document must parse");
     let template = Template::from_yaml(
         r##"
-version: "0.6"
+version: "0.7"
 formatting:
   heading:
     background: "#eeeeee"
@@ -207,7 +207,7 @@ formatting:
       rule:
         thickness: 0.5pt
         spacing_before: 2
-  rule:
+  horizontal_rule:
     thickness: 1pt
     color: "#112233"
     spacing_before: 12
@@ -297,7 +297,7 @@ fn unicode_task_markers_are_embedded() {
         markdown::parse("- [x] Feito\n- [ ] Pendente\n").expect("the document must parse");
     let template = Template::from_yaml(
         r##"
-version: "0.6"
+version: "0.7"
 formatting:
   paragraph:
     font_families:

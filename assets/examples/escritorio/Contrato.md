@@ -76,7 +76,7 @@ A tolerância de uma parte quanto ao descumprimento de obrigação pela outra n�
 
 Os casos omissos serão resolvidos de boa-fé pelas partes, à luz da legislação aplicável e dos princípios que regem a contratação.
 
-{pagebreak}
+-pagebreak-
 
 Local e data:
 

@@ -634,7 +634,7 @@ fn block_styles(output: &mut String, template: &Template) {
 }
 
 fn horizontal_line_style(output: &mut String, template: &Template) {
-    let rule = template.formatting().rule();
+    let rule = template.formatting().horizontal_rule();
     let before = rule.spacing_before().map_or_else(String::new, |length| {
         format!("fo:margin-top=\"{}\" ", xml::points(length))
     });

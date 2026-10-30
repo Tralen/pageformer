@@ -78,7 +78,7 @@ O bloco seguinte força uma quebra de página explícita antes do anexo. Sem o m
 
 Anexo
 
-O anexo começa em uma página nova por causa do parágrafo que contém apenas o marcador de quebra de página. Qualquer outra ocorrência, como {pagebreak} nesta frase, permanece texto comum.
+O anexo começa em uma página nova por causa do parágrafo que contém apenas o marcador de quebra de página, escrito como -pagebreak- ou pelo atalho -!-. Qualquer outra ocorrência, como -!- nesta frase, permanece texto comum.
 
 Apêndice
 

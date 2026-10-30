@@ -528,19 +528,32 @@ impl<'source> DocumentParser<'source> {
     }
 }
 
-/// A standalone `{pagebreak}` paragraph is an explicit page break. Braces are
-/// ordinary text to CommonMark and to the Zed preview, so the marker survives
-/// the parser without raw HTML or a backslash escape.
+/// A standalone marker paragraph is a page break or a horizontal rule. The
+/// markers are ordinary text to CommonMark and to the Zed preview, so they
+/// survive the parser without raw HTML or a backslash escape.
 fn paragraph_blocks(content: Vec<Inline>) -> Vec<Block> {
-    if is_page_break(&content) {
-        vec![Block::PageBreak]
-    } else {
-        vec![Block::Paragraph(content)]
+    match paragraph_marker(&content) {
+        Some(ParagraphMarker::PageBreak) => vec![Block::PageBreak],
+        Some(ParagraphMarker::HorizontalRule) => vec![Block::ThematicBreak],
+        None => vec![Block::Paragraph(content)],
     }
 }
 
-fn is_page_break(content: &[Inline]) -> bool {
-    matches!(content, [Inline::Text(text)] if text == "{pagebreak}")
+/// A marker that occupies a paragraph by itself.
+enum ParagraphMarker {
+    PageBreak,
+    HorizontalRule,
+}
+
+fn paragraph_marker(content: &[Inline]) -> Option<ParagraphMarker> {
+    let [Inline::Text(text)] = content else {
+        return None;
+    };
+    match text.trim() {
+        "-pagebreak-" | "-!-" => Some(ParagraphMarker::PageBreak),
+        "-horizontal-" => Some(ParagraphMarker::HorizontalRule),
+        _ => None,
+    }
 }
 
 /// A loose ordered list whose items are one paragraph each is a sequence of
@@ -813,22 +826,73 @@ mod tests {
     }
 
     #[test]
-    fn a_standalone_pagebreak_paragraph_is_a_page_break() {
-        let document = parse("Antes.\n\n{pagebreak}\n\nDepois.\n").expect("a page break");
-        assert_eq!(
-            document.blocks(),
-            &[
-                Block::Paragraph(vec![Inline::Text("Antes.".to_owned())]),
-                Block::PageBreak,
-                Block::Paragraph(vec![Inline::Text("Depois.".to_owned())]),
-            ]
+    fn a_standalone_pagebreak_marker_is_a_page_break() {
+        for marker in ["-pagebreak-", "-!-"] {
+            let source = format!("Antes.\n\n{marker}\n\nDepois.\n");
+            let document = parse(&source).expect("a page break");
+            assert_eq!(
+                document.blocks(),
+                &[
+                    Block::Paragraph(vec![Inline::Text("Antes.".to_owned())]),
+                    Block::PageBreak,
+                    Block::Paragraph(vec![Inline::Text("Depois.".to_owned())]),
+                ],
+                "{marker}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_pagebreak_marker_inside_a_paragraph_stays_text() {
+        for source in ["Texto -pagebreak- aqui.\n", "Texto -!- aqui.\n"] {
+            let document = parse(source).expect("inline text");
+            assert!(
+                matches!(first_block(&document), Block::Paragraph(_)),
+                "{source}"
+            );
+        }
+    }
+
+    #[test]
+    fn the_old_brace_pagebreak_is_ordinary_text() {
+        let document = parse("Antes.\n\n{pagebreak}\n\nDepois.\n").expect("ordinary text");
+        assert!(
+            matches!(document.blocks().get(1), Some(Block::Paragraph(_))),
+            "the old marker must not become a page break"
         );
     }
 
     #[test]
-    fn a_pagebreak_inside_a_paragraph_stays_text() {
-        let document = parse("Texto {pagebreak} aqui.\n").expect("inline text");
+    fn a_standalone_horizontal_marker_is_a_thematic_break() {
+        let document = parse("Antes.\n\n-horizontal-\n\nDepois.\n").expect("a horizontal rule");
+        assert_eq!(document.blocks().get(1), Some(&Block::ThematicBreak));
+    }
+
+    #[test]
+    fn a_horizontal_marker_inside_a_paragraph_stays_text() {
+        let document = parse("Texto -horizontal- aqui.\n").expect("inline text");
         assert!(matches!(first_block(&document), Block::Paragraph(_)));
+    }
+
+    #[test]
+    fn the_standard_thematic_break_forms_are_blocks() {
+        for marker in ["---", "***", "___"] {
+            let source = format!("Antes.\n\n{marker}\n\nDepois.\n");
+            let document = parse(&source).expect("a thematic break");
+            assert!(
+                document
+                    .blocks()
+                    .iter()
+                    .any(|block| matches!(block, Block::ThematicBreak)),
+                "{marker}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_setext_underline_is_a_heading_not_a_page_break() {
+        let document = parse("Título\n===\n").expect("a setext heading");
+        assert!(matches!(first_block(&document), Block::Heading(_)));
     }
 
     #[test]

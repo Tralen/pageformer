@@ -7,9 +7,9 @@ use pageformer::template::PageSize;
 use pageformer::template::loader::{self, TemplateOrigin};
 use tempfile::TempDir;
 
-const A4_TEMPLATE: &str = "version: \"0.6\"\npage:\n  size: a4\n";
-const LETTER_TEMPLATE: &str = "version: \"0.6\"\npage:\n  size: letter\n";
-const LEGAL_TEMPLATE: &str = "version: \"0.6\"\npage:\n  size: legal\n";
+const A4_TEMPLATE: &str = "version: \"0.7\"\npage:\n  size: a4\n";
+const LETTER_TEMPLATE: &str = "version: \"0.7\"\npage:\n  size: letter\n";
+const LEGAL_TEMPLATE: &str = "version: \"0.7\"\npage:\n  size: legal\n";
 
 fn write(path: &Path, contents: &str) {
     if let Some(parent) = path.parent() {

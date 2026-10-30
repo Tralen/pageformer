@@ -4,7 +4,7 @@
 # parent folder. Without a letterhead, both margins are free for the running
 # header and footer.
 
-version: "0.6"
+version: "0.7"
 
 page:
   size: a4

@@ -32,7 +32,7 @@ fn value_error_is(error: &TemplateError, field: &str, problem: ValueError) -> bo
 
 #[test]
 fn a_minimal_template_uses_the_documented_defaults() {
-    let template = parse("version: \"0.6\"\n");
+    let template = parse("version: \"0.7\"\n");
     assert_eq!(template.schema_version(), CURRENT_SCHEMA_VERSION);
     assert_eq!(template.page().size(), PageSize::A4);
     assert_eq!(template.page().orientation(), Orientation::Portrait);
@@ -63,7 +63,7 @@ fn a_minimal_template_uses_the_documented_defaults() {
 fn a_complete_template_is_read_field_by_field() {
     let template = parse(
         r#"
-version: "0.6"
+version: "0.7"
 
 page:
   size: letter
@@ -151,7 +151,7 @@ formatting:
 fn a_custom_page_keeps_its_dimensions() {
     let template = parse(
         r#"
-version: "0.6"
+version: "0.7"
 page:
   size:
     width: 216mm
@@ -166,7 +166,7 @@ page:
 
 #[test]
 fn landscape_swaps_the_page_dimensions() {
-    let template = parse("version: \"0.6\"\npage:\n  size: a4\n  orientation: landscape\n");
+    let template = parse("version: \"0.7\"\npage:\n  size: a4\n  orientation: landscape\n");
     let dimensions = template.page().dimensions();
     assert_millimetres(millimetres(dimensions.width()), 297.0);
     assert_millimetres(millimetres(dimensions.height()), 210.0);
@@ -185,7 +185,7 @@ fn an_unsupported_schema_version_is_rejected() {
     ));
     assert_eq!(
         error.to_string(),
-        "unsupported template schema version 0.4; this build supports version 0.6"
+        "unsupported template schema version 0.4; this build supports version 0.7"
     );
 }
 
@@ -197,13 +197,13 @@ fn a_missing_version_is_rejected() {
 
 #[test]
 fn an_unquoted_version_is_read_as_a_string() {
-    let template = parse("version: 0.6\n");
+    let template = parse("version: 0.7\n");
     assert_eq!(template.schema_version(), CURRENT_SCHEMA_VERSION);
 }
 
 #[test]
 fn the_removed_text_section_is_rejected() {
-    let error = Template::from_yaml("version: \"0.6\"\ntext:\n  size: 12\n")
+    let error = Template::from_yaml("version: \"0.7\"\ntext:\n  size: 12\n")
         .expect_err("formatting replaced text");
     let message = error.to_string();
     assert!(message.contains("unknown field `text`"), "{message}");
@@ -212,13 +212,13 @@ fn the_removed_text_section_is_rejected() {
 #[test]
 fn unknown_keys_are_rejected() {
     for yaml in [
-        "version: \"0.6\"\ncolour: red\n",
-        "version: \"0.6\"\npage:\n  size: a4\n  bleed: 3mm\n",
-        "version: \"0.6\"\nformatting:\n  paragraph:\n    font: Serif\n",
-        "version: \"0.6\"\nformatting:\n  heading:\n    h7:\n      size: 12\n",
-        "version: \"0.6\"\nformatting:\n  paragraph:\n    emphasis:\n      unknown: 1\n",
-        "version: \"0.6\"\npage:\n  header:\n    middle: x\n",
-        "version: \"0.6\"\nformatting:\n  table:\n    colour: red\n",
+        "version: \"0.7\"\ncolour: red\n",
+        "version: \"0.7\"\npage:\n  size: a4\n  bleed: 3mm\n",
+        "version: \"0.7\"\nformatting:\n  paragraph:\n    font: Serif\n",
+        "version: \"0.7\"\nformatting:\n  heading:\n    h7:\n      size: 12\n",
+        "version: \"0.7\"\nformatting:\n  paragraph:\n    emphasis:\n      unknown: 1\n",
+        "version: \"0.7\"\npage:\n  header:\n    middle: x\n",
+        "version: \"0.7\"\nformatting:\n  table:\n    colour: red\n",
     ] {
         assert!(
             matches!(Template::from_yaml(yaml), Err(TemplateError::Yaml { .. })),
@@ -229,7 +229,7 @@ fn unknown_keys_are_rejected() {
 
 #[test]
 fn an_unknown_page_size_lists_the_accepted_names() {
-    let error = Template::from_yaml("version: \"0.6\"\npage:\n  size: a3\n")
+    let error = Template::from_yaml("version: \"0.7\"\npage:\n  size: a3\n")
         .expect_err("a3 is not supported");
     let message = error.to_string();
     assert!(message.contains("a4"), "{message}");
@@ -237,21 +237,21 @@ fn an_unknown_page_size_lists_the_accepted_names() {
 
 #[test]
 fn an_unknown_orientation_is_rejected() {
-    let error = Template::from_yaml("version: \"0.6\"\npage:\n  orientation: sideways\n")
+    let error = Template::from_yaml("version: \"0.7\"\npage:\n  orientation: sideways\n")
         .expect_err("sideways is not supported");
     assert!(matches!(error, TemplateError::Yaml { .. }));
 }
 
 #[test]
 fn a_length_without_a_unit_is_points() {
-    let template = parse("version: \"0.6\"\npage:\n  margins:\n    top: 30\n");
+    let template = parse("version: \"0.7\"\npage:\n  margins:\n    top: 30\n");
     assert_eq!(template.page().margins().top().points(), 30.0);
 }
 
 #[test]
 fn an_unknown_length_unit_is_rejected() {
     let error =
-        Template::from_yaml("version: \"0.6\"\nformatting:\n  paragraph:\n    size: 12px\n")
+        Template::from_yaml("version: \"0.7\"\nformatting:\n  paragraph:\n    size: 12px\n")
             .expect_err("px is not supported");
     assert!(value_error_is(
         &error,
@@ -262,7 +262,7 @@ fn an_unknown_length_unit_is_rejected() {
 
 #[test]
 fn a_zero_font_size_is_rejected() {
-    let error = Template::from_yaml("version: \"0.6\"\nformatting:\n  paragraph:\n    size: 0\n")
+    let error = Template::from_yaml("version: \"0.7\"\nformatting:\n  paragraph:\n    size: 0\n")
         .expect_err("the font size must be positive");
     assert!(value_error_is(
         &error,
@@ -274,7 +274,7 @@ fn a_zero_font_size_is_rejected() {
 #[test]
 fn a_zero_heading_size_is_rejected() {
     let error =
-        Template::from_yaml("version: \"0.6\"\nformatting:\n  heading:\n    h1:\n      size: 0\n")
+        Template::from_yaml("version: \"0.7\"\nformatting:\n  heading:\n    h1:\n      size: 0\n")
             .expect_err("the heading size must be positive");
     assert!(value_error_is(
         &error,
@@ -286,7 +286,7 @@ fn a_zero_heading_size_is_rejected() {
 #[test]
 fn a_zero_inline_size_is_rejected() {
     let error = Template::from_yaml(
-        "version: \"0.6\"\nformatting:\n  paragraph:\n    emphasis:\n      size: 0\n",
+        "version: \"0.7\"\nformatting:\n  paragraph:\n    emphasis:\n      size: 0\n",
     )
     .expect_err("the inline size must be positive");
     assert!(value_error_is(
@@ -299,7 +299,7 @@ fn a_zero_inline_size_is_rejected() {
 #[test]
 fn a_negative_leading_is_rejected() {
     let error =
-        Template::from_yaml("version: \"0.6\"\nformatting:\n  paragraph:\n    leading: -7\n")
+        Template::from_yaml("version: \"0.7\"\nformatting:\n  paragraph:\n    leading: -7\n")
             .expect_err("the leading must not be negative");
     assert!(value_error_is(
         &error,
@@ -311,7 +311,7 @@ fn a_negative_leading_is_rejected() {
 #[test]
 fn a_negative_spacing_is_rejected() {
     let error =
-        Template::from_yaml("version: \"0.6\"\nformatting:\n  paragraph:\n    spacing: -1\n")
+        Template::from_yaml("version: \"0.7\"\nformatting:\n  paragraph:\n    spacing: -1\n")
             .expect_err("the spacing must not be negative");
     assert!(value_error_is(
         &error,
@@ -323,7 +323,7 @@ fn a_negative_spacing_is_rejected() {
 #[test]
 fn a_negative_heading_spacing_is_rejected() {
     let error = Template::from_yaml(
-        "version: \"0.6\"\nformatting:\n  heading:\n    h1:\n      spacing_before: -1\n",
+        "version: \"0.7\"\nformatting:\n  heading:\n    h1:\n      spacing_before: -1\n",
     )
     .expect_err("the heading spacing must not be negative");
     assert!(value_error_is(
@@ -336,7 +336,7 @@ fn a_negative_heading_spacing_is_rejected() {
 #[test]
 fn an_empty_font_list_is_rejected() {
     let error =
-        Template::from_yaml("version: \"0.6\"\nformatting:\n  paragraph:\n    font_families: []\n")
+        Template::from_yaml("version: \"0.7\"\nformatting:\n  paragraph:\n    font_families: []\n")
             .expect_err("the font list must not be empty");
     assert!(value_error_is(
         &error,
@@ -347,10 +347,10 @@ fn an_empty_font_list_is_rejected() {
 
 #[test]
 fn a_font_weight_name_and_number_are_accepted() {
-    let named = parse("version: \"0.6\"\nformatting:\n  paragraph:\n    weight: semibold\n");
+    let named = parse("version: \"0.7\"\nformatting:\n  paragraph:\n    weight: semibold\n");
     assert_eq!(named.formatting().paragraph().face().weight().get(), 600);
 
-    let numeric = parse("version: \"0.6\"\nformatting:\n  heading:\n    h2:\n      weight: 650\n");
+    let numeric = parse("version: \"0.7\"\nformatting:\n  heading:\n    h2:\n      weight: 650\n");
     assert_eq!(
         numeric.formatting().heading().levels()[1]
             .face()
@@ -363,7 +363,7 @@ fn a_font_weight_name_and_number_are_accepted() {
 #[test]
 fn an_invalid_font_weight_is_rejected() {
     let error =
-        Template::from_yaml("version: \"0.6\"\nformatting:\n  paragraph:\n    weight: 950\n")
+        Template::from_yaml("version: \"0.7\"\nformatting:\n  paragraph:\n    weight: 950\n")
             .expect_err("950 is outside the accepted range");
     assert!(value_error_is(
         &error,
@@ -372,7 +372,7 @@ fn an_invalid_font_weight_is_rejected() {
     ));
 
     let error =
-        Template::from_yaml("version: \"0.6\"\nformatting:\n  paragraph:\n    weight: heavyish\n")
+        Template::from_yaml("version: \"0.7\"\nformatting:\n  paragraph:\n    weight: heavyish\n")
             .expect_err("the weight name is not supported");
     assert!(value_error_is(
         &error,
@@ -384,7 +384,7 @@ fn an_invalid_font_weight_is_rejected() {
 #[test]
 fn an_unknown_style_is_rejected() {
     let error =
-        Template::from_yaml("version: \"0.6\"\nformatting:\n  paragraph:\n    style: oblique\n")
+        Template::from_yaml("version: \"0.7\"\nformatting:\n  paragraph:\n    style: oblique\n")
             .expect_err("oblique is not supported");
     assert!(matches!(error, TemplateError::Yaml { .. }));
 }
@@ -393,7 +393,7 @@ fn an_unknown_style_is_rejected() {
 fn a_running_header_and_footer_keep_their_slots() {
     let template = parse(
         r#"
-version: "0.6"
+version: "0.7"
 page:
   header:
     left: "{title}"
@@ -414,7 +414,7 @@ page:
 
 #[test]
 fn an_empty_running_section_is_none() {
-    let template = parse("version: \"0.6\"\npage:\n  header:\n    left: \"  \"\n  footer: {}\n");
+    let template = parse("version: \"0.7\"\npage:\n  header:\n    left: \"  \"\n  footer: {}\n");
     assert_eq!(template.page().header(), None);
     assert_eq!(template.page().footer(), None);
 }
@@ -422,7 +422,7 @@ fn an_empty_running_section_is_none() {
 #[test]
 fn an_unknown_lowercase_token_is_rejected() {
     let error = Template::from_yaml(
-        "version: \"0.6\"\npage:\n  header:\n    center: \"Página {pagina}\"\n",
+        "version: \"0.7\"\npage:\n  header:\n    center: \"Página {pagina}\"\n",
     )
     .expect_err("an unknown token");
     assert!(matches!(
@@ -436,7 +436,7 @@ fn an_unknown_lowercase_token_is_rejected() {
 
 #[test]
 fn a_confidential_field_in_running_content_is_rejected() {
-    let error = Template::from_yaml("version: \"0.6\"\npage:\n  header:\n    right: \"{NOME}\"\n")
+    let error = Template::from_yaml("version: \"0.7\"\npage:\n  header:\n    right: \"{NOME}\"\n")
         .expect_err("confidential fields are not resolved in running content");
     assert!(matches!(
         error,
@@ -448,7 +448,7 @@ fn a_confidential_field_in_running_content_is_rejected() {
 
 #[test]
 fn the_table_style_defaults_preserve_the_plain_grid() {
-    let template = parse("version: \"0.6\"\n");
+    let template = parse("version: \"0.7\"\n");
     let table = template.table();
     assert_eq!(table.border().points(), 0.5);
     assert_eq!(table.border_color().hex(), "#bbbbbb");
@@ -460,7 +460,7 @@ fn the_table_style_defaults_preserve_the_plain_grid() {
 fn the_table_style_is_read_field_by_field() {
     let template = parse(
         r##"
-version: "0.6"
+version: "0.7"
 formatting:
   table:
     border: 1.5pt
@@ -482,10 +482,10 @@ formatting:
 #[test]
 fn an_invalid_color_is_rejected() {
     for yaml in [
-        "version: \"0.6\"\nformatting:\n  table:\n    border_color: bbbbbb\n",
-        "version: \"0.6\"\nformatting:\n  table:\n    border_color: \"#bbbb\"\n",
-        "version: \"0.6\"\nformatting:\n  table:\n    border_color: \"#gggggg\"\n",
-        "version: \"0.6\"\nformatting:\n  table:\n    header_fill: \"notacolor\"\n",
+        "version: \"0.7\"\nformatting:\n  table:\n    border_color: bbbbbb\n",
+        "version: \"0.7\"\nformatting:\n  table:\n    border_color: \"#bbbb\"\n",
+        "version: \"0.7\"\nformatting:\n  table:\n    border_color: \"#gggggg\"\n",
+        "version: \"0.7\"\nformatting:\n  table:\n    header_fill: \"notacolor\"\n",
     ] {
         let error = Template::from_yaml(yaml).expect_err("an invalid color");
         assert!(matches!(error, TemplateError::Value { .. }), "{yaml}");
@@ -495,7 +495,7 @@ fn an_invalid_color_is_rejected() {
 #[test]
 fn a_heading_page_break_can_be_inherited_or_overridden() {
     let base = parse(
-        "version: \"0.6\"\nformatting:\n  heading:\n    page_break_before: true\n    h3:\n      page_break_before: false\n",
+        "version: \"0.7\"\nformatting:\n  heading:\n    page_break_before: true\n    h3:\n      page_break_before: false\n",
     );
     let levels = base.formatting().heading().levels();
     assert!(levels[0].page_break_before());
@@ -504,7 +504,7 @@ fn a_heading_page_break_can_be_inherited_or_overridden() {
     assert!(levels[5].page_break_before());
 
     let level = parse(
-        "version: \"0.6\"\nformatting:\n  heading:\n    h2:\n      page_break_before: true\n",
+        "version: \"0.7\"\nformatting:\n  heading:\n    h2:\n      page_break_before: true\n",
     );
     let levels = level.formatting().heading().levels();
     assert!(!levels[0].page_break_before());
@@ -514,16 +514,16 @@ fn a_heading_page_break_can_be_inherited_or_overridden() {
 #[test]
 fn an_unknown_heading_key_is_rejected_with_page_breaks() {
     let error = Template::from_yaml(
-        "version: \"0.6\"\nformatting:\n  heading:\n    h1:\n      page_break: true\n",
+        "version: \"0.7\"\nformatting:\n  heading:\n    h1:\n      page_break: true\n",
     )
     .expect_err("the key is not supported");
     assert!(matches!(error, TemplateError::Yaml { .. }));
 }
 
 #[test]
-fn the_rule_defaults_are_a_black_half_point_line() {
-    let template = parse("version: \"0.6\"\n");
-    let rule = template.formatting().rule();
+fn the_horizontal_rule_defaults_are_a_black_half_point_line() {
+    let template = parse("version: \"0.7\"\n");
+    let rule = template.formatting().horizontal_rule();
     assert_eq!(rule.thickness().points(), 0.5);
     assert_eq!(rule.color().hex(), "#000000");
     assert_eq!(rule.spacing_before(), None);
@@ -531,19 +531,19 @@ fn the_rule_defaults_are_a_black_half_point_line() {
 }
 
 #[test]
-fn the_rule_is_read_field_by_field() {
+fn the_horizontal_rule_is_read_field_by_field() {
     let template = parse(
         r##"
-version: "0.6"
+version: "0.7"
 formatting:
-  rule:
+  horizontal_rule:
     thickness: 1.5pt
     color: "#112233"
     spacing_before: 12
     spacing_after: 4mm
 "##,
     );
-    let rule = template.formatting().rule();
+    let rule = template.formatting().horizontal_rule();
     assert_eq!(rule.thickness().points(), 1.5);
     assert_eq!(rule.color().hex(), "#112233");
     assert_eq!(rule.spacing_before().map(Length::points), Some(12.0));
@@ -551,43 +551,56 @@ formatting:
 }
 
 #[test]
-fn an_invalid_rule_value_is_rejected_with_its_field() {
-    let zero = Template::from_yaml("version: \"0.6\"\nformatting:\n  rule:\n    thickness: 0\n")
-        .expect_err("a zero thickness");
+fn an_invalid_horizontal_rule_value_is_rejected_with_its_field() {
+    let zero = Template::from_yaml(
+        "version: \"0.7\"\nformatting:\n  horizontal_rule:\n    thickness: 0\n",
+    )
+    .expect_err("a zero thickness");
     assert!(
-        value_error_is(&zero, "formatting.rule.thickness", ValueError::Zero),
+        value_error_is(
+            &zero,
+            "formatting.horizontal_rule.thickness",
+            ValueError::Zero
+        ),
         "{zero}"
     );
 
-    let color =
-        Template::from_yaml("version: \"0.6\"\nformatting:\n  rule:\n    color: notacolor\n")
-            .expect_err("an invalid color");
+    let color = Template::from_yaml(
+        "version: \"0.7\"\nformatting:\n  horizontal_rule:\n    color: notacolor\n",
+    )
+    .expect_err("an invalid color");
     assert!(
-        value_error_is(&color, "formatting.rule.color", ValueError::InvalidColor),
+        value_error_is(
+            &color,
+            "formatting.horizontal_rule.color",
+            ValueError::InvalidColor
+        ),
         "{color}"
     );
 
-    let spacing =
-        Template::from_yaml("version: \"0.6\"\nformatting:\n  rule:\n    spacing_after: -4\n")
-            .expect_err("a negative spacing");
+    let spacing = Template::from_yaml(
+        "version: \"0.7\"\nformatting:\n  horizontal_rule:\n    spacing_after: -4\n",
+    )
+    .expect_err("a negative spacing");
     assert!(
         value_error_is(
             &spacing,
-            "formatting.rule.spacing_after",
+            "formatting.horizontal_rule.spacing_after",
             ValueError::Negative
         ),
         "{spacing}"
     );
 
-    let unknown = Template::from_yaml("version: \"0.6\"\nformatting:\n  rule:\n    width: 1pt\n")
-        .expect_err("the key is not supported");
+    let unknown =
+        Template::from_yaml("version: \"0.7\"\nformatting:\n  horizontal_rule:\n    width: 1pt\n")
+            .expect_err("the key is not supported");
     assert!(matches!(unknown, TemplateError::Yaml { .. }), "{unknown}");
 }
 
 #[test]
 fn a_heading_background_is_inherited_and_overridden_per_level() {
     let template = parse(
-        "version: \"0.6\"\nformatting:\n  heading:\n    background: \"#eeeeee\"\n    h2:\n      background: \"#DDDDDD\"\n",
+        "version: \"0.7\"\nformatting:\n  heading:\n    background: \"#eeeeee\"\n    h2:\n      background: \"#DDDDDD\"\n",
     );
     let levels = template.formatting().heading().levels();
     let hex = |index: usize| levels[index].background().map(|color| color.hex());
@@ -595,14 +608,14 @@ fn a_heading_background_is_inherited_and_overridden_per_level() {
     assert_eq!(hex(1), Some("#dddddd".to_owned()));
     assert_eq!(hex(5), Some("#eeeeee".to_owned()));
 
-    let plain = parse("version: \"0.6\"\n");
+    let plain = parse("version: \"0.7\"\n");
     assert_eq!(plain.formatting().heading().levels()[0].background(), None);
 }
 
 #[test]
 fn an_invalid_heading_background_names_its_level() {
     let error = Template::from_yaml(
-        "version: \"0.6\"\nformatting:\n  heading:\n    h3:\n      background: notacolor\n",
+        "version: \"0.7\"\nformatting:\n  heading:\n    h3:\n      background: notacolor\n",
     )
     .expect_err("an invalid color");
     assert!(
@@ -619,7 +632,7 @@ fn an_invalid_heading_background_names_its_level() {
 fn a_heading_rule_is_declared_per_level() {
     let template = parse(
         r##"
-version: "0.6"
+version: "0.7"
 formatting:
   heading:
     h2:
@@ -655,7 +668,7 @@ formatting:
 fn a_base_rule_and_background_are_inherited_by_every_level() {
     let template = parse(
         r##"
-version: "0.6"
+version: "0.7"
 formatting:
   heading:
     background: "#eeeeee"
@@ -681,7 +694,7 @@ formatting:
 fn a_level_clears_an_inherited_rule_and_background_with_none() {
     let template = parse(
         r##"
-version: "0.6"
+version: "0.7"
 formatting:
   heading:
     background: "#eeeeee"
@@ -713,7 +726,7 @@ formatting:
 #[test]
 fn a_heading_rule_written_as_text_is_rejected() {
     let error = Template::from_yaml(
-        "version: \"0.6\"\nformatting:\n  heading:\n    h2:\n      rule: \"1pt\"\n",
+        "version: \"0.7\"\nformatting:\n  heading:\n    h2:\n      rule: \"1pt\"\n",
     )
     .expect_err("a rule is a map or none");
     assert!(error.to_string().contains("a rule is a map"), "{error}");
@@ -722,7 +735,7 @@ fn a_heading_rule_written_as_text_is_rejected() {
 #[test]
 fn an_invalid_heading_rule_names_its_level() {
     let zero = Template::from_yaml(
-        "version: \"0.6\"\nformatting:\n  heading:\n    h3:\n      rule:\n        thickness: 0\n",
+        "version: \"0.7\"\nformatting:\n  heading:\n    h3:\n      rule:\n        thickness: 0\n",
     )
     .expect_err("a zero thickness");
     assert!(
@@ -735,7 +748,7 @@ fn an_invalid_heading_rule_names_its_level() {
     );
 
     let color = Template::from_yaml(
-        "version: \"0.6\"\nformatting:\n  heading:\n    h3:\n      rule:\n        color: notacolor\n",
+        "version: \"0.7\"\nformatting:\n  heading:\n    h3:\n      rule:\n        color: notacolor\n",
     )
     .expect_err("an invalid color");
     assert!(
@@ -752,7 +765,7 @@ fn an_invalid_heading_rule_names_its_level() {
 fn a_foreground_is_read_for_every_text_style() {
     let template = parse(
         r##"
-version: "0.6"
+version: "0.7"
 formatting:
   paragraph:
     foreground: "#112233"
@@ -773,14 +786,14 @@ formatting:
         assert_eq!(hex(level.face()), Some("#778899".to_owned()));
     }
 
-    let plain = parse("version: \"0.6\"\n");
+    let plain = parse("version: \"0.7\"\n");
     let paragraph = plain.formatting().paragraph();
     assert_eq!(hex(paragraph.face()), None);
     assert_eq!(hex(paragraph.strong().face()), None);
     assert_eq!(hex(plain.formatting().heading().levels()[0].face()), None);
 
     let inherited =
-        parse("version: \"0.6\"\nformatting:\n  paragraph:\n    foreground: \"#112233\"\n");
+        parse("version: \"0.7\"\nformatting:\n  paragraph:\n    foreground: \"#112233\"\n");
     assert_eq!(
         hex(inherited.formatting().paragraph().strong().face()),
         None,
@@ -792,7 +805,7 @@ formatting:
 fn a_heading_foreground_can_be_cleared_per_level_with_none() {
     let template = parse(
         r##"
-version: "0.6"
+version: "0.7"
 formatting:
   heading:
     foreground: "#778899"
@@ -812,15 +825,15 @@ formatting:
 fn an_invalid_foreground_names_its_field() {
     for (yaml, field) in [
         (
-            "version: \"0.6\"\nformatting:\n  paragraph:\n    foreground: notacolor\n",
+            "version: \"0.7\"\nformatting:\n  paragraph:\n    foreground: notacolor\n",
             "formatting.paragraph.foreground",
         ),
         (
-            "version: \"0.6\"\nformatting:\n  paragraph:\n    strong:\n      foreground: notacolor\n",
+            "version: \"0.7\"\nformatting:\n  paragraph:\n    strong:\n      foreground: notacolor\n",
             "formatting.paragraph.strong.foreground",
         ),
         (
-            "version: \"0.6\"\nformatting:\n  heading:\n    h2:\n      foreground: notacolor\n",
+            "version: \"0.7\"\nformatting:\n  heading:\n    h2:\n      foreground: notacolor\n",
             "formatting.heading.h2.foreground",
         ),
     ] {
@@ -836,7 +849,7 @@ fn an_invalid_foreground_names_its_field() {
 fn the_paragraph_and_block_styles_are_read() {
     let template = parse(
         r##"
-version: "0.6"
+version: "0.7"
 formatting:
   paragraph:
     background: "#fafafa"
@@ -921,7 +934,7 @@ formatting:
 
 #[test]
 fn the_new_styles_follow_the_paragraph_face_by_default() {
-    let template = parse("version: \"0.6\"\n");
+    let template = parse("version: \"0.7\"\n");
     let paragraph = template.formatting().paragraph();
     assert_eq!(paragraph.background(), None);
     for style in [paragraph.code(), paragraph.strikethrough()] {
@@ -974,7 +987,7 @@ fn the_new_styles_follow_the_paragraph_face_by_default() {
 fn the_task_style_is_read_field_by_field() {
     let template = parse(
         r##"
-version: "0.6"
+version: "0.7"
 formatting:
   list:
     task:
@@ -1020,7 +1033,7 @@ formatting:
 #[test]
 fn task_markers_accept_unicode() {
     let template = parse(
-        "version: \"0.6\"\nformatting:\n  list:\n    task:\n      done:\n        marker: \"☑\"\n      todo:\n        marker: \"☐\"\n",
+        "version: \"0.7\"\nformatting:\n  list:\n    task:\n      done:\n        marker: \"☑\"\n      todo:\n        marker: \"☐\"\n",
     );
     let task = template.formatting().list().task();
     assert_eq!(task.done().marker(), "☑");
@@ -1030,8 +1043,8 @@ fn task_markers_accept_unicode() {
 #[test]
 fn an_empty_task_marker_is_rejected() {
     for yaml in [
-        "version: \"0.6\"\nformatting:\n  list:\n    task:\n      done:\n        marker: \"\"\n",
-        "version: \"0.6\"\nformatting:\n  list:\n    task:\n      todo:\n        marker: \"   \"\n",
+        "version: \"0.7\"\nformatting:\n  list:\n    task:\n      done:\n        marker: \"\"\n",
+        "version: \"0.7\"\nformatting:\n  list:\n    task:\n      todo:\n        marker: \"   \"\n",
     ] {
         let error = Template::from_yaml(yaml).expect_err("an empty marker is invalid");
         assert!(matches!(error, TemplateError::Value { .. }), "{yaml}");
@@ -1041,7 +1054,7 @@ fn an_empty_task_marker_is_rejected() {
 #[test]
 fn a_negative_task_gap_is_rejected() {
     let error =
-        Template::from_yaml("version: \"0.6\"\nformatting:\n  list:\n    task:\n      gap: -1\n")
+        Template::from_yaml("version: \"0.7\"\nformatting:\n  list:\n    task:\n      gap: -1\n")
             .expect_err("a negative gap is invalid");
     assert!(matches!(error, TemplateError::Yaml { .. }), "{error}");
 }
@@ -1050,7 +1063,7 @@ fn a_negative_task_gap_is_rejected() {
 fn the_list_style_is_read_field_by_field() {
     let template = parse(
         r##"
-version: "0.6"
+version: "0.7"
 formatting:
   paragraph:
     foreground: "#112233"
@@ -1115,9 +1128,9 @@ formatting:
 #[test]
 fn an_empty_list_marker_set_is_rejected() {
     for yaml in [
-        "version: \"0.6\"\nformatting:\n  list:\n    bullet: []\n",
-        "version: \"0.6\"\nformatting:\n  list:\n    bullet: [\"\"]\n",
-        "version: \"0.6\"\nformatting:\n  list:\n    numbering:\n      format: []\n",
+        "version: \"0.7\"\nformatting:\n  list:\n    bullet: []\n",
+        "version: \"0.7\"\nformatting:\n  list:\n    bullet: [\"\"]\n",
+        "version: \"0.7\"\nformatting:\n  list:\n    numbering:\n      format: []\n",
     ] {
         let error = Template::from_yaml(yaml).expect_err("an empty marker set is invalid");
         assert!(matches!(error, TemplateError::Value { .. }), "{yaml}");
@@ -1127,7 +1140,7 @@ fn an_empty_list_marker_set_is_rejected() {
 #[test]
 fn an_unknown_numbering_format_is_rejected() {
     let error = Template::from_yaml(
-        "version: \"0.6\"\nformatting:\n  list:\n    numbering:\n      format:\n        - octal\n",
+        "version: \"0.7\"\nformatting:\n  list:\n    numbering:\n      format:\n        - octal\n",
     )
     .expect_err("octal is not a numbering format");
     assert!(matches!(error, TemplateError::Yaml { .. }), "{error}");
@@ -1135,7 +1148,7 @@ fn an_unknown_numbering_format_is_rejected() {
 
 #[test]
 fn the_table_section_lives_under_formatting() {
-    let error = Template::from_yaml("version: \"0.6\"\ntable:\n  border: 1pt\n")
+    let error = Template::from_yaml("version: \"0.7\"\ntable:\n  border: 1pt\n")
         .expect_err("a top-level table is no longer accepted");
     assert!(matches!(error, TemplateError::Yaml { .. }), "{error}");
 }
@@ -1144,19 +1157,19 @@ fn the_table_section_lives_under_formatting() {
 fn an_invalid_color_in_a_new_style_names_its_field() {
     for (yaml, field) in [
         (
-            "version: \"0.6\"\nformatting:\n  paragraph:\n    background: notacolor\n",
+            "version: \"0.7\"\nformatting:\n  paragraph:\n    background: notacolor\n",
             "formatting.paragraph.background",
         ),
         (
-            "version: \"0.6\"\nformatting:\n  paragraph:\n    code:\n      foreground: notacolor\n",
+            "version: \"0.7\"\nformatting:\n  paragraph:\n    code:\n      foreground: notacolor\n",
             "formatting.paragraph.code.foreground",
         ),
         (
-            "version: \"0.6\"\nformatting:\n  quote:\n    background: notacolor\n",
+            "version: \"0.7\"\nformatting:\n  quote:\n    background: notacolor\n",
             "formatting.quote.background",
         ),
         (
-            "version: \"0.6\"\nformatting:\n  code_block:\n    foreground: notacolor\n",
+            "version: \"0.7\"\nformatting:\n  code_block:\n    foreground: notacolor\n",
             "formatting.code_block.foreground",
         ),
     ] {
@@ -1171,8 +1184,8 @@ fn an_invalid_color_in_a_new_style_names_its_field() {
 #[test]
 fn an_unknown_key_in_a_new_style_is_rejected() {
     for yaml in [
-        "version: \"0.6\"\nformatting:\n  quote:\n    align: left\n",
-        "version: \"0.6\"\nformatting:\n  paragraph:\n    code:\n      colors: red\n",
+        "version: \"0.7\"\nformatting:\n  quote:\n    align: left\n",
+        "version: \"0.7\"\nformatting:\n  paragraph:\n    code:\n      colors: red\n",
     ] {
         let error = Template::from_yaml(yaml).expect_err("an unknown key");
         assert!(matches!(error, TemplateError::Yaml { .. }), "{error}");

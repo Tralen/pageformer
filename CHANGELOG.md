@@ -4,6 +4,13 @@
 
 *Major updates and feature releases.*
 
+### 0.29.0
+
+- Replaced the `{pagebreak}` marker with `-pagebreak-`, and added `-!-` as its shorthand. A paragraph that contains only one of them is a page break; the old brace form is now ordinary text. The change keeps braces reserved for confidential fields and running slots.
+- Added `-horizontal-` as a word form of the thematic break, alongside the standard `---`, `***` and `___`.
+- Renamed `formatting.rule` to `formatting.horizontal_rule`, so the key names the line it styles and no longer reads as a global rule. Bumped the template schema to 0.7; a template written for 0.6 is rejected instead of being read with the old key.
+- Regenerates the examples for the new markers, the technical report prose and the ODT generator version.
+
 ### 0.28.1
 
 - ODT footnote citations are now superscript both in the text and in the note body, using the `Footnote anchor` and `Footnote Symbol` character styles at `super 58%`. The PDF and DOCX already did this.

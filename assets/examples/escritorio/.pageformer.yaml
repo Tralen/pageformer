@@ -4,7 +4,7 @@
 # directories. This file applies to Contrato.md and Embargos.md.
 # Lengths accept mm, cm, in or pt; a number without a unit is points.
 
-version: "0.6"
+version: "0.7"
 
 page:
   size: a4

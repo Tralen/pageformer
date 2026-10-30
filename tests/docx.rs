@@ -185,7 +185,7 @@ fn a_template_change_is_visible_in_the_styles() {
     );
     let template = Template::from_yaml(
         r##"
-version: "0.6"
+version: "0.7"
 formatting:
   paragraph:
     size: 13
@@ -214,11 +214,11 @@ fn a_rule_and_a_heading_background_follow_the_template() {
         markdown::parse("# Título\n\nTexto.\n\n---\n\nDepois.\n").expect("the document must parse");
     let template = Template::from_yaml(
         r##"
-version: "0.6"
+version: "0.7"
 formatting:
   heading:
     background: "#EEEEEE"
-  rule:
+  horizontal_rule:
     thickness: 1.5pt
     color: "#112233"
     spacing_before: 12
@@ -249,7 +249,7 @@ fn the_foreground_reaches_the_styles_and_the_runs() {
         .expect("the document must parse");
     let template = Template::from_yaml(
         r##"
-version: "0.6"
+version: "0.7"
 formatting:
   paragraph:
     foreground: "#112233"
@@ -297,7 +297,7 @@ fn the_paragraph_and_block_styles_reach_the_package() {
     .expect("the document must parse");
     let template = Template::from_yaml(
         r##"
-version: "0.6"
+version: "0.7"
 formatting:
   paragraph:
     background: "#fafafa"
@@ -382,7 +382,7 @@ fn a_heading_rule_is_a_bottom_border_of_its_level() {
     let document = markdown::parse("## Escopo\n\nTexto.\n").expect("the document must parse");
     let template = Template::from_yaml(
         r##"
-version: "0.6"
+version: "0.7"
 formatting:
   heading:
     h2:
@@ -433,7 +433,7 @@ fn lists_take_their_markers_layout_and_text_from_the_template() {
         .expect("the document must parse");
     let template = Template::from_yaml(
         r##"
-version: "0.6"
+version: "0.7"
 formatting:
   list:
     foreground: "#112233"
@@ -500,7 +500,7 @@ fn task_markers_take_their_style_and_can_drop_the_bullet() {
         markdown::parse("- [x] Feito\n- [ ] Pendente\n").expect("the document must parse");
     let template = Template::from_yaml(
         r##"
-version: "0.6"
+version: "0.7"
 formatting:
   list:
     task:
@@ -593,7 +593,7 @@ fn links_take_the_template_style() {
         markdown::parse("Veja [o site](https://example.org).\n").expect("the document must parse");
     let template = Template::from_yaml(
         r##"
-version: "0.6"
+version: "0.7"
 formatting:
   paragraph:
     link:

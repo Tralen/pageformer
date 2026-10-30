@@ -67,7 +67,7 @@ impl<'a> SourceBuilder<'a> {
             output: String::new(),
             assets,
             table: template.table(),
-            rule: template.formatting().rule(),
+            rule: template.formatting().horizontal_rule(),
             list,
             list_fill,
             list_fill_padding,
@@ -1087,7 +1087,7 @@ mod tests {
     use crate::template::Template;
 
     fn template() -> Template {
-        Template::from_yaml("version: \"0.6\"\n").expect("the default template")
+        Template::from_yaml("version: \"0.7\"\n").expect("the default template")
     }
 
     fn paragraph(text: &str) -> Document {
@@ -1190,7 +1190,7 @@ mod tests {
     #[test]
     fn running_content_expands_the_page_tokens() {
         let template = Template::from_yaml(
-            "version: \"0.6\"\npage:\n  header:\n    left: \"{title}\"\n    right: \"Página {page} de {pages}\"\n  footer:\n    center: \"{author}\"\n",
+            "version: \"0.7\"\npage:\n  header:\n    left: \"{title}\"\n    right: \"Página {page} de {pages}\"\n  footer:\n    center: \"{author}\"\n",
         )
         .expect("a template with running content");
         let metadata = Metadata::new(
@@ -1217,7 +1217,7 @@ mod tests {
     #[test]
     fn running_content_without_a_title_renders_an_empty_slot() {
         let template =
-            Template::from_yaml("version: \"0.6\"\npage:\n  header:\n    center: \"{title}\"\n")
+            Template::from_yaml("version: \"0.7\"\npage:\n  header:\n    center: \"{title}\"\n")
                 .expect("a template with a header");
         let document = Document::new(Metadata::default(), Vec::new());
         let source = typst_source(&document, &template, &AssetMap::new()).expect("the source");
@@ -1263,7 +1263,7 @@ mod tests {
         );
 
         let template = Template::from_yaml(
-            "version: \"0.6\"\nformatting:\n  table:\n    border: 1pt\n    border_color: \"#112233\"\n    header_fill: \"#eeeeee\"\n    cell_padding: 4pt\n",
+            "version: \"0.7\"\nformatting:\n  table:\n    border: 1pt\n    border_color: \"#112233\"\n    header_fill: \"#eeeeee\"\n    cell_padding: 4pt\n",
         )
         .expect("a styled template");
         let styled = typst_source(&document, &template, &AssetMap::new()).expect("the source");
@@ -1288,7 +1288,7 @@ mod tests {
         .expect("a valid table");
         let document = Document::new(Metadata::default(), vec![Block::Table(table)]);
         let template =
-            Template::from_yaml("version: \"0.6\"\nformatting:\n  table:\n    border: 0\n")
+            Template::from_yaml("version: \"0.7\"\nformatting:\n  table:\n    border: 0\n")
                 .expect("a template without a border");
         let source = typst_source(&document, &template, &AssetMap::new()).expect("the source");
         assert!(source.contains("stroke: none,"), "{source}");
@@ -1297,7 +1297,7 @@ mod tests {
     #[test]
     fn the_page_uses_the_template_dimensions_and_margins() {
         let template = Template::from_yaml(
-            "version: \"0.6\"\npage:\n  size: a5\n  orientation: landscape\n  margins:\n    top: 10mm\n    bottom: 20mm\n    left: 30mm\n    right: 40mm\n",
+            "version: \"0.7\"\npage:\n  size: a5\n  orientation: landscape\n  margins:\n    top: 10mm\n    bottom: 20mm\n    left: 30mm\n    right: 40mm\n",
         )
         .expect("the template");
         let document = Document::new(Metadata::default(), Vec::new());
@@ -1452,7 +1452,7 @@ mod tests {
     #[test]
     fn a_link_without_an_underline_is_not_wrapped() {
         let template = Template::from_yaml(
-            "version: \"0.6\"\nformatting:\n  paragraph:\n    link:\n      underline: false\n      foreground: \"#112233\"\n",
+            "version: \"0.7\"\nformatting:\n  paragraph:\n    link:\n      underline: false\n      foreground: \"#112233\"\n",
         )
         .expect("the template");
         let document = Document::new(
@@ -1486,7 +1486,7 @@ mod tests {
     #[test]
     fn a_block_fill_pads_the_font_box_on_the_vertical_sides() {
         let template = Template::from_yaml(
-            "version: \"0.6\"\nformatting:\n  quote:\n    background: \"#eeeeee\"\n    border:\n      left: 3pt\n      color: \"#cccccc\"\n      padding: 8\n",
+            "version: \"0.7\"\nformatting:\n  quote:\n    background: \"#eeeeee\"\n    border:\n      left: 3pt\n      color: \"#cccccc\"\n      padding: 8\n",
         )
         .expect("the template");
         let document = Document::new(
@@ -1524,7 +1524,7 @@ mod tests {
     #[test]
     fn lists_take_their_markers_and_numbering_from_the_template() {
         let template = Template::from_yaml(
-            "version: \"0.6\"\nformatting:\n  list:\n    indent: 6mm\n    marker_gap: 3mm\n    alignment: justified\n    bullet:\n      - \"*\"\n      - \"+\"\n    numbering:\n      format:\n        - upper-roman\n        - upper-alpha\n      suffix: \")\"\n    spacing: 4pt\n",
+            "version: \"0.7\"\nformatting:\n  list:\n    indent: 6mm\n    marker_gap: 3mm\n    alignment: justified\n    bullet:\n      - \"*\"\n      - \"+\"\n    numbering:\n      format:\n        - upper-roman\n        - upper-alpha\n      suffix: \")\"\n    spacing: 4pt\n",
         )
         .expect("the template");
         let list = List::new(
@@ -1560,7 +1560,7 @@ mod tests {
     #[test]
     fn a_list_fill_wraps_the_item_paragraph() {
         let template = Template::from_yaml(
-            "version: \"0.6\"\nformatting:\n  list:\n    background: \"#eeeeee\"\n",
+            "version: \"0.7\"\nformatting:\n  list:\n    background: \"#eeeeee\"\n",
         )
         .expect("the template");
         let item = || {
@@ -1593,7 +1593,7 @@ mod tests {
     #[test]
     fn task_markers_take_their_style_and_can_drop_the_bullet() {
         let template = Template::from_yaml(
-            "version: \"0.6\"\nformatting:\n  list:\n    task:\n      gap: 2\n      bullet: false\n      done:\n        marker: \"[X]\"\n        foreground: \"#2e7d32\"\n        weight: bold\n      todo:\n        marker: \"[ ]\"\n        foreground: \"#777777\"\n",
+            "version: \"0.7\"\nformatting:\n  list:\n    task:\n      gap: 2\n      bullet: false\n      done:\n        marker: \"[X]\"\n        foreground: \"#2e7d32\"\n        weight: bold\n      todo:\n        marker: \"[ ]\"\n        foreground: \"#777777\"\n",
         )
         .expect("the template");
         let list = List::new(
@@ -1629,7 +1629,7 @@ mod tests {
     #[test]
     fn a_mixed_or_ordered_task_list_keeps_its_marker() {
         let template = Template::from_yaml(
-            "version: \"0.6\"\nformatting:\n  list:\n    task:\n      bullet: false\n",
+            "version: \"0.7\"\nformatting:\n  list:\n    task:\n      bullet: false\n",
         )
         .expect("the template");
         let task = || {
@@ -1660,7 +1660,7 @@ mod tests {
     #[test]
     fn a_nested_list_fill_merges_with_the_parent_band() {
         let template = Template::from_yaml(
-            "version: \"0.6\"\nformatting:\n  list:\n    background: \"#eeeeee\"\n",
+            "version: \"0.7\"\nformatting:\n  list:\n    background: \"#eeeeee\"\n",
         )
         .expect("the template");
         let nested = List::new(
@@ -1730,7 +1730,7 @@ mod tests {
     #[test]
     fn paragraph_spacing_is_emitted_when_configured() {
         let template =
-            Template::from_yaml("version: \"0.6\"\nformatting:\n  paragraph:\n    spacing: 6pt\n")
+            Template::from_yaml("version: \"0.7\"\nformatting:\n  paragraph:\n    spacing: 6pt\n")
                 .expect("the template");
         let document = Document::new(
             Metadata::default(),
@@ -1752,7 +1752,7 @@ mod tests {
     #[test]
     fn leading_is_emitted_in_points() {
         let template =
-            Template::from_yaml("version: \"0.6\"\nformatting:\n  paragraph:\n    leading: 9pt\n")
+            Template::from_yaml("version: \"0.7\"\nformatting:\n  paragraph:\n    leading: 9pt\n")
                 .expect("the template");
         let document = Document::new(Metadata::default(), Vec::new());
         let source = typst_source(&document, &template, &AssetMap::new()).expect("the source");
@@ -1762,7 +1762,7 @@ mod tests {
     #[test]
     fn headings_use_the_configured_styles_and_spacing() {
         let template = Template::from_yaml(
-            "version: \"0.6\"\nformatting:\n  heading:\n    font_families:\n      - Liberation Sans\n    weight: bold\n    style: normal\n    spacing_before: 18\n    spacing_after: 6\n    h1:\n      size: 20\n    h2:\n      size: 14\n      weight: normal\n      style: italic\n",
+            "version: \"0.7\"\nformatting:\n  heading:\n    font_families:\n      - Liberation Sans\n    weight: bold\n    style: normal\n    spacing_before: 18\n    spacing_after: 6\n    h1:\n      size: 20\n    h2:\n      size: 14\n      weight: normal\n      style: italic\n",
         )
         .expect("the template");
         let document = Document::new(
@@ -1810,7 +1810,7 @@ mod tests {
         );
 
         let template = Template::from_yaml(
-            "version: \"0.6\"\nformatting:\n  heading:\n    h1:\n      page_break_before: true\n",
+            "version: \"0.7\"\nformatting:\n  heading:\n    h1:\n      page_break_before: true\n",
         )
         .expect("the template");
         let source = typst_source(&document, &template, &AssetMap::new()).expect("the source");
@@ -1829,7 +1829,7 @@ mod tests {
     #[test]
     fn a_heading_background_wraps_the_text_at_the_full_width() {
         let template = Template::from_yaml(
-            "version: \"0.6\"\nformatting:\n  heading:\n    spacing_before: 18\n    spacing_after: 6\n    h1:\n      background: \"#EEEEEE\"\n      page_break_before: true\n",
+            "version: \"0.7\"\nformatting:\n  heading:\n    spacing_before: 18\n    spacing_after: 6\n    h1:\n      background: \"#EEEEEE\"\n      page_break_before: true\n",
         )
         .expect("the template");
         let document = Document::new(
@@ -1852,7 +1852,7 @@ mod tests {
     #[test]
     fn the_fill_padding_follows_the_heading_size() {
         let template = Template::from_yaml(
-            "version: \"0.6\"\nformatting:\n  heading:\n    background: \"#eeeeee\"\n    h1:\n      size: 20\n",
+            "version: \"0.7\"\nformatting:\n  heading:\n    background: \"#eeeeee\"\n    h1:\n      size: 20\n",
         )
         .expect("the template");
         let document = Document::new(Metadata::default(), Vec::new());
@@ -1870,7 +1870,7 @@ mod tests {
     #[test]
     fn a_heading_rule_is_a_line_below_its_own_level() {
         let template = Template::from_yaml(
-            "version: \"0.6\"\nformatting:\n  heading:\n    spacing_before: 16\n    spacing_after: 6\n    h2:\n      rule:\n        thickness: 1pt\n        color: \"#112233\"\n        spacing_before: 3\n        spacing_after: 9\n",
+            "version: \"0.7\"\nformatting:\n  heading:\n    spacing_before: 16\n    spacing_after: 6\n    h2:\n      rule:\n        thickness: 1pt\n        color: \"#112233\"\n        spacing_before: 3\n        spacing_after: 9\n",
         )
         .expect("the template");
         let document = Document::new(
@@ -1897,7 +1897,7 @@ mod tests {
     #[test]
     fn a_heading_rule_without_spacing_keeps_the_heading_spacing_below() {
         let template = Template::from_yaml(
-            "version: \"0.6\"\nformatting:\n  heading:\n    spacing_after: 6\n    h1:\n      rule: {}\n",
+            "version: \"0.7\"\nformatting:\n  heading:\n    spacing_after: 6\n    h1:\n      rule: {}\n",
         )
         .expect("the template");
         let document = Document::new(
@@ -1930,7 +1930,7 @@ mod tests {
     #[test]
     fn the_thematic_break_follows_the_rule_style() {
         let template = Template::from_yaml(
-            "version: \"0.6\"\nformatting:\n  rule:\n    thickness: 1.5pt\n    color: \"#112233\"\n    spacing_before: 12\n",
+            "version: \"0.7\"\nformatting:\n  horizontal_rule:\n    thickness: 1.5pt\n    color: \"#112233\"\n    spacing_before: 12\n",
         )
         .expect("the template");
         let document = Document::new(Metadata::default(), vec![Block::ThematicBreak]);
@@ -1946,7 +1946,7 @@ mod tests {
     #[test]
     fn the_foreground_reaches_the_text_styles() {
         let template = Template::from_yaml(
-            "version: \"0.6\"\nformatting:\n  paragraph:\n    foreground: \"#112233\"\n    emphasis:\n      foreground: \"#445566\"\n  heading:\n    foreground: \"#778899\"\n",
+            "version: \"0.7\"\nformatting:\n  paragraph:\n    foreground: \"#112233\"\n    emphasis:\n      foreground: \"#445566\"\n  heading:\n    foreground: \"#778899\"\n",
         )
         .expect("the template");
         let document = Document::new(Metadata::default(), Vec::new());
@@ -1968,7 +1968,7 @@ mod tests {
     #[test]
     fn a_heading_without_a_foreground_inherits_the_document_color() {
         let template = Template::from_yaml(
-            "version: \"0.6\"\nformatting:\n  paragraph:\n    foreground: \"#112233\"\n",
+            "version: \"0.7\"\nformatting:\n  paragraph:\n    foreground: \"#112233\"\n",
         )
         .expect("the template");
         let document = Document::new(
@@ -1996,7 +1996,7 @@ mod tests {
     #[test]
     fn the_paragraph_background_wraps_a_paragraph_with_its_own_spacing() {
         let template = Template::from_yaml(
-            "version: \"0.6\"\nformatting:\n  paragraph:\n    background: \"#fafafa\"\n    spacing: 12\n",
+            "version: \"0.7\"\nformatting:\n  paragraph:\n    background: \"#fafafa\"\n    spacing: 12\n",
         )
         .expect("the template");
         let source =
@@ -2012,7 +2012,7 @@ mod tests {
     #[test]
     fn a_paragraph_background_skips_quotes_and_lists() {
         let template = Template::from_yaml(
-            "version: \"0.6\"\nformatting:\n  paragraph:\n    background: \"#fafafa\"\n",
+            "version: \"0.7\"\nformatting:\n  paragraph:\n    background: \"#fafafa\"\n",
         )
         .expect("the template");
         let document = Document::new(
@@ -2046,7 +2046,7 @@ mod tests {
     #[test]
     fn a_paragraph_background_keeps_the_default_spacing() {
         let template = Template::from_yaml(
-            "version: \"0.6\"\nformatting:\n  paragraph:\n    background: \"#fafafa\"\n",
+            "version: \"0.7\"\nformatting:\n  paragraph:\n    background: \"#fafafa\"\n",
         )
         .expect("the template");
         let source =
@@ -2060,7 +2060,7 @@ mod tests {
     #[test]
     fn an_inline_background_is_a_zero_extent_highlight() {
         let template = Template::from_yaml(
-            "version: \"0.6\"\nformatting:\n  paragraph:\n    emphasis:\n      background: \"#eeeeee\"\n    strong:\n      background: navy\n",
+            "version: \"0.7\"\nformatting:\n  paragraph:\n    emphasis:\n      background: \"#eeeeee\"\n    strong:\n      background: navy\n",
         )
         .expect("the template");
         let source =
@@ -2079,7 +2079,7 @@ mod tests {
     #[test]
     fn an_inline_code_style_inherits_the_paragraph_face() {
         let template = Template::from_yaml(
-            "version: \"0.6\"\nformatting:\n  paragraph:\n    code:\n      foreground: navy\n",
+            "version: \"0.7\"\nformatting:\n  paragraph:\n    code:\n      foreground: navy\n",
         )
         .expect("the template");
         let source =
@@ -2095,7 +2095,7 @@ mod tests {
     #[test]
     fn a_partial_background_wraps_inline_content_in_a_box() {
         let template = Template::from_yaml(
-            "version: \"0.6\"\nformatting:\n  paragraph:\n    strikethrough:\n      background: \"#eeeeee\"\n",
+            "version: \"0.7\"\nformatting:\n  paragraph:\n    strikethrough:\n      background: \"#eeeeee\"\n",
         )
         .expect("the template");
         let source =
@@ -2109,7 +2109,7 @@ mod tests {
     #[test]
     fn the_quote_and_code_block_styles_reach_typst() {
         let template = Template::from_yaml(
-            "version: \"0.6\"\nformatting:\n  quote:\n    background: \"#f0f0f0\"\n  code_block:\n    font_families:\n      - Liberation Mono\n    background: \"#111111\"\n",
+            "version: \"0.7\"\nformatting:\n  quote:\n    background: \"#f0f0f0\"\n  code_block:\n    font_families:\n      - Liberation Mono\n    background: \"#111111\"\n",
         )
         .expect("the template");
         let source =
@@ -2141,7 +2141,7 @@ mod tests {
     #[test]
     fn a_block_border_emits_each_declared_side() {
         let template = Template::from_yaml(
-            "version: \"0.6\"\nformatting:\n  quote:\n    border:\n      left: 3pt\n      bottom: 0.5pt\n      color: \"#cccccc\"\n      padding: 8\n",
+            "version: \"0.7\"\nformatting:\n  quote:\n    border:\n      left: 3pt\n      bottom: 0.5pt\n      color: \"#cccccc\"\n      padding: 8\n",
         )
         .expect("the template");
         let source =
@@ -2161,7 +2161,7 @@ mod tests {
     #[test]
     fn a_block_alignment_can_be_justified() {
         let template = Template::from_yaml(
-            "version: \"0.6\"\nformatting:\n  code_block:\n    alignment: justified\n",
+            "version: \"0.7\"\nformatting:\n  code_block:\n    alignment: justified\n",
         )
         .expect("the template");
         let source =
@@ -2181,7 +2181,7 @@ mod tests {
     #[test]
     fn inline_styles_use_the_configured_faces() {
         let template = Template::from_yaml(
-            "version: \"0.6\"\nformatting:\n  paragraph:\n    font_families:\n      - Liberation Serif\n    size: 12\n    emphasis:\n      font_families:\n        - DejaVu Serif\n      weight: semibold\n    strong:\n      size: 13\n      style: italic\n",
+            "version: \"0.7\"\nformatting:\n  paragraph:\n    font_families:\n      - Liberation Serif\n    size: 12\n    emphasis:\n      font_families:\n        - DejaVu Serif\n      weight: semibold\n    strong:\n      size: 13\n      style: italic\n",
         )
         .expect("the template");
         let document = Document::new(Metadata::default(), Vec::new());

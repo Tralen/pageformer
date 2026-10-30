@@ -359,7 +359,7 @@ mod tests {
     #[test]
     fn the_normal_style_carries_the_template_face_and_spacing() {
         let template = Template::from_yaml(
-            "version: \"0.6\"\nformatting:\n  paragraph:\n    size: 12\n    leading: 8\n    spacing: 24\n",
+            "version: \"0.7\"\nformatting:\n  paragraph:\n    size: 12\n    leading: 8\n    spacing: 24\n",
         )
         .expect("the template must be valid");
         let styles = styles_xml(&Document::new(Metadata::default(), Vec::new()), &template);

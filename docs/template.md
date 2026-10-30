@@ -19,7 +19,7 @@ Paths written in the template, such as the letterhead image, resolve relative to
 ## Schema
 
 ```yaml
-version: "0.6"
+version: "0.7"
 
 page:
   size: a4
@@ -138,7 +138,7 @@ formatting:
       size: 12
       spacing_before: 8
       spacing_after: 2
-  rule:
+  horizontal_rule:
     thickness: 0.5pt
     color: "#888888"
     spacing_before: 12
@@ -154,7 +154,7 @@ Every section and every key is optional except `version`. Missing keys take the 
 
 ### `version`
 
-The schema version is a string in the form `major.minor`, quoted so YAML cannot turn it into a float. This build accepts `"0.6"` and rejects every other value. Version 0.5 replaced the `text` section with `formatting`, made `paragraph` and `heading` explicit, added `weight` and `style`, and added the `emphasis` and `strong` inline overrides. The optional `page.header`, `page.footer` and `formatting.paragraph.link` sections and the frontmatter `date`, `subject` and `keywords` were added inside version 0.5. Version 0.6 added `formatting.list` and moved `table` under `formatting`, so one section owns every presentation field; a template written for 0.5 is rejected instead of being read with the old path.
+The schema version is a string in the form `major.minor`, quoted so YAML cannot turn it into a float. This build accepts `"0.7"` and rejects every other value. Version 0.5 replaced the `text` section with `formatting`, made `paragraph` and `heading` explicit, added `weight` and `style`, and added the `emphasis` and `strong` inline overrides. The optional `page.header`, `page.footer` and `formatting.paragraph.link` sections and the frontmatter `date`, `subject` and `keywords` were added inside version 0.5. Version 0.6 added `formatting.list` and moved `table` under `formatting`, so one section owns every presentation field; a template written for 0.5 is rejected instead of being read with the old path. Version 0.7 renamed `formatting.rule` to `formatting.horizontal_rule`, so the key names the horizontal rule it styles; a template written for 0.6 is rejected instead of being read with the old path.
 
 ### Document metadata
 
@@ -250,7 +250,7 @@ The height of a fill follows the font's natural line box in the PDF and in ODT. 
 
 The `h1` to `h6` maps are optional overrides with the same keys. Only declared keys replace the base values. The default sizes are `18pt` for `h1`, `14pt` for `h2` and `12pt` for `h3` to `h6`; the default spacing is 18/6 for `h1`, 12/4 for `h2`, 10/4 for `h3` and 8/2 for `h4` to `h6`.
 
-A level may declare `rule`, a line drawn below its text, with the keys of [`formatting.rule`](#formattingrule).
+A level may declare `rule`, a line drawn below its text, with the keys of [`formatting.horizontal_rule`](#formattinghorizontal_rule).
 
 `background` and `rule` may also be declared on the base heading map, where every level inherits them, the same way `size` and `spacing_before` are inherited. A level overrides an inherited value by declaring its own, and clears it with `none`, in any case: `rule: none`, `background: NONE`. A level that declares nothing keeps the base value. An empty `rule: {}` is a rule with the defaults and is not the same as `rule: none`.
 
@@ -304,9 +304,9 @@ The marker is inline at the start of the item, so a wrapped line aligns with the
 
 `marker` is a string, so it accepts any Unicode glyph, such as `☑`, `☐`, `✔` or `✗`. The PDF embeds it through Typst's font fallback; when the output must be deterministic, declare a `font_families` that contains the glyph. Prefer a monochrome symbol for PDF/A, because a color emoji may not embed with the required profile.
 
-### `formatting.rule`
+### `formatting.horizontal_rule`
 
-The thematic break, written as `---`, `***` or `___` in the Markdown body, is drawn as a horizontal rule across the text width. The same keys declare the rule under a heading level, in `formatting.heading.h1` to `h6`, and every format reads them the same way:
+The thematic break, written as `---`, `***`, `___` or `-horizontal-` in the Markdown body, is drawn as a horizontal rule across the text width. The same keys declare the rule under a heading level, in `formatting.heading.h1` to `h6`, and every format reads them the same way:
 
 - `thickness`: the line thickness, as a length greater than zero. The default is `0.5pt`.
 - `color`: the line color, as a [color](#colors). The default is `#000000`.
@@ -325,7 +325,7 @@ The `formatting.table` section styles every table in the document:
 
 ## Page breaks
 
-A paragraph that contains only `{pagebreak}` starts a new page. The marker becomes a page break in the document model, so every paged backend reads the same block. Braces are ordinary text to CommonMark, so the Zed preview shows the marker and no raw HTML is involved. Any other occurrence, such as `{pagebreak}` inside a sentence, stays literal text. The backslash form `\pagebreak` is no longer special and stays literal text.
+A paragraph that contains only `-pagebreak-` starts a new page; `-!-` is the shorthand with the same effect. The marker becomes a page break in the document model, so every paged backend reads the same block. Dashes and the exclamation mark are ordinary text to CommonMark, so the Zed preview shows the marker and no raw HTML is involved. Any other occurrence, such as `-pagebreak-` or `-!-` inside a sentence, stays literal text. The old brace form `{pagebreak}` and the backslash form `\pagebreak` are ordinary text.
 
 ## Colors
 
@@ -355,7 +355,7 @@ Images in the Markdown body resolve relative to the Markdown file, not to the te
 
 ## Current backend
 
-Every format reads the text colors: the body, the headings, emphasis, strong, code, strikethrough and links. TXT has no color and ignores them. The PDF backend applies the paragraph face, leading, spacing and alignment. It emits one show rule per heading level with the resolved font, size, weight, style and spacing, show rules for `emph`, `strong`, `code` and `strike` from the inline overrides, and a `link` rule that carries the face, color, fill and underline. The ODT and DOCX writers map the same keys to their character styles. A level with `page_break_before` also gets a weak page-break show rule. List markers and numbering become `#set list` and `#set enum` rules, and each item paragraph takes the list face, color, fill and alignment. A task marker is inline `#text`/`#box` content with only its declared overrides; a task-only unordered list with `task.bullet: false` passes `marker: []` and `body-indent: 0pt` to the list. The backend draws the running header and footer, expands their tokens, applies the table style and explicit page breaks, and writes the frontmatter title, author, subject, keywords, language and date into the PDF metadata. The thematic break follows `formatting.rule`. A heading background and a heading rule are drawn as one block: the fill wraps the text across the full width with a vertical padding of 0.24 of the heading size, so the fill does not hug the glyphs, and the rule sits below it. A quote or code block fill uses the same vertical padding, unless a top or bottom border already declares a larger padding for that side. Typst measures a zero-inset block by its cap height and baseline, while the DOCX fill covers the font's line box, so the padding makes up the difference; the DOCX fill is the reference for the other formats.
+Every format reads the text colors: the body, the headings, emphasis, strong, code, strikethrough and links. TXT has no color and ignores them. The PDF backend applies the paragraph face, leading, spacing and alignment. It emits one show rule per heading level with the resolved font, size, weight, style and spacing, show rules for `emph`, `strong`, `code` and `strike` from the inline overrides, and a `link` rule that carries the face, color, fill and underline. The ODT and DOCX writers map the same keys to their character styles. A level with `page_break_before` also gets a weak page-break show rule. List markers and numbering become `#set list` and `#set enum` rules, and each item paragraph takes the list face, color, fill and alignment. A task marker is inline `#text`/`#box` content with only its declared overrides; a task-only unordered list with `task.bullet: false` passes `marker: []` and `body-indent: 0pt` to the list. The backend draws the running header and footer, expands their tokens, applies the table style and explicit page breaks, and writes the frontmatter title, author, subject, keywords, language and date into the PDF metadata. The thematic break follows `formatting.horizontal_rule`. A heading background and a heading rule are drawn as one block: the fill wraps the text across the full width with a vertical padding of 0.24 of the heading size, so the fill does not hug the glyphs, and the rule sits below it. A quote or code block fill uses the same vertical padding, unless a top or bottom border already declares a larger padding for that side. Typst measures a zero-inset block by its cap height and baseline, while the DOCX fill covers the font's line box, so the padding makes up the difference; the DOCX fill is the reference for the other formats.
 
 ## Example
 

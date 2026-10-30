@@ -160,7 +160,7 @@ fn a_template_change_is_visible_in_the_styles() {
     );
     let template = Template::from_yaml(
         r##"
-version: "0.6"
+version: "0.7"
 formatting:
   paragraph:
     size: 13
@@ -221,7 +221,7 @@ fn an_inline_image_is_packaged_and_referenced() {
 
 #[test]
 fn footnotes_alerts_and_page_breaks_are_mapped() {
-    let source = "Texto[^1].\n\n[^1]: Nota.\n\n{pagebreak}\n\n> [!WARNING]\n> Cuidado.\n";
+    let source = "Texto[^1].\n\n[^1]: Nota.\n\n-pagebreak-\n\n> [!WARNING]\n> Cuidado.\n";
     let document = markdown::parse(source).expect("the document must parse");
     let bytes = render(&document);
     let mut archive = ZipArchive::new(Cursor::new(bytes)).expect("the package must be a ZIP");
@@ -257,11 +257,11 @@ fn a_rule_and_a_heading_background_follow_the_template() {
         markdown::parse("# Título\n\nTexto.\n\n---\n\nDepois.\n").expect("the document must parse");
     let template = Template::from_yaml(
         r##"
-version: "0.6"
+version: "0.7"
 formatting:
   heading:
     background: "#EEEEEE"
-  rule:
+  horizontal_rule:
     thickness: 1.5pt
     color: "#112233"
     spacing_before: 12
@@ -295,7 +295,7 @@ fn the_foreground_reaches_the_styles() {
         .expect("the document must parse");
     let template = Template::from_yaml(
         r##"
-version: "0.6"
+version: "0.7"
 formatting:
   paragraph:
     foreground: "#112233"
@@ -344,7 +344,7 @@ fn the_paragraph_and_block_styles_reach_the_package() {
     .expect("the document must parse");
     let template = Template::from_yaml(
         r##"
-version: "0.6"
+version: "0.7"
 formatting:
   paragraph:
     background: "#fafafa"
@@ -432,7 +432,7 @@ fn lists_take_their_markers_layout_and_text_from_the_template() {
         .expect("the document must parse");
     let template = Template::from_yaml(
         r##"
-version: "0.6"
+version: "0.7"
 formatting:
   list:
     foreground: "#112233"
@@ -501,7 +501,7 @@ fn task_markers_take_their_style_and_can_drop_the_bullet() {
         markdown::parse("- [x] Feito\n- [ ] Pendente\n").expect("the document must parse");
     let template = Template::from_yaml(
         r##"
-version: "0.6"
+version: "0.7"
 formatting:
   list:
     task:
@@ -571,7 +571,7 @@ fn links_take_the_template_style() {
         markdown::parse("Veja [o site](https://example.org).\n").expect("the document must parse");
     let template = Template::from_yaml(
         r##"
-version: "0.6"
+version: "0.7"
 formatting:
   paragraph:
     link:
@@ -607,7 +607,7 @@ fn a_heading_fill_scales_with_the_heading_size() {
         markdown::parse("# Um\n\nTexto.\n\n## Dois\n\nTexto.\n").expect("the document must parse");
     let template = Template::from_yaml(
         r##"
-version: "0.6"
+version: "0.7"
 formatting:
   paragraph:
     size: 12
@@ -642,7 +642,7 @@ fn a_heading_rule_is_a_bottom_border_of_its_level() {
     let document = markdown::parse("## Escopo\n\nTexto.\n").expect("the document must parse");
     let template = Template::from_yaml(
         r##"
-version: "0.6"
+version: "0.7"
 formatting:
   heading:
     h2:
@@ -670,7 +670,7 @@ formatting:
 #[test]
 fn the_line_spacing_follows_the_typst_leading_model() {
     let template = Template::from_yaml(
-        "version: \"0.6\"\nformatting:\n  paragraph:\n    size: 12\n    leading: 8\n    spacing: 24\n",
+        "version: \"0.7\"\nformatting:\n  paragraph:\n    size: 12\n    leading: 8\n    spacing: 24\n",
     )
     .expect("the template must be valid");
     let document = Document::new(Metadata::default(), Vec::new());
@@ -685,7 +685,7 @@ fn the_line_spacing_follows_the_typst_leading_model() {
 #[test]
 fn table_cells_absorb_the_leading_and_do_not_inherit_paragraph_spacing() {
     let template = Template::from_yaml(
-        "version: \"0.6\"\nformatting:\n  paragraph:\n    size: 12\n    leading: 8\n  table:\n    cell_padding: 6pt\n",
+        "version: \"0.7\"\nformatting:\n  paragraph:\n    size: 12\n    leading: 8\n  table:\n    cell_padding: 6pt\n",
     )
     .expect("the template must be valid");
     let document = Document::new(
@@ -710,7 +710,7 @@ fn table_cells_absorb_the_leading_and_do_not_inherit_paragraph_spacing() {
 #[test]
 fn a_running_header_reserves_its_band_from_the_page_margin() {
     let template = Template::from_yaml(
-        "version: \"0.6\"\npage:\n  margins:\n    top: 30mm\n  header:\n    right: \"{page}\"\n",
+        "version: \"0.7\"\npage:\n  margins:\n    top: 30mm\n  header:\n    right: \"{page}\"\n",
     )
     .expect("the template must be valid");
     let document = Document::new(Metadata::default(), Vec::new());
@@ -730,7 +730,7 @@ fn the_running_text_uses_the_paragraph_face_and_hyphenates_in_the_document_langu
         Some(pageformer::document::Language::parse("pt-BR").expect("a valid language tag")),
     );
     let template = Template::from_yaml(
-        "version: \"0.6\"\nformatting:\n  paragraph:\n    size: 13\npage:\n  header:\n    right: \"{page}\"\n",
+        "version: \"0.7\"\nformatting:\n  paragraph:\n    size: 13\npage:\n  header:\n    right: \"{page}\"\n",
     )
     .expect("the template must be valid");
     let document = Document::new(metadata, Vec::new());

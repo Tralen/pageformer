@@ -5,7 +5,6 @@
 mod cli;
 
 use std::collections::BTreeMap;
-use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::str::FromStr;
@@ -14,15 +13,11 @@ use anyhow::{Context, Result};
 use clap::{Arg, ArgAction, Command};
 
 use pageformer::confidential::{self, ConfidentialStore};
-use pageformer::docx::DocxRenderer;
-use pageformer::markdown;
-use pageformer::odt::OdtRenderer;
-use pageformer::pdf;
-use pageformer::render::Renderer;
-use pageformer::template::loader::{self, ResolvedTemplate, TemplateOrigin};
-use pageformer::txt::TxtRenderer;
+use pageformer::format::Format;
+use pageformer::pipeline::{self, DocumentJob, Source};
+use pageformer::template::loader;
 
-use self::cli::{ColorChoice, Format, InputFile, Painter, Stream, Style, write_atomic};
+use self::cli::{ColorChoice, InputFile, Painter, Stream, Style};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Mode {
@@ -306,117 +301,32 @@ fn process(
     global: Option<&Path>,
     store: &ConfidentialStore,
 ) -> Result<Outcome> {
-    let input = job.input.path();
-    let source =
-        fs::read_to_string(input).with_context(|| format!("cannot read {}", input.display()))?;
-    let document = markdown::parse(&source).with_context(|| "cannot parse the Markdown")?;
-    let resolution = confidential::resolve(&document, store)
-        .with_context(|| "cannot resolve confidential fields")?;
-    let names = resolution
-        .names()
-        .iter()
-        .map(|name| name.as_str().to_owned())
-        .collect::<Vec<_>>();
-    let resolved = resolve_template(input, explicit, global)?;
+    let document_job = DocumentJob::new(
+        Source::File(job.input.path().to_path_buf()),
+        job.input.root().to_path_buf(),
+    )
+    .with_template(explicit.map(Path::to_path_buf))
+    .with_global_template(global.map(Path::to_path_buf));
     match mode {
-        Mode::Check => Ok(Outcome::Checked {
-            blocks: document.block_count(),
-            headings: document.heading_count(),
-            template: resolved.origin().to_string(),
-            confidential: names,
-        }),
+        Mode::Check => {
+            let outcome = pipeline::check(&document_job, store)?;
+            Ok(Outcome::Checked {
+                blocks: outcome.blocks(),
+                headings: outcome.headings(),
+                template: outcome.template().to_owned(),
+                confidential: outcome.confidential().to_vec(),
+            })
+        }
         Mode::Render => {
             let output = job
                 .output
                 .as_deref()
                 .context("the output path was not planned")?;
-            if !names.is_empty() {
-                require_confidential_output(job)?;
-            }
-            let document = resolution.document();
-            let source_directory = input
-                .parent()
-                .filter(|parent| !parent.as_os_str().is_empty())
-                .unwrap_or_else(|| Path::new("."));
-            let rendered = match format {
-                Format::Pdf => {
-                    let assets = pdf::load_assets(
-                        document,
-                        resolved.template(),
-                        source_directory,
-                        resolved.base_directory(),
-                    )?;
-                    pdf::PdfRenderer::new(assets)
-                        .render(document, resolved.template())
-                        .with_context(|| "cannot render the PDF")?
-                }
-                Format::Txt => TxtRenderer
-                    .render(document, resolved.template())
-                    .with_context(|| "cannot render the plain text")?,
-                Format::Odt => OdtRenderer::load(
-                    document,
-                    resolved.template(),
-                    source_directory,
-                    resolved.base_directory(),
-                )?
-                .render(document, resolved.template())
-                .with_context(|| "cannot render the ODT")?,
-                Format::Docx => DocxRenderer::load(
-                    document,
-                    resolved.template(),
-                    source_directory,
-                    resolved.base_directory(),
-                )?
-                .render(document, resolved.template())
-                .with_context(|| "cannot render the DOCX")?,
-            };
-            write_atomic(output, rendered.bytes())?;
+            let outcome = pipeline::export(&document_job, format, output, store)?;
             Ok(Outcome::Rendered {
-                output: output.to_path_buf(),
-                warnings: rendered.warnings().to_vec(),
+                output: outcome.output().to_path_buf(),
+                warnings: outcome.warnings().to_vec(),
             })
-        }
-    }
-}
-
-/// A document with confidential fields must be written outside its source tree.
-fn require_confidential_output(job: &Job) -> Result<()> {
-    let output = job
-        .output
-        .as_deref()
-        .context("the output path was not planned")?;
-    let directory = output
-        .parent()
-        .filter(|parent| !parent.as_os_str().is_empty())
-        .unwrap_or_else(|| Path::new("."));
-    if confidential::is_within(job.input.root(), directory) {
-        anyhow::bail!(
-            "a document with confidential fields must be written outside its source tree; use --output with a directory outside {}",
-            job.input.root().display()
-        );
-    }
-    Ok(())
-}
-
-fn resolve_template(
-    input: &Path,
-    explicit: Option<&Path>,
-    global: Option<&Path>,
-) -> Result<ResolvedTemplate> {
-    match explicit {
-        Some(path) => {
-            let template = loader::load_file(path)?;
-            Ok(ResolvedTemplate::new(
-                TemplateOrigin::Explicit(path.to_owned()),
-                template,
-            ))
-        }
-        None => {
-            let directory = input
-                .parent()
-                .filter(|parent| !parent.as_os_str().is_empty())
-                .unwrap_or_else(|| Path::new("."));
-            Ok(loader::resolve(directory, global)?)
         }
     }
 }

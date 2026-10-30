@@ -170,12 +170,12 @@ A phase is closed only when all of the following hold:
 
 ## Phase 7: Minimal GUI
 
-**Goal.** Expose the pipeline in a minimal egui converter without duplicating any of it. The WYSIWYG editor, Pageweaver, is a separate project; it calls the same library for export.
+**Goal.** Expose the pipeline in a minimal egui converter without duplicating any of it. The WYSIWYG editor, Pageweaver, is a separate project; it calls the same library for export and starts only after 1.0.0.
 
 **Work.**
 
-- Extract the pipeline and the export API into the library first; the CLI, the minimal GUI and Pageweaver call the same functions.
-- Ship a small converter window, working name `pageformer-publisher`: a drop box, format buttons enabled only after a valid Markdown file, a template label with edit and open-folder actions, a status line and an open-output action. The CLI remains the main workflow.
+- The pipeline and the export API are in the library (`src/pipeline.rs`); the CLI, the minimal GUI and Pageweaver call the same functions.
+- Ship a small converter window, `pageformer-publisher`: a drop box, format buttons enabled only after a valid Markdown file, a template label with edit and open-folder actions, a status line and an open-output action. The CLI remains the main workflow.
 - Model the window as a state machine with `Idle`, `Working`, `Succeeded` and `Failed`. Render on a worker thread and communicate through a channel, so the frame loop never blocks; a second request while working is disabled, not queued.
 - Call the same pipeline. The GUI never parses Markdown, resolves a template or writes a file itself.
 - Require an output directory outside the source tree when the document contains placeholders, and never display a confidential value.

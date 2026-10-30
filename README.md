@@ -2,11 +2,11 @@
 
 *"One document, every format."*
 
-Generates documents from Markdown content and a single generic YAML template. One template drives every output format, so all of them stay consistent. A separate WYSIWYG editor, [Pageweaver](docs/pageweaver.md), uses the same library for authoring, while Pageformer keeps a minimal converter window for quick exports.
+Generates documents from Markdown content and a single generic YAML template. One template drives every output format, so all of them stay consistent. A separate WYSIWYG editor, [Pageweaver](docs/pageweaver.md), uses the same library for authoring and is planned for after 1.0.0, while Pageformer keeps the minimal `pageformer-publisher` converter window for quick exports.
 
 ## Stack
 
-Rust with egui for the graphical interface. The main workflow runs in the terminal; the interface is a minimal window launched by argument. The companion editor, Pageweaver, is a separate Tauri project. PDF rendering uses Typst as an internal library, and users never write Typst.
+Rust with egui for the minimal `pageformer-publisher` converter window; the main workflow runs in the terminal. The companion editor, Pageweaver, is a separate Tauri project. PDF rendering uses Typst as an internal library, and users never write Typst.
 
 ## Build
 

@@ -7,64 +7,9 @@ use std::fmt;
 use std::fs;
 use std::io::{self, IsTerminal};
 use std::path::{Path, PathBuf};
-use std::str::FromStr;
 
 use anyhow::{Context, Result};
-
-/// The output formats the command can produce.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Format {
-    Pdf,
-    Txt,
-    Odt,
-    Docx,
-}
-
-impl Format {
-    pub fn extension(self) -> &'static str {
-        match self {
-            Self::Pdf => "pdf",
-            Self::Txt => "txt",
-            Self::Odt => "odt",
-            Self::Docx => "docx",
-        }
-    }
-}
-
-impl FromStr for Format {
-    type Err = FormatError;
-
-    fn from_str(text: &str) -> Result<Self, Self::Err> {
-        match text {
-            "pdf" => Ok(Self::Pdf),
-            "txt" => Ok(Self::Txt),
-            "odt" => Ok(Self::Odt),
-            "docx" => Ok(Self::Docx),
-            other => Err(FormatError::Unknown(other.to_owned())),
-        }
-    }
-}
-
-/// Why a format name was rejected.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum FormatError {
-    Unknown(String),
-}
-
-impl fmt::Display for FormatError {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Unknown(name) => {
-                write!(
-                    formatter,
-                    "unknown format `{name}`; use pdf, txt, odt or docx"
-                )
-            }
-        }
-    }
-}
-
-impl std::error::Error for FormatError {}
+use pageformer::format::Format;
 
 /// A Markdown file and the root that discovered it.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -361,36 +306,6 @@ fn is_markdown(path: &Path) -> bool {
         .is_some_and(|extension| extension == OsStr::new("md"))
 }
 
-/// Writes a file through a temporary file in the same directory.
-pub fn write_atomic(path: &Path, bytes: &[u8]) -> Result<()> {
-    if let Some(parent) = path
-        .parent()
-        .filter(|parent| !parent.as_os_str().is_empty())
-    {
-        fs::create_dir_all(parent)
-            .with_context(|| format!("cannot create {}", parent.display()))?;
-    }
-    let temporary = temporary_path(path)?;
-    if let Err(error) = fs::write(&temporary, bytes) {
-        let _ = fs::remove_file(&temporary);
-        return Err(error).with_context(|| format!("cannot write {}", temporary.display()));
-    }
-    if let Err(error) = fs::rename(&temporary, path) {
-        let _ = fs::remove_file(&temporary);
-        return Err(error).with_context(|| format!("cannot replace {}", path.display()));
-    }
-    Ok(())
-}
-
-fn temporary_path(path: &Path) -> Result<PathBuf> {
-    let mut name = path
-        .file_name()
-        .with_context(|| format!("{} has no file name", path.display()))?
-        .to_os_string();
-    name.push(".tmp");
-    Ok(path.with_file_name(name))
-}
-
 /// How the command decides whether to color its output.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ColorChoice {
@@ -614,27 +529,6 @@ mod tests {
     }
 
     #[test]
-    fn a_format_name_selects_the_extension() {
-        assert_eq!(Format::Pdf.extension(), "pdf");
-        assert_eq!(Format::Txt.extension(), "txt");
-        assert_eq!(Format::Odt.extension(), "odt");
-        assert_eq!(Format::Docx.extension(), "docx");
-        assert_eq!("txt".parse::<Format>(), Ok(Format::Txt));
-        assert_eq!("odt".parse::<Format>(), Ok(Format::Odt));
-        assert_eq!("docx".parse::<Format>(), Ok(Format::Docx));
-    }
-
-    #[test]
-    fn an_unknown_format_name_is_rejected() {
-        let error = "epub".parse::<Format>().expect_err("an unknown format");
-
-        assert!(
-            error.to_string().contains("pdf, txt, odt or docx"),
-            "{error}"
-        );
-    }
-
-    #[test]
     fn without_an_output_directory_the_file_stays_beside_its_source() {
         let input = InputFile::new(PathBuf::from("docs/A.md"), PathBuf::from("docs"));
 
@@ -658,17 +552,6 @@ mod tests {
         assert_eq!(planned[0].output, PathBuf::from("out/A.pdf"));
         assert_eq!(errors.len(), 1);
         assert!(errors[0].message.contains("already used"));
-    }
-
-    #[test]
-    fn an_atomic_write_creates_the_parent_and_removes_the_temporary_file() {
-        let project = TempDir::new().expect("a temporary project");
-        let path = project.path().join("out/A.pdf");
-
-        write_atomic(&path, b"new").expect("the file must be written");
-
-        assert_eq!(fs::read(&path).expect("the file must exist"), b"new");
-        assert!(!path.with_file_name("A.pdf.tmp").exists());
     }
 
     #[test]

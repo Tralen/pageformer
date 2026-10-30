@@ -4,6 +4,14 @@
 
 *Major updates and feature releases.*
 
+### 0.30.0
+
+- Extracted the document pipeline into the library: `Format` in `src/format.rs`, and `DocumentJob`/`Source`, `check`/`export`, `CheckOutcome`/`ExportOutcome` and `ExportError` in `src/pipeline.rs`. The CLI is now a thin frontend, and Pageweaver can call the same API.
+- The export accepts an in-memory Markdown buffer together with the source path used for template and asset resolution, so an unsaved editor buffer can be exported without a temporary file.
+- Moved the atomic write into the pipeline; output errors are domain values and no `anyhow` crosses the library boundary.
+- Named the minimal GUI `pageformer-publisher`; Pageweaver work is planned for after 1.0.0.
+- Regenerates the ODT examples for the version in `meta:generator`.
+
 ### 0.29.1
 
 - Added `docs/pageweaver.md`, describing the separate Pageweaver editor, the library export contract, the preview CSS boundary and the minimal converter GUI.

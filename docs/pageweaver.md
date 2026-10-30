@@ -6,7 +6,11 @@ Pageweaver is the separate WYSIWYG editor for Pageformer documents. It edits the
 
 - **Pageformer** is the engine and the CLI: Markdown parser, document model, template schema and resolution, style resolution, confidential fields, assets, renderers and atomic writes. It is the source of truth for the final appearance.
 - **Pageweaver** is the authoring app: continuous editing, notebook navigation, outline, local links and images, and interface themes. It does not parse Markdown, resolve templates or render final files itself.
-- **The minimal GUI** in Pageformer is a converter for people who only need to export a document. It has no editing, notebook or live preview. The working name is `pageformer-publisher`; `pageformer-renderer` is the technical alternative.
+- **The minimal GUI** in Pageformer is `pageformer-publisher`, a converter for people who only need to export a document. It has no editing, notebook or live preview.
+
+## Status
+
+Pageweaver work starts only after Pageformer reaches 1.0.0. Until then the Pageformer library, the CLI and `pageformer-publisher` are the priority; the editor is planned but not started.
 
 ## Why two projects
 
@@ -16,7 +20,7 @@ The editor uses a different stack (Tauri, Tiptap/Milkdown, a web view) and has a
 
 Pageweaver calls the Pageformer library in process. The export accepts the Markdown buffer and the source path, so an unsaved buffer can be exported without a temporary file; the source path resolves the template, the letterhead and the images. Pageformer owns the parse, template resolution, confidential substitution, rendering and atomic write. Pageweaver owns the editor state, the format and destination choice, and the error presentation.
 
-The export returns a domain `Outcome` and a domain `ExportError`; `anyhow` stays at the binary boundary. The caller runs the export on a worker thread, so the UI stays responsive. The supported formats come from the library; today PDF, ODT, DOCX and TXT, with HTML and EPUB when they land.
+The export returns a domain `ExportOutcome` and a domain `ExportError`; `anyhow` stays at the binary boundary. The public types are `Format`, `DocumentJob`, `Source`, `CheckOutcome`, `ExportOutcome` and `ExportError`, and the entry points are `check` and `export` in `src/pipeline.rs`. The caller runs the export on a worker thread, so the UI stays responsive. The supported formats come from the library; today PDF, ODT, DOCX and TXT, with HTML and EPUB when they land.
 
 Confidential fields stay opaque in the editor: `{NAME}` is shown as a placeholder, never resolved, and Pageformer never puts a value in the editor. A document with fields must be exported outside its source tree, and that check belongs to Pageformer.
 
@@ -30,8 +34,8 @@ The editor serializes Markdown back to the source. The serialization must preser
 
 ## Dependency
 
-Pageweaver depends on Pageformer as a versioned library. When the work starts, Pageformer is published on GitHub; Pageweaver uses a tag or a version, not a path between sibling folders. A local `[patch]` may point at the sibling checkout during development, but it is not the release architecture. Publishing to crates.io is a later option; the crate is `publish = false` today.
+Pageweaver depends on Pageformer as a versioned library. When the work starts, at or after Pageformer 1.0.0, Pageformer is published on GitHub; Pageweaver uses a tag or a version, not a path between sibling folders. A local `[patch]` may point at the sibling checkout during development, but it is not the release architecture. Publishing to crates.io is a later option; the crate is `publish = false` today.
 
 ## Minimal GUI
 
-Pageformer keeps a small egui window for conversion and export only: drop a Markdown file, choose a format, export and open the output, with a template label and a status line. It has no editing, notebook, outline or live preview. Many users will not use the editor, and they still need a graphical way to export. The GUI is a thin consumer of the same library, not a second pipeline.
+Pageformer keeps a small egui window, `pageformer-publisher`, for conversion and export only: drop a Markdown file, choose a format, export and open the output, with a template label and a status line. It has no editing, notebook, outline or live preview. Many users will not use the editor, and they still need a graphical way to export. The GUI is a thin consumer of the same library, not a second pipeline.

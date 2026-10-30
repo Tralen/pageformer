@@ -535,7 +535,7 @@ fn cell_paragraph_styles(output: &mut String, template: &Template) {
         xml::push_fmt(
             output,
             format_args!(
-                "<style:style style:name=\"{name}\" style:family=\"paragraph\"><style:paragraph-properties fo:line-height=\"{line}\" fo:margin-bottom=\"0cm\" fo:text-align=\"{alignment}\"/></style:style>\n",
+                "<style:style style:name=\"{name}\" style:family=\"paragraph\"><style:paragraph-properties fo:line-height=\"{line}\" fo:margin-bottom=\"0cm\" fo:hyphenate=\"true\" fo:text-align=\"{alignment}\"/></style:style>\n",
                 line = xml::points_value(line),
             ),
         );

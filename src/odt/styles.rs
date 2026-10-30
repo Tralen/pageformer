@@ -32,20 +32,22 @@ pub fn styles_xml(document: &Document, template: &Template, assets: &Assets) -> 
 
     let paragraph = template.formatting().paragraph();
     let face = paragraph.face();
+    let language = language_attributes(document.metadata().language().map(|value| value.as_str()));
     xml::push_fmt(
         &mut output,
         format_args!(
-            "<style:default-style style:family=\"paragraph\"><style:paragraph-properties fo:orphans=\"2\" fo:widows=\"2\"/><style:text-properties fo:font-family=\"'{family}'\" fo:font-size=\"{size}\" fo:font-weight=\"{weight}\" fo:font-style=\"{slant}\"/></style:default-style>\n",
+            "<style:default-style style:family=\"paragraph\"><style:paragraph-properties fo:orphans=\"2\" fo:widows=\"2\"/><style:text-properties fo:font-family=\"'{family}'\" fo:font-size=\"{size}\" fo:font-weight=\"{weight}\" fo:font-style=\"{slant}\"{language}/></style:default-style>\n",
             family = xml::escape_attribute(first_family(face)),
             size = xml::points(face.size()),
             weight = weight(face.weight().get()),
             slant = slant(face.slant()),
+            language = language,
         ),
     );
     xml::push_fmt(
         &mut output,
         format_args!(
-            "<style:style style:name=\"Standard\" style:family=\"paragraph\" style:class=\"text\"><style:paragraph-properties {line_height}{margin_bottom}fo:text-align=\"{align}\"/><style:text-properties style:font-name=\"{family}\" fo:font-size=\"{size}\" fo:font-weight=\"{weight}\" fo:font-style=\"{slant}\"/></style:style>\n",
+            "<style:style style:name=\"Standard\" style:family=\"paragraph\" style:class=\"text\"><style:paragraph-properties {line_height}{margin_bottom}fo:hyphenate=\"true\" fo:text-align=\"{align}\"/><style:text-properties style:font-name=\"{family}\" fo:font-size=\"{size}\" fo:font-weight=\"{weight}\" fo:font-style=\"{slant}\"{language}/></style:style>\n",
             line_height = xml::line_advance_attribute(face.size(), paragraph.leading()),
             margin_bottom = margin_bottom(paragraph.spacing(), paragraph.leading()),
             align = alignment(paragraph.alignment()),
@@ -53,8 +55,10 @@ pub fn styles_xml(document: &Document, template: &Template, assets: &Assets) -> 
             size = xml::points(face.size()),
             weight = weight(face.weight().get()),
             slant = slant(face.slant()),
+            language = language,
         ),
     );
+
     character_style(&mut output, "Emphasis", paragraph.emphasis());
     character_style(&mut output, "Strong", paragraph.strong());
     xml::push(
@@ -72,7 +76,7 @@ pub fn styles_xml(document: &Document, template: &Template, assets: &Assets) -> 
         xml::push_fmt(
             &mut output,
             format_args!(
-                "<style:style style:name=\"Heading{level}\" style:family=\"paragraph\" style:parent-style-name=\"Standard\" style:next-style-name=\"Standard\"><style:paragraph-properties {line_height}fo:margin-top=\"{before}\" fo:margin-bottom=\"{after}\" fo:keep-with-next=\"always\" style:default-outline-level=\"{level}\"{page_break}/><style:text-properties style:font-name=\"{family}\" fo:font-size=\"{size}\" fo:font-weight=\"{weight}\" fo:font-style=\"{slant}\"/></style:style>\n",
+                "<style:style style:name=\"Heading{level}\" style:family=\"paragraph\" style:parent-style-name=\"Standard\" style:next-style-name=\"Standard\"><style:paragraph-properties {line_height}fo:margin-top=\"{before}\" fo:margin-bottom=\"{after}\" fo:keep-with-next=\"always\" fo:hyphenate=\"true\" style:default-outline-level=\"{level}\"{page_break}/><style:text-properties style:font-name=\"{family}\" fo:font-size=\"{size}\" fo:font-weight=\"{weight}\" fo:font-style=\"{slant}\"/></style:style>\n",
                 line_height = xml::line_advance_attribute(face.size(), paragraph.leading()),
                 before = xml::points_value(heading_margin(
                     heading.spacing_before(),
@@ -96,7 +100,7 @@ pub fn styles_xml(document: &Document, template: &Template, assets: &Assets) -> 
     list_styles(&mut output);
     xml::push(&mut output, "</office:styles>\n<office:automatic-styles>\n");
     page_layout(&mut output, template, assets);
-    running_style(&mut output, template);
+    running_style(&mut output, template, document);
     xml::push(
         &mut output,
         "</office:automatic-styles>\n<office:master-styles>\n",
@@ -160,6 +164,26 @@ fn alignment(alignment: ParagraphAlignment) -> &'static str {
     match alignment {
         ParagraphAlignment::Justified => "justify",
         ParagraphAlignment::Left => "left",
+    }
+}
+
+/// Expands a BCP 47 tag into the ODF language attributes.
+fn language_attributes(tag: Option<&str>) -> String {
+    let Some(tag) = tag else {
+        return String::new();
+    };
+    let mut parts = tag.split('-');
+    let primary = parts.next().unwrap_or_default();
+    if primary.is_empty() {
+        return String::new();
+    }
+    match parts.next() {
+        Some(region) => format!(
+            " fo:language=\"{}\" fo:country=\"{}\"",
+            xml::escape_attribute(primary),
+            xml::escape_attribute(&region.to_ascii_uppercase()),
+        ),
+        None => format!(" fo:language=\"{}\"", xml::escape_attribute(primary)),
     }
 }
 
@@ -230,7 +254,7 @@ fn list_styles(output: &mut String) {
 }
 
 /// The minimum height reserved for a running header or footer.
-const RUNNING_MIN_HEIGHT: f64 = 0.8 * 72.0 / 2.54;
+const RUNNING_MIN_HEIGHT: f64 = 1.2 * 72.0 / 2.54;
 /// The gap between a running header or footer and the text area.
 const RUNNING_SPACING: f64 = 0.3 * 72.0 / 2.54;
 /// How much of the heading space above Writer already counts in the line box.
@@ -307,17 +331,23 @@ fn page_layout(output: &mut String, template: &Template, assets: &Assets) {
     xml::push(output, "</style:page-layout>\n");
 }
 
-fn running_style(output: &mut String, template: &Template) {
+fn running_style(output: &mut String, template: &Template, document: &Document) {
     let dimensions = template.page().dimensions();
     let margins = template.page().margins();
+    let face = template.formatting().paragraph().face();
+    let language = language_attributes(document.metadata().language().map(|value| value.as_str()));
     let text_width =
         (dimensions.width().points() - margins.left().points() - margins.right().points()).max(1.0);
     xml::push_fmt(
         output,
         format_args!(
-            "<style:style style:name=\"RunningText\" style:family=\"paragraph\"><style:paragraph-properties fo:text-align=\"left\"><style:tab-stops><style:tab-stop style:position=\"{center}\" style:type=\"center\"/><style:tab-stop style:position=\"{right}\" style:type=\"right\"/></style:tab-stops></style:paragraph-properties><style:text-properties fo:font-size=\"9pt\"/></style:style>\n",
+            "<style:style style:name=\"RunningText\" style:family=\"paragraph\"><style:paragraph-properties fo:text-align=\"left\"><style:tab-stops><style:tab-stop style:position=\"{center}\" style:type=\"center\"/><style:tab-stop style:position=\"{right}\" style:type=\"right\"/></style:tab-stops></style:paragraph-properties><style:text-properties style:font-name=\"{family}\" fo:font-size=\"{size}\" fo:font-weight=\"{weight}\" fo:font-style=\"{slant}\"{language}/></style:style>\n",
             center = xml::centimetres_points(text_width / 2.0),
             right = xml::centimetres_points(text_width),
+            family = xml::escape_attribute(first_family(face)),
+            size = xml::points(face.size()),
+            weight = weight(face.weight().get()),
+            slant = slant(face.slant()),
         ),
     );
 }

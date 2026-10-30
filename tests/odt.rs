@@ -293,8 +293,33 @@ fn a_running_header_reserves_its_band_from_the_page_margin() {
     let mut archive = ZipArchive::new(Cursor::new(bytes)).expect("the package must be a ZIP");
     let styles = entry(&mut archive, "styles.xml");
 
-    assert!(styles.contains("fo:margin-top=\"1.900cm\""), "{styles}");
+    assert!(styles.contains("fo:margin-top=\"1.500cm\""), "{styles}");
     assert!(styles.contains("<style:header>"), "{styles}");
+}
+
+#[test]
+fn the_running_text_uses_the_paragraph_face_and_hyphenates_in_the_document_language() {
+    let metadata = pageformer::document::Metadata::new(
+        None,
+        None,
+        Some(pageformer::document::Language::parse("pt-BR").expect("a valid language tag")),
+    );
+    let template = Template::from_yaml(
+        "version: \"0.5\"\nformatting:\n  paragraph:\n    size: 13\npage:\n  header:\n    right: \"{page}\"\n",
+    )
+    .expect("the template must be valid");
+    let document = Document::new(metadata, Vec::new());
+    let bytes = odt::render(&document, &template, &Assets::default()).expect("the package");
+    let mut archive = ZipArchive::new(Cursor::new(bytes)).expect("the package must be a ZIP");
+    let styles = entry(&mut archive, "styles.xml");
+
+    assert!(styles.contains("style:name=\"RunningText\""), "{styles}");
+    assert!(styles.contains("fo:font-size=\"13.00pt\""), "{styles}");
+    assert!(styles.contains("fo:hyphenate=\"true\""), "{styles}");
+    assert!(
+        styles.contains("fo:language=\"pt\" fo:country=\"BR\""),
+        "{styles}"
+    );
 }
 
 fn minimal_png() -> Vec<u8> {

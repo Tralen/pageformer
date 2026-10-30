@@ -4,6 +4,12 @@
 
 *Major updates and feature releases.*
 
+### 0.16.2
+
+- Enabled hyphenation with the frontmatter language on paragraphs, headings and cells, because Typst hyphenates and the ODT line breaks otherwise drift; the Embargos item 12 now stays on page 2, as in the PDF.
+- The running header and footer use the paragraph face, so the page number is 12pt instead of a fixed 9pt, and reserve a 1.5cm band; the number now sits above the letterhead rule.
+- Regenerated the ODT examples; the page counts remain 4, 4 and 3 and the page starts match the PDF.
+
 ### 0.16.1
 
 - Matched the ODT spacing to the PDF: the ODF line height is the leading plus the cap height Typst uses, paragraph spacing subtracts the leading, heading margins account for the Writer line box, and tight list items carry no paragraph margin.

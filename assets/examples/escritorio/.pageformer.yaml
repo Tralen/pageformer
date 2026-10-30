@@ -36,6 +36,15 @@ formatting:
       style: italic
     strong:
       weight: bold
+    # Inline styles inherit this face; code declares monospace explicitly.
+    code:
+      font_families:
+        - Liberation Mono
+        - DejaVu Sans Mono
+  code_block:
+    font_families:
+      - Liberation Mono
+      - DejaVu Sans Mono
   heading:
     font_families:
       - Liberation Sans

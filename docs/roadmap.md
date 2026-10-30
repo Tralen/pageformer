@@ -235,8 +235,8 @@ A phase is closed only when all of the following hold:
 | Page | `page.size`, `page.orientation`, `page.margins`, `page.letterhead` | 0.5.0 | Shared by every paged format. |
 | Paragraph | `formatting.paragraph` | 0.9.0 | Font families, size, weight, style, leading, spacing, alignment, `foreground` (0.21.0), `background`, `code` and `strikethrough` (0.23.0) and the inline overrides. |
 | Inline spans | `formatting.paragraph.emphasis`, `formatting.paragraph.strong` | 0.9.0 | Inherit the paragraph face and its `foreground`; style italic and weight bold are the semantic defaults; `background` since 0.23.0. |
-| Code and strikethrough | `formatting.paragraph.code`, `formatting.paragraph.strikethrough` | 0.23.0 | Patch the renderer defaults, so an undeclared key changes nothing. |
-| Blocks | `formatting.quote`, `formatting.code_block` | 0.23.0 | Face and colors for block quotes and fenced code blocks; `alignment` and per-side `border` since 0.24.0. |
+| Code and strikethrough | `formatting.paragraph.code`, `formatting.paragraph.strikethrough` | 0.23.0 | Inherit the paragraph face; since 0.25.0 an undeclared key follows the paragraph instead of a renderer default. |
+| Blocks | `formatting.quote`, `formatting.code_block` | 0.23.0 | Face and colors for block quotes and fenced code blocks; `alignment` and per-side `border` since 0.24.0; the face inherits the paragraph since 0.25.0. |
 | Headings | `formatting.heading`, `formatting.heading.h1` to `h6` | 0.12.0 | Base plus per-level overrides for fonts, size, weight, style, spacing, `page_break_before`, `background` and `rule`; since 0.20.0 the base map carries `background` and `rule`, and a level clears them with `none`; `foreground` arrived in 0.21.0 and follows the same inheritance. |
 | Rule | `formatting.rule`, `formatting.heading.h1` to `h6` `rule` | 0.18.0 | Thematic break thickness, color and optional spacing, and a rule below each heading level, shared by every format; the level rule arrived in 0.19.0 and `none` in 0.20.0. |
 | Header and footer | `page.header`, `page.footer` | 0.10.0 | Running content in left, center and right slots; lowercase tokens only. |

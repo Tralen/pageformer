@@ -197,7 +197,9 @@ The header and footer use the paragraph face. Their content sits inside the top 
 
 Inside `emphasis` and `strong`, the allowed keys are `font_families`, `size`, `weight`, `style`, `foreground` and `background`. Only the declared keys override the paragraph values, so an empty map is valid and changes nothing beyond the semantic default. Without its own `foreground`, an inline span keeps the surrounding color: the paragraph color in body text, and the heading color inside a heading. A `background` fills the span itself.
 
-`code` and `strikethrough` style inline code spans and strikethrough text. They accept the same keys, including `font_families`, and are optional: while a key stays undeclared, the renderer keeps what it already does, so a map with only `foreground` changes the color and leaves the monospace font alone. For `code`, the monospace family the office formats already use stays the default until `font_families` is declared; `emphasis`, `strong` and `strikethrough` inherit the paragraph face instead.
+`code` and `strikethrough` style inline code spans and strikethrough text. They accept the same keys as `emphasis` and `strong`, including `font_families`, and every undeclared key inherits the paragraph face: there is no hidden renderer default. A map with only `foreground` changes the color and keeps the paragraph font.
+
+Because of that, code is monospaced only when the template says so. The default template declares a monospace family for `code`, so the different font has a visible reason in the file instead of being a surprise.
 
 ### `formatting.heading`
 
@@ -226,7 +228,7 @@ The template sets explicit values for each level. There is no hidden multiplier 
 
 ### `formatting.quote` and `formatting.code_block`
 
-Block quotes and fenced code blocks are paragraphs with their own style, outside `paragraph`. Both accept `font_families`, `size`, `weight`, `style`, `foreground`, `background`, `alignment` and `border`. Text keys change nothing while undeclared: a quote keeps the body face and the one centimeter indent, and a code block keeps its monospace face.
+Block quotes and fenced code blocks are paragraphs with their own style, outside `paragraph`. Both accept `font_families`, `size`, `weight`, `style`, `foreground`, `background`, `alignment` and `border`. Every undeclared text key inherits the paragraph face, and a quote keeps its one centimeter indent. A code block is monospaced only when the template declares a monospace family, which the default template does.
 
 `alignment` is `left` by default for both, because justified code and quotes read worse; set `justified` to follow the body.
 

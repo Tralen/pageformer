@@ -29,6 +29,16 @@ formatting:
       style: italic
     strong:
       weight: bold
+    # Every inline style inherits this face; code declares monospace explicitly,
+    # so the different font is visible in the template and not a hidden default.
+    code:
+      font_families:
+        - Liberation Mono
+        - DejaVu Sans Mono
+  code_block:
+    font_families:
+      - Liberation Mono
+      - DejaVu Sans Mono
   heading:
     font_families:
       - Liberation Sans

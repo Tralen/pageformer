@@ -173,12 +173,8 @@ impl<'a> SourceBuilder<'a> {
         self.inline_style("emph", paragraph.emphasis());
         self.inline_style("strong", paragraph.strong());
 
-        if let Some(style) = paragraph.code() {
-            self.inline_partial("raw.where(block: false)", style);
-        }
-        if let Some(style) = paragraph.strikethrough() {
-            self.inline_partial("strike", style);
-        }
+        self.inline_partial("raw.where(block: false)", paragraph.code());
+        self.inline_partial("strike", paragraph.strikethrough());
         self.block_style("quote.where(block: true)", template.formatting().quote());
         self.block_style("raw.where(block: true)", template.formatting().code_block());
         self.output.push('\n');
@@ -1655,7 +1651,7 @@ mod tests {
     }
 
     #[test]
-    fn a_partial_style_emits_only_the_declared_keys() {
+    fn an_inline_code_style_inherits_the_paragraph_face() {
         let template = Template::from_yaml(
             "version: \"0.5\"\nformatting:\n  paragraph:\n    code:\n      foreground: navy\n",
         )
@@ -1663,12 +1659,10 @@ mod tests {
         let source =
             typst_source(&paragraph("Texto"), &template, &AssetMap::new()).expect("the source");
         assert!(
-            source.contains("#show raw.where(block: false): set text(fill: rgb(\"#000080\"))\n"),
-            "{source}"
-        );
-        assert!(
-            !source.contains("raw.where(block: false): set text(font:"),
-            "an undeclared font is not emitted: {source}"
+            source.contains(
+                "#show raw.where(block: false): set text(font: (\"Liberation Serif\", \"DejaVu Serif\", \"Libertinus Serif\", ), size: 12.000pt, weight: 400, style: \"normal\", fill: rgb(\"#000080\"))"
+            ),
+            "the face comes from the paragraph and only the color is declared: {source}"
         );
     }
 
@@ -1705,8 +1699,9 @@ mod tests {
             "{source}"
         );
         assert!(
-            source
-                .contains("#show raw.where(block: true): set text(font: (\"Liberation Mono\", ))"),
+            source.contains(
+                "#show raw.where(block: true): set text(font: (\"Liberation Mono\", ), size: 12.000pt, weight: 400, style: \"normal\")"
+            ),
             "{source}"
         );
         assert!(

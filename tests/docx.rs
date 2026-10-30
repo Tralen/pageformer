@@ -370,8 +370,10 @@ formatting:
         "{styles}"
     );
     assert!(
-        content.contains("<w:strike/><w:color w:val=\"dc143c\"/>"),
-        "the strikethrough run takes the color: {content}"
+        content.contains("<w:strike/>")
+            && content.contains("<w:color w:val=\"dc143c\"/>")
+            && content.contains("w:ascii=\"Liberation Serif\""),
+        "the strikethrough run takes the color and the paragraph face: {content}"
     );
 }
 

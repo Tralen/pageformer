@@ -1043,8 +1043,8 @@ pub struct ParagraphStyle {
     background: Option<Color>,
     emphasis: InlineStyle,
     strong: InlineStyle,
-    code: Option<PartialTextStyle>,
-    strikethrough: Option<PartialTextStyle>,
+    code: PartialTextStyle,
+    strikethrough: PartialTextStyle,
 }
 
 impl ParagraphStyle {
@@ -1057,8 +1057,8 @@ impl ParagraphStyle {
         background: Option<Color>,
         emphasis: InlineStyle,
         strong: InlineStyle,
-        code: Option<PartialTextStyle>,
-        strikethrough: Option<PartialTextStyle>,
+        code: PartialTextStyle,
+        strikethrough: PartialTextStyle,
     ) -> Self {
         Self {
             face,
@@ -1102,14 +1102,14 @@ impl ParagraphStyle {
         &self.strong
     }
 
-    /// The inline code style, when the template declares one.
-    pub fn code(&self) -> Option<&PartialTextStyle> {
-        self.code.as_ref()
+    /// The inline code style, resolved from the paragraph face.
+    pub fn code(&self) -> &PartialTextStyle {
+        &self.code
     }
 
-    /// The strikethrough style, when the template declares one.
-    pub fn strikethrough(&self) -> Option<&PartialTextStyle> {
-        self.strikethrough.as_ref()
+    /// The strikethrough style, resolved from the paragraph face.
+    pub fn strikethrough(&self) -> &PartialTextStyle {
+        &self.strikethrough
     }
 }
 
@@ -1237,6 +1237,14 @@ pub struct BlockStyle {
 }
 
 impl BlockStyle {
+    pub fn new(text: PartialTextStyle, alignment: ParagraphAlignment, border: BlockBorder) -> Self {
+        Self {
+            text,
+            alignment,
+            border,
+        }
+    }
+
     pub fn text(&self) -> &PartialTextStyle {
         &self.text
     }
@@ -1764,18 +1772,25 @@ fn margin(value: Option<String>, field: &'static str) -> Result<Option<Length>, 
 }
 
 fn convert_formatting(raw: RawFormatting) -> Result<Formatting, TemplateError> {
-    Ok(Formatting::new(
-        convert_paragraph(raw.paragraph.unwrap_or_default())?,
-        convert_headings(raw.heading.unwrap_or_default())?,
-        convert_rule(raw.rule.unwrap_or_default(), "formatting.rule")?,
-        convert_block(raw.quote, "formatting.quote")?,
-        convert_block(raw.code_block, "formatting.code_block")?,
-    ))
+    let paragraph = convert_paragraph(raw.paragraph.unwrap_or_default())?;
+    let heading = convert_headings(raw.heading.unwrap_or_default())?;
+    let rule = convert_rule(raw.rule.unwrap_or_default(), "formatting.rule")?;
+    let quote = convert_block(raw.quote, "formatting.quote", paragraph.face())?;
+    let code_block = convert_block(raw.code_block, "formatting.code_block", paragraph.face())?;
+    Ok(Formatting::new(paragraph, heading, rule, quote, code_block))
 }
 
-fn convert_block(raw: Option<RawBlockStyle>, prefix: &str) -> Result<BlockStyle, TemplateError> {
+fn convert_block(
+    raw: Option<RawBlockStyle>,
+    prefix: &str,
+    base: &TextFace,
+) -> Result<BlockStyle, TemplateError> {
     let Some(raw) = raw else {
-        return Ok(BlockStyle::default());
+        return Ok(BlockStyle::new(
+            convert_partial(RawInlineStyle::default(), prefix, base)?,
+            ParagraphAlignment::Left,
+            BlockBorder::default(),
+        ));
     };
     let text = convert_partial(
         RawInlineStyle {
@@ -1787,12 +1802,13 @@ fn convert_block(raw: Option<RawBlockStyle>, prefix: &str) -> Result<BlockStyle,
             background: raw.background,
         },
         prefix,
+        base,
     )?;
-    Ok(BlockStyle {
+    Ok(BlockStyle::new(
         text,
-        alignment: raw.alignment.unwrap_or(ParagraphAlignment::Left),
-        border: convert_border(raw.border, &format!("{prefix}.border"))?,
-    })
+        raw.alignment.unwrap_or(ParagraphAlignment::Left),
+        convert_border(raw.border, &format!("{prefix}.border"))?,
+    ))
 }
 
 fn convert_border(raw: Option<RawBorder>, prefix: &str) -> Result<BlockBorder, TemplateError> {
@@ -1831,7 +1847,13 @@ fn border_side(value: Option<String>, field: &str) -> Result<Option<Length>, Tem
     }
 }
 
-fn convert_partial(raw: RawInlineStyle, prefix: &str) -> Result<PartialTextStyle, TemplateError> {
+/// Resolves a partial style from the paragraph face, so an undeclared key has no
+/// hidden renderer default behind it.
+fn convert_partial(
+    raw: RawInlineStyle,
+    prefix: &str,
+    base: &TextFace,
+) -> Result<PartialTextStyle, TemplateError> {
     let size = raw
         .size
         .map(|text| parse_length_field(&text, &format!("{prefix}.size")))
@@ -1840,16 +1862,20 @@ fn convert_partial(raw: RawInlineStyle, prefix: &str) -> Result<PartialTextStyle
         return Err(value_error(format!("{prefix}.size"), ValueError::Zero));
     }
     Ok(PartialTextStyle {
-        font_families: raw
-            .font_families
-            .map(|values| parse_families(values, &format!("{prefix}.font_families")))
-            .transpose()?,
-        size,
-        weight: raw
-            .weight
-            .map(|text| parse_weight(&text, &format!("{prefix}.weight")))
-            .transpose()?,
-        slant: raw.style,
+        font_families: Some(
+            raw.font_families
+                .map(|values| parse_families(values, &format!("{prefix}.font_families")))
+                .transpose()?
+                .unwrap_or_else(|| base.font_families().to_vec()),
+        ),
+        size: Some(size.unwrap_or_else(|| base.size())),
+        weight: Some(
+            raw.weight
+                .map(|text| parse_weight(&text, &format!("{prefix}.weight")))
+                .transpose()?
+                .unwrap_or_else(|| base.weight()),
+        ),
+        slant: Some(raw.style.unwrap_or_else(|| base.slant())),
         foreground: parse_optional_color(raw.foreground, &format!("{prefix}.foreground"))?,
         background: parse_optional_color(raw.background, &format!("{prefix}.background"))?,
     })
@@ -1923,14 +1949,16 @@ fn convert_paragraph(raw: RawParagraph) -> Result<ParagraphStyle, TemplateError>
         None,
         Some(FontWeight::BOLD),
     )?;
-    let code = raw
-        .code
-        .map(|raw| convert_partial(raw, "formatting.paragraph.code"))
-        .transpose()?;
-    let strikethrough = raw
-        .strikethrough
-        .map(|raw| convert_partial(raw, "formatting.paragraph.strikethrough"))
-        .transpose()?;
+    let code = convert_partial(
+        raw.code.unwrap_or_default(),
+        "formatting.paragraph.code",
+        &face,
+    )?;
+    let strikethrough = convert_partial(
+        raw.strikethrough.unwrap_or_default(),
+        "formatting.paragraph.strikethrough",
+        &face,
+    )?;
     Ok(ParagraphStyle::new(
         face,
         leading,

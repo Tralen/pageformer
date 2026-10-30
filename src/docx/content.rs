@@ -313,7 +313,7 @@ impl<'a> Builder<'a> {
             Inline::Strikethrough(content) => {
                 let mut merged = String::from("<w:strike/>");
                 merged.push_str(&partial_properties(
-                    self.template.formatting().paragraph().strikethrough(),
+                    Some(self.template.formatting().paragraph().strikethrough()),
                     None,
                     true,
                 ));

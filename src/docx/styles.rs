@@ -145,10 +145,7 @@ pub(crate) fn styles_xml(document: &Document, template: &Template) -> String {
          <w:style w:type=\"character\" w:styleId=\"FootnoteReference\"><w:name w:val=\"footnote reference\"/><w:rPr><w:vertAlign w:val=\"superscript\"/></w:rPr></w:style>\n\
          <w:style w:type=\"character\" w:styleId=\"Hyperlink\"><w:name w:val=\"Hyperlink\"/><w:rPr><w:color w:val=\"0563C1\"/><w:u w:val=\"single\"/></w:rPr></w:style>\n",
     );
-    let code_char = partial_rpr(
-        template.formatting().paragraph().code(),
-        Some("<w:rFonts w:ascii=\"Consolas\" w:hAnsi=\"Consolas\" w:cs=\"Consolas\"/>"),
-    );
+    let code_char = partial_rpr(Some(template.formatting().paragraph().code()), None);
     xml::push_fmt(
         &mut output,
         format_args!(

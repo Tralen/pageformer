@@ -30,6 +30,32 @@ formatting:
     size: 11
     leading: 7
     spacing: 10
+    # Inline styles inherit this face; code declares monospace explicitly.
+    code:
+      font_families:
+        - Liberation Mono
+        - DejaVu Sans Mono
+      foreground: "#7a2a5a"
+      background: "#f2eef6"
+    strikethrough:
+      foreground: "#7a2a2a"
+  quote:
+    foreground: "#2a4d7a"
+    background: "#f7fafd"
+    border:
+      left: 3pt
+      color: "#336699"
+      padding: 8
+  code_block:
+    font_families:
+      - Liberation Mono
+      - DejaVu Sans Mono
+    background: "#f4f4f4"
+    border:
+      top: 0.5pt
+      bottom: 0.5pt
+      color: "#999999"
+      padding: 6
   heading:
     font_families:
       - Liberation Sans

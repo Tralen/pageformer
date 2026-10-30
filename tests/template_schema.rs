@@ -865,7 +865,7 @@ formatting:
         Some("#fafafa".to_owned())
     );
 
-    let code = paragraph.code().expect("inline code");
+    let code = paragraph.code();
     assert_eq!(
         code.font_families()
             .and_then(|families| families.first())
@@ -884,12 +884,24 @@ formatting:
         Some("#eeeeee".to_owned())
     );
 
-    let strike = paragraph.strikethrough().expect("strikethrough");
+    let strike = paragraph.strikethrough();
     assert_eq!(
         strike.foreground().map(|color| color.hex()),
         Some("#dc143c".to_owned())
     );
-    assert_eq!(strike.size(), None, "an undeclared key changes nothing");
+    assert_eq!(
+        strike.size().map(Length::points),
+        Some(12.0),
+        "an undeclared key follows the paragraph size"
+    );
+    assert_eq!(
+        strike
+            .font_families()
+            .and_then(|families| families.first())
+            .map(|family| family.as_str()),
+        Some("Liberation Serif"),
+        "an undeclared family follows the paragraph face"
+    );
 
     let quote = template.formatting().quote();
     assert_eq!(
@@ -907,12 +919,20 @@ formatting:
 }
 
 #[test]
-fn the_new_styles_are_absent_by_default() {
+fn the_new_styles_follow_the_paragraph_face_by_default() {
     let template = parse("version: \"0.5\"\n");
     let paragraph = template.formatting().paragraph();
     assert_eq!(paragraph.background(), None);
-    assert!(paragraph.code().is_none());
-    assert!(paragraph.strikethrough().is_none());
+    for style in [paragraph.code(), paragraph.strikethrough()] {
+        assert_eq!(
+            style.font_families().and_then(|families| families.first()),
+            paragraph.face().font_families().first(),
+            "no hidden default face"
+        );
+        assert_eq!(style.size(), Some(paragraph.face().size()));
+        assert_eq!(style.foreground(), None);
+        assert_eq!(style.background(), None);
+    }
     for block in [
         template.formatting().quote(),
         template.formatting().code_block(),

@@ -78,17 +78,11 @@ pub fn styles_xml(document: &Document, template: &Template, assets: &Assets) -> 
     partial_character_style(
         &mut output,
         "Strikethrough",
-        paragraph.strikethrough(),
+        Some(paragraph.strikethrough()),
         "style:text-line-through-style=\"solid\"",
         None,
     );
-    partial_character_style(
-        &mut output,
-        "CodeInline",
-        paragraph.code(),
-        "",
-        Some("fo:font-family=\"'Liberation Mono', monospace\""),
-    );
+    partial_character_style(&mut output, "CodeInline", Some(paragraph.code()), "", None);
 
     for (index, heading) in template.formatting().heading().levels().iter().enumerate() {
         let level = index.saturating_add(1);
@@ -296,12 +290,9 @@ fn font_families(template: &Template) -> BTreeSet<String> {
     for style in [
         paragraph.code(),
         paragraph.strikethrough(),
-        Some(template.formatting().quote().text()),
-        Some(template.formatting().code_block().text()),
-    ]
-    .into_iter()
-    .flatten()
-    {
+        template.formatting().quote().text(),
+        template.formatting().code_block().text(),
+    ] {
         if let Some(family) = style.font_families().and_then(|families| families.first()) {
             families.insert(family.as_str().to_owned());
         }

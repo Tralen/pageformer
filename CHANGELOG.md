@@ -4,6 +4,13 @@
 
 *Major updates and feature releases.*
 
+### 0.25.0
+
+- Inline code and fenced code blocks now inherit the paragraph face when a key is undeclared, like every other inline style. There is no hidden monospace default left in the renderers, so a template can explain every font it sees.
+- The default template and both example templates declare a monospace family for `code` and `code_block`, with a comment saying why the face differs.
+- The technical example was expanded to demonstrate the inline formats, lists, task list, table, quote, alert, code block, thematic break, footnote and page breaks. It now renders four pages.
+- Regenerates the office and technical examples; the PDFs stay deterministic and pass veraPDF.
+
 ### 0.24.0
 
 - Added `alignment` to `formatting.quote` and `formatting.code_block`. Both default to `left`, because justified quotes and code read worse; `justified` follows the body again.

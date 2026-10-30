@@ -1,6 +1,10 @@
 //! Generates `word/numbering.xml`, with one numbering instance per list.
 
+use crate::metrics;
+use crate::template::{ListStyle, Template};
 use crate::xml;
+
+use super::styles::partial_properties;
 
 /// The marker kind of a list.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -34,15 +38,16 @@ impl Numbering {
         self.instances.len()
     }
 
-    pub fn xml(&self) -> String {
+    pub fn xml(&self, template: &Template) -> String {
         let mut output = String::new();
         xml::push(
             &mut output,
             "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n\
              <w:numbering xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\">\n",
         );
-        abstract_levels(&mut output, 0, NumberingKind::Bullet);
-        abstract_levels(&mut output, 1, NumberingKind::Decimal);
+        let list = template.formatting().list();
+        abstract_levels(&mut output, 0, NumberingKind::Bullet, list);
+        abstract_levels(&mut output, 1, NumberingKind::Decimal, list);
         for (index, instance) in self.instances.iter().enumerate() {
             let number = index.saturating_add(1);
             let abstract_id = match instance.kind {
@@ -71,26 +76,42 @@ impl Numbering {
     }
 }
 
-fn abstract_levels(output: &mut String, abstract_id: u8, kind: NumberingKind) {
+fn abstract_levels(output: &mut String, abstract_id: u8, kind: NumberingKind, list: &ListStyle) {
     xml::push_fmt(
         output,
         format_args!(
             "<w:abstractNum w:abstractNumId=\"{abstract_id}\"><w:multiLevelType w:val=\"hybridMultilevel\"/>"
         ),
     );
-    for level in 0..9_u32 {
-        let indent = level.saturating_add(1).saturating_mul(360);
+    let marker_rpr = partial_properties(Some(list.text()), None, false);
+    let marker_rpr = if marker_rpr.is_empty() {
+        String::new()
+    } else {
+        format!("<w:rPr>{marker_rpr}</w:rPr>")
+    };
+    for level in 0..9_usize {
+        let step = u32::try_from(level.saturating_add(1)).unwrap_or(1);
+        let indent = list.indent().points() * f64::from(step);
+        let left = metrics::twips(indent + list.marker_gap().points());
+        let hanging = metrics::twips(list.marker_gap().points());
         let (format, text) = match kind {
-            NumberingKind::Bullet => ("bullet".to_owned(), "•".to_owned()),
+            NumberingKind::Bullet => (
+                "bullet".to_owned(),
+                xml::escape_attribute(list.bullet(level)),
+            ),
             NumberingKind::Decimal => (
-                "decimal".to_owned(),
-                format!("%{}.", level.saturating_add(1)),
+                list.numbering_format(level).ooxml_code().to_owned(),
+                format!(
+                    "%{}{}",
+                    level.saturating_add(1),
+                    xml::escape_attribute(list.suffix())
+                ),
             ),
         };
         xml::push_fmt(
             output,
             format_args!(
-                "<w:lvl w:ilvl=\"{level}\"><w:start w:val=\"1\"/><w:numFmt w:val=\"{format}\"/><w:lvlText w:val=\"{text}\"/><w:lvlJc w:val=\"left\"/><w:pPr><w:ind w:left=\"{indent}\" w:hanging=\"360\"/></w:pPr></w:lvl>"
+                "<w:lvl w:ilvl=\"{level}\"><w:start w:val=\"1\"/><w:numFmt w:val=\"{format}\"/><w:lvlText w:val=\"{text}\"/><w:lvlJc w:val=\"left\"/><w:pPr><w:ind w:left=\"{left}\" w:hanging=\"{hanging}\"/></w:pPr>{marker_rpr}</w:lvl>"
             ),
         );
     }
@@ -103,7 +124,7 @@ mod tests {
 
     #[test]
     fn an_empty_numbering_has_only_the_abstract_definitions() {
-        let xml = Numbering::new().xml();
+        let xml = Numbering::new().xml(&Template::embedded().expect("the embedded template"));
 
         assert!(xml.contains("w:abstractNumId=\"0\""));
         assert!(!xml.contains("<w:num "));
@@ -116,7 +137,7 @@ mod tests {
         let second = numbering.add(NumberingKind::Decimal, 3, 1);
 
         assert_eq!((first, second), (1, 2));
-        let xml = numbering.xml();
+        let xml = numbering.xml(&Template::embedded().expect("the embedded template"));
         assert!(xml.contains("<w:num w:numId=\"2\"><w:abstractNumId w:val=\"1\"/>"));
         assert!(xml.contains("<w:lvlOverride w:ilvl=\"1\"><w:startOverride w:val=\"3\"/>"));
     }

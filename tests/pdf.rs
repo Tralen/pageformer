@@ -158,20 +158,20 @@ fn running_content_tables_and_page_breaks_render() {
     let document = markdown::parse(source).expect("the document must parse");
     let template = Template::from_yaml(
         r##"
-version: "0.5"
+version: "0.6"
 page:
   header:
     left: "{title}"
     right: "Página {page} de {pages}"
   footer:
     center: "{author}"
-table:
-  border: 1pt
-  header_fill: "#eeeeee"
 formatting:
   heading:
     h1:
       page_break_before: true
+  table:
+    border: 1pt
+    header_fill: "#eeeeee"
 "##,
     )
     .expect("the template must be valid");
@@ -199,7 +199,7 @@ fn rules_and_heading_backgrounds_render_deterministically() {
             .expect("the document must parse");
     let template = Template::from_yaml(
         r##"
-version: "0.5"
+version: "0.6"
 formatting:
   heading:
     background: "#eeeeee"

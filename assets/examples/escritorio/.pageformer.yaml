@@ -4,7 +4,7 @@
 # directories. This file applies to Contrato.md and Embargos.md.
 # Lengths accept mm, cm, in or pt; a number without a unit is points.
 
-version: "0.5"
+version: "0.6"
 
 page:
   size: a4
@@ -48,6 +48,20 @@ formatting:
     font_families:
       - Liberation Mono
       - DejaVu Sans Mono
+  list:
+    indent: 0.6cm
+    marker_gap: 0.5cm
+    alignment: left
+    bullet:
+      - "•"
+      - "–"
+      - "◦"
+    numbering:
+      format:
+        - decimal
+        - lower-alpha
+        - lower-roman
+      suffix: "."
   heading:
     font_families:
       - Liberation Sans
@@ -71,8 +85,8 @@ formatting:
     h6:
       size: 12
 
-table:
-  border: 0.5pt
-  border_color: "#bbbbbb"
-  header_fill: "#eeeeee"
-  cell_padding: 6pt
+  table:
+    border: 0.5pt
+    border_color: "#bbbbbb"
+    header_fill: "#eeeeee"
+    cell_padding: 6pt

@@ -3,7 +3,7 @@
 # A local `.pageformer.yaml` replaces this file entirely: there is no merge.
 # The schema version is a string with the form `major.minor`.
 # Lengths accept mm, cm, in or pt; a number without a unit is points.
-version: "0.5"
+version: "0.6"
 
 page:
   size: a4
@@ -44,6 +44,23 @@ formatting:
     font_families:
       - Liberation Mono
       - DejaVu Sans Mono
+  # Lists inherit the paragraph face unless they declare their own. The marker
+  # indent, the gap and both marker sets are stated here instead of relying on
+  # a backend default.
+  list:
+    indent: 0.5cm
+    marker_gap: 0.5cm
+    alignment: left
+    bullet:
+      - "•"
+      - "–"
+      - "◦"
+    numbering:
+      format:
+        - decimal
+        - lower-alpha
+        - lower-roman
+      suffix: "."
   heading:
     font_families:
       - Liberation Sans

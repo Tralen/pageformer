@@ -89,7 +89,7 @@ A passing PDF/A run prints `PASS <path> 2b`. The tests also assert the PDF heade
 
 ## ODT packages
 
-`tests/odt.rs` unzips the package with the `zip` dev-dependency, parses every XML part with `roxmltree`, asserts that `mimetype` is first and stored, that the header fill and heading size follow the template, and that two renders are byte-identical. The same tests assert that a confidential value never reaches `meta.xml`.
+`tests/odt.rs` unzips the package with the `zip` dev-dependency, parses every XML part with `roxmltree`, asserts that `mimetype` is first and stored, that the header fill, heading size, list markers, list formats and item styles follow the template, and that two renders are byte-identical. The same tests assert that a confidential value never reaches `meta.xml`.
 
 The LibreOffice smoke test converts the examples headlessly; the conversion must succeed without repair:
 
@@ -101,7 +101,7 @@ The three examples match the PDF page counts (4, 4 and 4). Editor rendering can 
 
 ## DOCX packages
 
-`tests/docx.rs` unzips the package with the `zip` dev-dependency, parses every XML part with `roxmltree`, asserts that every required part and relationship exists, that every list has its own numbering instance with a restart, that the header row repeats, and that two renders are byte-identical. The same tests assert that a confidential value never reaches `docProps/core.xml`.
+`tests/docx.rs` unzips the package with the `zip` dev-dependency, parses every XML part with `roxmltree`, asserts that every required part and relationship exists, that every list has its own numbering instance with a restart and the template markers, formats and indents, that the header row repeats, and that two renders are byte-identical. The same tests assert that a confidential value never reaches `docProps/core.xml`.
 
 The LibreOffice smoke test converts the DOCX examples next to the ODT ones; the conversion must succeed without repair:
 

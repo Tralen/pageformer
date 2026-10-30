@@ -113,6 +113,21 @@ pub(crate) fn styles_xml(document: &Document, template: &Template) -> String {
         );
     }
 
+    let list = template.formatting().list();
+    let list_line = metrics::line_advance(face.size(), paragraph.leading());
+    let list_after =
+        metrics::paragraph_after(list.spacing().or(paragraph.spacing()), paragraph.leading());
+    let list_rpr = rpr(partial_properties(Some(list.text()), None, false));
+    xml::push_fmt(
+        &mut output,
+        format_args!(
+            "<w:style w:type=\"paragraph\" w:styleId=\"ListParagraph\"><w:name w:val=\"List Paragraph\"/><w:basedOn w:val=\"Normal\"/><w:pPr>{spacing}{shading}<w:jc w:val=\"{align}\"/></w:pPr>{list_rpr}</w:style>\n",
+            spacing = spacing(list_line, list_after),
+            shading = shading(list.text().background()),
+            align = alignment(list.alignment()),
+        ),
+    );
+
     let quote = template.formatting().quote();
     let quote_rpr = rpr(partial_properties(Some(quote.text()), None, false));
     xml::push_fmt(
@@ -331,7 +346,7 @@ mod tests {
     #[test]
     fn the_normal_style_carries_the_template_face_and_spacing() {
         let template = Template::from_yaml(
-            "version: \"0.5\"\nformatting:\n  paragraph:\n    size: 12\n    leading: 8\n    spacing: 24\n",
+            "version: \"0.6\"\nformatting:\n  paragraph:\n    size: 12\n    leading: 8\n    spacing: 24\n",
         )
         .expect("the template must be valid");
         let styles = styles_xml(&Document::new(Metadata::default(), Vec::new()), &template);

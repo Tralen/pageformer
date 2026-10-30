@@ -4,6 +4,13 @@
 
 *Major updates and feature releases.*
 
+### 0.27.0
+
+- Added `formatting.list`, which styles list item text (face, foreground, background and alignment), the marker indent and gap, per-level bullet characters, per-level numbering formats with a suffix, and the spacing between loose items. Markers and formats cycle by nesting depth, so the template declares the order instead of relying on a backend default.
+- The PDF maps the list style to `#set list` and `#set enum`, and a tight item fill merges with its neighbours the way the office paragraph shading does. ODT uses `ListItem` and `ListLooseItem` plus level data in `list_styles`; DOCX uses `ListParagraph` and the abstract numbering levels.
+- Bumped the template schema to 0.6 and moved `table` under `formatting.table`, so every presentation section lives under `formatting`. A 0.5 template is rejected instead of being read with the old path.
+- The technical example now has nested bullet and ordered lists, and both example templates declare their list style. Regenerates the four formats; the PDFs stay deterministic, pass veraPDF as PDF/A-2b and keep their page counts.
+
 ### 0.26.1
 
 - Links are underlined only when the template declares `underline: true`; the default is now `false`, so the default and example templates state the underline explicitly and no backend supplies a hidden one.

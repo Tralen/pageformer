@@ -8,11 +8,11 @@ use std::collections::BTreeMap;
 use std::fmt::Write;
 
 use crate::document::{
-    Block, CodeBlock, ColumnAlignment, Document, Inline, Language, List, ListStart, QuoteKind,
-    Table, TaskState,
+    Block, CodeBlock, ColumnAlignment, Document, Inline, Language, List, ListItem, ListStart,
+    QuoteKind, Table, TaskState,
 };
 use crate::template::{
-    BlockStyle, Color, HeadingStyle, InlineStyle, Length, LinkStyle, ParagraphAlignment,
+    BlockStyle, Color, HeadingStyle, InlineStyle, Length, LinkStyle, ListStyle, ParagraphAlignment,
     PartialTextStyle, RuleStyle, RunningText, TableStyle, Template, TextFace, is_lowercase_token,
 };
 
@@ -37,6 +37,10 @@ struct SourceBuilder<'a> {
     assets: &'a AssetMap,
     table: &'a TableStyle,
     rule: &'a RuleStyle,
+    list: &'a ListStyle,
+    list_fill: Option<Color>,
+    list_fill_padding: f64,
+    list_fill_outset: f64,
     paragraph_fill: Option<Color>,
     paragraph_spacing: String,
     nested: bool,
@@ -48,11 +52,24 @@ impl<'a> SourceBuilder<'a> {
     fn new(document: &Document, template: &'a Template, assets: &'a AssetMap) -> Self {
         let mut footnotes = BTreeMap::new();
         collect_footnotes(document.blocks(), &mut footnotes);
+        let list = template.formatting().list();
+        let list_fill = list.text().background();
+        let list_fill_padding = list
+            .text()
+            .size()
+            .unwrap_or_else(|| template.formatting().paragraph().face().size())
+            .points()
+            * FILL_PADDING;
+        let list_fill_outset = template.formatting().paragraph().leading().points();
         Self {
             output: String::new(),
             assets,
             table: template.table(),
             rule: template.formatting().rule(),
+            list,
+            list_fill,
+            list_fill_padding,
+            list_fill_outset,
             paragraph_fill: template.formatting().paragraph().background(),
             paragraph_spacing: template
                 .formatting()
@@ -178,6 +195,7 @@ impl<'a> SourceBuilder<'a> {
         self.link_style(paragraph.link());
         self.block_style("quote.where(block: true)", template.formatting().quote());
         self.block_style("raw.where(block: true)", template.formatting().code_block());
+        self.list_style(template.formatting().list());
         self.output.push('\n');
     }
 
@@ -191,6 +209,37 @@ impl<'a> SourceBuilder<'a> {
                 background.hex()
             );
         }
+    }
+
+    /// Applies the list text face, alignment, marker layout, bullets and the
+    /// numbering pattern to both list kinds.
+    fn list_style(&mut self, list: &ListStyle) {
+        self.text_partial("list.item", list.text());
+        self.text_partial("enum.item", list.text());
+        let justify = matches!(list.alignment(), ParagraphAlignment::Justified);
+        let _ = writeln!(self.output, "#show list.item: set par(justify: {justify})");
+        let _ = writeln!(self.output, "#show enum.item: set par(justify: {justify})");
+        let indent = typst_length(list.indent());
+        let body_indent = typst_length(list.marker_gap());
+        let mut markers = String::from("(");
+        for bullet in list.bullets() {
+            let _ = write!(markers, "[{}], ", escape_markup(bullet));
+        }
+        markers.push(')');
+        let _ = writeln!(
+            self.output,
+            "#set list(indent: {indent}, body-indent: {body_indent}, marker: {markers})"
+        );
+        let mut pattern = String::new();
+        for depth in 0..10 {
+            pattern.push(list.numbering_format(depth).typst_symbol());
+            pattern.push_str(list.suffix());
+        }
+        let _ = writeln!(
+            self.output,
+            "#set enum(indent: {indent}, body-indent: {body_indent}, numbering: {})",
+            typst_string(&pattern)
+        );
     }
 
     /// Applies the link decoration: the face, the optional fill, the color and
@@ -638,32 +687,88 @@ impl<'a> SourceBuilder<'a> {
         if list.items().is_empty() {
             return Ok(());
         }
+        let spacing = if list.is_tight() {
+            String::new()
+        } else {
+            self.list.spacing().map_or_else(String::new, |spacing| {
+                format!(", spacing: {}", typst_length(spacing))
+            })
+        };
         match list.start() {
             ListStart::Unordered => {
-                let _ = writeln!(self.output, "#list(tight: {},", list.is_tight());
+                let _ = writeln!(self.output, "#list(tight: {}{spacing},", list.is_tight());
             }
             ListStart::Ordered(start) => {
                 let _ = writeln!(
                     self.output,
-                    "#enum(tight: {}, start: {start},",
+                    "#enum(tight: {}, start: {start}{spacing},",
                     list.is_tight()
                 );
             }
         }
         let outer = std::mem::replace(&mut self.nested, true);
-        for item in list.items() {
+        let count = list.items().len();
+        for (index, item) in list.items().iter().enumerate() {
             self.output.push_str("  [");
-            match item.task() {
-                Some(TaskState::Done) => self.output.push_str("\\[x\\] "),
-                Some(TaskState::Todo) => self.output.push_str("\\[ \\] "),
-                None => {}
-            }
-            self.item_blocks(item.blocks())?;
+            let first = index == 0;
+            let last = index.saturating_add(1) == count;
+            self.item(item, list.is_tight(), first, last)?;
             self.output.push_str("],\n");
         }
         self.nested = outer;
         self.output.push(')');
         Ok(())
+    }
+
+    /// Renders one list item. A declared background fills the first paragraph
+    /// and the task marker, not the marker column or a nested list. In a tight
+    /// list the fill outgrows the item into the gap between items, so adjacent
+    /// bands meet the way the office paragraph shading does.
+    fn item(
+        &mut self,
+        item: &ListItem,
+        tight: bool,
+        first: bool,
+        last: bool,
+    ) -> Result<(), PdfError> {
+        if let Some(fill) = self.list_fill
+            && let Some(Block::Paragraph(inlines)) = item.blocks().first()
+        {
+            let outset = if tight {
+                let top = if first { 0.0 } else { self.list_fill_outset };
+                let bottom = if last { 0.0 } else { self.list_fill_outset };
+                if top > 0.0 || bottom > 0.0 {
+                    format!(", outset: (top: {top:.3}pt, bottom: {bottom:.3}pt)")
+                } else {
+                    String::new()
+                }
+            } else {
+                String::new()
+            };
+            let _ = write!(
+                self.output,
+                "#block(width: 100%, fill: rgb(\"{}\"), inset: (x: 0pt, y: {:.3}pt){outset})[",
+                fill.hex(),
+                self.list_fill_padding
+            );
+            self.task_marker(item.task());
+            self.inlines(inlines)?;
+            self.output.push(']');
+            if let Some(rest) = item.blocks().get(1..) {
+                self.blocks(rest)?;
+            }
+            return Ok(());
+        }
+        self.task_marker(item.task());
+        self.item_blocks(item.blocks())
+    }
+
+    fn task_marker(&mut self, task: Option<TaskState>) {
+        match task {
+            Some(TaskState::Done) => self.output.push_str("\\[x\\] "),
+            Some(TaskState::Todo) => self.output.push_str("\\[ \\] "),
+            None => {}
+        }
     }
 
     fn item_blocks(&mut self, blocks: &[Block]) -> Result<(), PdfError> {
@@ -937,7 +1042,7 @@ mod tests {
     use crate::template::Template;
 
     fn template() -> Template {
-        Template::from_yaml("version: \"0.5\"\n").expect("the default template")
+        Template::from_yaml("version: \"0.6\"\n").expect("the default template")
     }
 
     fn paragraph(text: &str) -> Document {
@@ -1040,7 +1145,7 @@ mod tests {
     #[test]
     fn running_content_expands_the_page_tokens() {
         let template = Template::from_yaml(
-            "version: \"0.5\"\npage:\n  header:\n    left: \"{title}\"\n    right: \"Página {page} de {pages}\"\n  footer:\n    center: \"{author}\"\n",
+            "version: \"0.6\"\npage:\n  header:\n    left: \"{title}\"\n    right: \"Página {page} de {pages}\"\n  footer:\n    center: \"{author}\"\n",
         )
         .expect("a template with running content");
         let metadata = Metadata::new(
@@ -1067,7 +1172,7 @@ mod tests {
     #[test]
     fn running_content_without_a_title_renders_an_empty_slot() {
         let template =
-            Template::from_yaml("version: \"0.5\"\npage:\n  header:\n    center: \"{title}\"\n")
+            Template::from_yaml("version: \"0.6\"\npage:\n  header:\n    center: \"{title}\"\n")
                 .expect("a template with a header");
         let document = Document::new(Metadata::default(), Vec::new());
         let source = typst_source(&document, &template, &AssetMap::new()).expect("the source");
@@ -1113,7 +1218,7 @@ mod tests {
         );
 
         let template = Template::from_yaml(
-            "version: \"0.5\"\ntable:\n  border: 1pt\n  border_color: \"#112233\"\n  header_fill: \"#eeeeee\"\n  cell_padding: 4pt\n",
+            "version: \"0.6\"\nformatting:\n  table:\n    border: 1pt\n    border_color: \"#112233\"\n    header_fill: \"#eeeeee\"\n    cell_padding: 4pt\n",
         )
         .expect("a styled template");
         let styled = typst_source(&document, &template, &AssetMap::new()).expect("the source");
@@ -1137,8 +1242,9 @@ mod tests {
         )
         .expect("a valid table");
         let document = Document::new(Metadata::default(), vec![Block::Table(table)]);
-        let template = Template::from_yaml("version: \"0.5\"\ntable:\n  border: 0\n")
-            .expect("a template without a border");
+        let template =
+            Template::from_yaml("version: \"0.6\"\nformatting:\n  table:\n    border: 0\n")
+                .expect("a template without a border");
         let source = typst_source(&document, &template, &AssetMap::new()).expect("the source");
         assert!(source.contains("stroke: none,"), "{source}");
     }
@@ -1146,7 +1252,7 @@ mod tests {
     #[test]
     fn the_page_uses_the_template_dimensions_and_margins() {
         let template = Template::from_yaml(
-            "version: \"0.5\"\npage:\n  size: a5\n  orientation: landscape\n  margins:\n    top: 10mm\n    bottom: 20mm\n    left: 30mm\n    right: 40mm\n",
+            "version: \"0.6\"\npage:\n  size: a5\n  orientation: landscape\n  margins:\n    top: 10mm\n    bottom: 20mm\n    left: 30mm\n    right: 40mm\n",
         )
         .expect("the template");
         let document = Document::new(Metadata::default(), Vec::new());
@@ -1301,7 +1407,7 @@ mod tests {
     #[test]
     fn a_link_without_an_underline_is_not_wrapped() {
         let template = Template::from_yaml(
-            "version: \"0.5\"\nformatting:\n  paragraph:\n    link:\n      underline: false\n      foreground: \"#112233\"\n",
+            "version: \"0.6\"\nformatting:\n  paragraph:\n    link:\n      underline: false\n      foreground: \"#112233\"\n",
         )
         .expect("the template");
         let document = Document::new(
@@ -1335,7 +1441,7 @@ mod tests {
     #[test]
     fn a_block_fill_pads_the_font_box_on_the_vertical_sides() {
         let template = Template::from_yaml(
-            "version: \"0.5\"\nformatting:\n  quote:\n    background: \"#eeeeee\"\n    border:\n      left: 3pt\n      color: \"#cccccc\"\n      padding: 8\n",
+            "version: \"0.6\"\nformatting:\n  quote:\n    background: \"#eeeeee\"\n    border:\n      left: 3pt\n      color: \"#cccccc\"\n      padding: 8\n",
         )
         .expect("the template");
         let document = Document::new(
@@ -1368,6 +1474,75 @@ mod tests {
         let source = source(&document, &AssetMap::new());
         assert_eq!(source.matches("#footnote[").count(), 1, "{source}");
         assert!(source.contains("\\[^a\\]"), "{source}");
+    }
+
+    #[test]
+    fn lists_take_their_markers_and_numbering_from_the_template() {
+        let template = Template::from_yaml(
+            "version: \"0.6\"\nformatting:\n  list:\n    indent: 6mm\n    marker_gap: 3mm\n    alignment: justified\n    bullet:\n      - \"*\"\n      - \"+\"\n    numbering:\n      format:\n        - upper-roman\n        - upper-alpha\n      suffix: \")\"\n    spacing: 4pt\n",
+        )
+        .expect("the template");
+        let list = List::new(
+            ListStart::Unordered,
+            vec![ListItem::new(
+                None,
+                vec![Block::Paragraph(vec![Inline::Text("Item".to_owned())])],
+            )],
+            false,
+        );
+        let document = Document::new(Metadata::default(), vec![Block::List(list)]);
+        let source = typst_source(&document, &template, &AssetMap::new()).expect("the source");
+        assert!(
+            source.contains(
+                "#set list(indent: 17.008pt, body-indent: 8.504pt, marker: ([\\*], [\\+], ))"
+            ),
+            "{source}"
+        );
+        assert!(
+            source.contains("#set enum(indent: 17.008pt, body-indent: 8.504pt, numbering: \"I)A)I)A)I)A)I)A)I)A)\")"),
+            "{source}"
+        );
+        assert!(
+            source.contains("#show list.item: set par(justify: true)"),
+            "{source}"
+        );
+        assert!(
+            source.contains("#list(tight: false, spacing: 4.000pt,"),
+            "{source}"
+        );
+    }
+
+    #[test]
+    fn a_list_fill_wraps_the_item_paragraph() {
+        let template = Template::from_yaml(
+            "version: \"0.6\"\nformatting:\n  list:\n    background: \"#eeeeee\"\n",
+        )
+        .expect("the template");
+        let item = || {
+            ListItem::new(
+                None,
+                vec![Block::Paragraph(vec![Inline::Text("Item".to_owned())])],
+            )
+        };
+        let list = List::new(ListStart::Unordered, vec![item(), item()], true);
+        let document = Document::new(Metadata::default(), vec![Block::List(list)]);
+        let source = typst_source(&document, &template, &AssetMap::new()).expect("the source");
+        assert!(
+            source.contains(
+                "#block(width: 100%, fill: rgb(\"#eeeeee\"), inset: (x: 0pt, y: 2.880pt), outset: (top: 0.000pt, bottom: 7.800pt))[Item]"
+            ),
+            "the first item fills the gap below: {source}"
+        );
+        assert!(
+            source.contains(
+                "#block(width: 100%, fill: rgb(\"#eeeeee\"), inset: (x: 0pt, y: 2.880pt), outset: (top: 7.800pt, bottom: 0.000pt))[Item]"
+            ),
+            "the last item fills the gap above: {source}"
+        );
+        assert!(
+            !source.contains("#list(tight: true, spacing:"),
+            "a tight list keeps the Markdown spacing: {source}"
+        );
     }
 
     #[test]
@@ -1411,7 +1586,7 @@ mod tests {
     #[test]
     fn paragraph_spacing_is_emitted_when_configured() {
         let template =
-            Template::from_yaml("version: \"0.5\"\nformatting:\n  paragraph:\n    spacing: 6pt\n")
+            Template::from_yaml("version: \"0.6\"\nformatting:\n  paragraph:\n    spacing: 6pt\n")
                 .expect("the template");
         let document = Document::new(
             Metadata::default(),
@@ -1433,7 +1608,7 @@ mod tests {
     #[test]
     fn leading_is_emitted_in_points() {
         let template =
-            Template::from_yaml("version: \"0.5\"\nformatting:\n  paragraph:\n    leading: 9pt\n")
+            Template::from_yaml("version: \"0.6\"\nformatting:\n  paragraph:\n    leading: 9pt\n")
                 .expect("the template");
         let document = Document::new(Metadata::default(), Vec::new());
         let source = typst_source(&document, &template, &AssetMap::new()).expect("the source");
@@ -1443,7 +1618,7 @@ mod tests {
     #[test]
     fn headings_use_the_configured_styles_and_spacing() {
         let template = Template::from_yaml(
-            "version: \"0.5\"\nformatting:\n  heading:\n    font_families:\n      - Liberation Sans\n    weight: bold\n    style: normal\n    spacing_before: 18\n    spacing_after: 6\n    h1:\n      size: 20\n    h2:\n      size: 14\n      weight: normal\n      style: italic\n",
+            "version: \"0.6\"\nformatting:\n  heading:\n    font_families:\n      - Liberation Sans\n    weight: bold\n    style: normal\n    spacing_before: 18\n    spacing_after: 6\n    h1:\n      size: 20\n    h2:\n      size: 14\n      weight: normal\n      style: italic\n",
         )
         .expect("the template");
         let document = Document::new(
@@ -1491,7 +1666,7 @@ mod tests {
         );
 
         let template = Template::from_yaml(
-            "version: \"0.5\"\nformatting:\n  heading:\n    h1:\n      page_break_before: true\n",
+            "version: \"0.6\"\nformatting:\n  heading:\n    h1:\n      page_break_before: true\n",
         )
         .expect("the template");
         let source = typst_source(&document, &template, &AssetMap::new()).expect("the source");
@@ -1510,7 +1685,7 @@ mod tests {
     #[test]
     fn a_heading_background_wraps_the_text_at_the_full_width() {
         let template = Template::from_yaml(
-            "version: \"0.5\"\nformatting:\n  heading:\n    spacing_before: 18\n    spacing_after: 6\n    h1:\n      background: \"#EEEEEE\"\n      page_break_before: true\n",
+            "version: \"0.6\"\nformatting:\n  heading:\n    spacing_before: 18\n    spacing_after: 6\n    h1:\n      background: \"#EEEEEE\"\n      page_break_before: true\n",
         )
         .expect("the template");
         let document = Document::new(
@@ -1533,7 +1708,7 @@ mod tests {
     #[test]
     fn the_fill_padding_follows_the_heading_size() {
         let template = Template::from_yaml(
-            "version: \"0.5\"\nformatting:\n  heading:\n    background: \"#eeeeee\"\n    h1:\n      size: 20\n",
+            "version: \"0.6\"\nformatting:\n  heading:\n    background: \"#eeeeee\"\n    h1:\n      size: 20\n",
         )
         .expect("the template");
         let document = Document::new(Metadata::default(), Vec::new());
@@ -1551,7 +1726,7 @@ mod tests {
     #[test]
     fn a_heading_rule_is_a_line_below_its_own_level() {
         let template = Template::from_yaml(
-            "version: \"0.5\"\nformatting:\n  heading:\n    spacing_before: 16\n    spacing_after: 6\n    h2:\n      rule:\n        thickness: 1pt\n        color: \"#112233\"\n        spacing_before: 3\n        spacing_after: 9\n",
+            "version: \"0.6\"\nformatting:\n  heading:\n    spacing_before: 16\n    spacing_after: 6\n    h2:\n      rule:\n        thickness: 1pt\n        color: \"#112233\"\n        spacing_before: 3\n        spacing_after: 9\n",
         )
         .expect("the template");
         let document = Document::new(
@@ -1578,7 +1753,7 @@ mod tests {
     #[test]
     fn a_heading_rule_without_spacing_keeps_the_heading_spacing_below() {
         let template = Template::from_yaml(
-            "version: \"0.5\"\nformatting:\n  heading:\n    spacing_after: 6\n    h1:\n      rule: {}\n",
+            "version: \"0.6\"\nformatting:\n  heading:\n    spacing_after: 6\n    h1:\n      rule: {}\n",
         )
         .expect("the template");
         let document = Document::new(
@@ -1611,7 +1786,7 @@ mod tests {
     #[test]
     fn the_thematic_break_follows_the_rule_style() {
         let template = Template::from_yaml(
-            "version: \"0.5\"\nformatting:\n  rule:\n    thickness: 1.5pt\n    color: \"#112233\"\n    spacing_before: 12\n",
+            "version: \"0.6\"\nformatting:\n  rule:\n    thickness: 1.5pt\n    color: \"#112233\"\n    spacing_before: 12\n",
         )
         .expect("the template");
         let document = Document::new(Metadata::default(), vec![Block::ThematicBreak]);
@@ -1627,7 +1802,7 @@ mod tests {
     #[test]
     fn the_foreground_reaches_the_text_styles() {
         let template = Template::from_yaml(
-            "version: \"0.5\"\nformatting:\n  paragraph:\n    foreground: \"#112233\"\n    emphasis:\n      foreground: \"#445566\"\n  heading:\n    foreground: \"#778899\"\n",
+            "version: \"0.6\"\nformatting:\n  paragraph:\n    foreground: \"#112233\"\n    emphasis:\n      foreground: \"#445566\"\n  heading:\n    foreground: \"#778899\"\n",
         )
         .expect("the template");
         let document = Document::new(Metadata::default(), Vec::new());
@@ -1649,7 +1824,7 @@ mod tests {
     #[test]
     fn a_heading_without_a_foreground_inherits_the_document_color() {
         let template = Template::from_yaml(
-            "version: \"0.5\"\nformatting:\n  paragraph:\n    foreground: \"#112233\"\n",
+            "version: \"0.6\"\nformatting:\n  paragraph:\n    foreground: \"#112233\"\n",
         )
         .expect("the template");
         let document = Document::new(
@@ -1677,7 +1852,7 @@ mod tests {
     #[test]
     fn the_paragraph_background_wraps_a_paragraph_with_its_own_spacing() {
         let template = Template::from_yaml(
-            "version: \"0.5\"\nformatting:\n  paragraph:\n    background: \"#fafafa\"\n    spacing: 12\n",
+            "version: \"0.6\"\nformatting:\n  paragraph:\n    background: \"#fafafa\"\n    spacing: 12\n",
         )
         .expect("the template");
         let source =
@@ -1693,7 +1868,7 @@ mod tests {
     #[test]
     fn a_paragraph_background_skips_quotes_and_lists() {
         let template = Template::from_yaml(
-            "version: \"0.5\"\nformatting:\n  paragraph:\n    background: \"#fafafa\"\n",
+            "version: \"0.6\"\nformatting:\n  paragraph:\n    background: \"#fafafa\"\n",
         )
         .expect("the template");
         let document = Document::new(
@@ -1727,7 +1902,7 @@ mod tests {
     #[test]
     fn a_paragraph_background_keeps_the_default_spacing() {
         let template = Template::from_yaml(
-            "version: \"0.5\"\nformatting:\n  paragraph:\n    background: \"#fafafa\"\n",
+            "version: \"0.6\"\nformatting:\n  paragraph:\n    background: \"#fafafa\"\n",
         )
         .expect("the template");
         let source =
@@ -1741,7 +1916,7 @@ mod tests {
     #[test]
     fn an_inline_background_is_a_zero_extent_highlight() {
         let template = Template::from_yaml(
-            "version: \"0.5\"\nformatting:\n  paragraph:\n    emphasis:\n      background: \"#eeeeee\"\n    strong:\n      background: navy\n",
+            "version: \"0.6\"\nformatting:\n  paragraph:\n    emphasis:\n      background: \"#eeeeee\"\n    strong:\n      background: navy\n",
         )
         .expect("the template");
         let source =
@@ -1760,7 +1935,7 @@ mod tests {
     #[test]
     fn an_inline_code_style_inherits_the_paragraph_face() {
         let template = Template::from_yaml(
-            "version: \"0.5\"\nformatting:\n  paragraph:\n    code:\n      foreground: navy\n",
+            "version: \"0.6\"\nformatting:\n  paragraph:\n    code:\n      foreground: navy\n",
         )
         .expect("the template");
         let source =
@@ -1776,7 +1951,7 @@ mod tests {
     #[test]
     fn a_partial_background_wraps_inline_content_in_a_box() {
         let template = Template::from_yaml(
-            "version: \"0.5\"\nformatting:\n  paragraph:\n    strikethrough:\n      background: \"#eeeeee\"\n",
+            "version: \"0.6\"\nformatting:\n  paragraph:\n    strikethrough:\n      background: \"#eeeeee\"\n",
         )
         .expect("the template");
         let source =
@@ -1790,7 +1965,7 @@ mod tests {
     #[test]
     fn the_quote_and_code_block_styles_reach_typst() {
         let template = Template::from_yaml(
-            "version: \"0.5\"\nformatting:\n  quote:\n    background: \"#f0f0f0\"\n  code_block:\n    font_families:\n      - Liberation Mono\n    background: \"#111111\"\n",
+            "version: \"0.6\"\nformatting:\n  quote:\n    background: \"#f0f0f0\"\n  code_block:\n    font_families:\n      - Liberation Mono\n    background: \"#111111\"\n",
         )
         .expect("the template");
         let source =
@@ -1822,7 +1997,7 @@ mod tests {
     #[test]
     fn a_block_border_emits_each_declared_side() {
         let template = Template::from_yaml(
-            "version: \"0.5\"\nformatting:\n  quote:\n    border:\n      left: 3pt\n      bottom: 0.5pt\n      color: \"#cccccc\"\n      padding: 8\n",
+            "version: \"0.6\"\nformatting:\n  quote:\n    border:\n      left: 3pt\n      bottom: 0.5pt\n      color: \"#cccccc\"\n      padding: 8\n",
         )
         .expect("the template");
         let source =
@@ -1842,7 +2017,7 @@ mod tests {
     #[test]
     fn a_block_alignment_can_be_justified() {
         let template = Template::from_yaml(
-            "version: \"0.5\"\nformatting:\n  code_block:\n    alignment: justified\n",
+            "version: \"0.6\"\nformatting:\n  code_block:\n    alignment: justified\n",
         )
         .expect("the template");
         let source =
@@ -1862,7 +2037,7 @@ mod tests {
     #[test]
     fn inline_styles_use_the_configured_faces() {
         let template = Template::from_yaml(
-            "version: \"0.5\"\nformatting:\n  paragraph:\n    font_families:\n      - Liberation Serif\n    size: 12\n    emphasis:\n      font_families:\n        - DejaVu Serif\n      weight: semibold\n    strong:\n      size: 13\n      style: italic\n",
+            "version: \"0.6\"\nformatting:\n  paragraph:\n    font_families:\n      - Liberation Serif\n    size: 12\n    emphasis:\n      font_families:\n        - DejaVu Serif\n      weight: semibold\n    strong:\n      size: 13\n      style: italic\n",
         )
         .expect("the template");
         let document = Document::new(Metadata::default(), Vec::new());

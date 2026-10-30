@@ -455,7 +455,7 @@ impl<'a> Builder<'a> {
             Some(Block::Paragraph(inlines)) => {
                 let mut runs = self.run(task, "");
                 runs.push_str(&self.runs(inlines, ""));
-                let paragraph = self.paragraph(None, &extra, &runs);
+                let paragraph = self.paragraph(Some("ListParagraph"), &extra, &runs);
                 self.document.push_str(&paragraph);
                 if let Some(rest) = item.blocks().get(1..) {
                     self.blocks(rest, depth.saturating_add(1));
@@ -464,7 +464,7 @@ impl<'a> Builder<'a> {
             _ => {
                 if !task.is_empty() {
                     let runs = self.run(task.trim_end(), "");
-                    let paragraph = self.paragraph(None, &extra, &runs);
+                    let paragraph = self.paragraph(Some("ListParagraph"), &extra, &runs);
                     self.document.push_str(&paragraph);
                 }
                 self.blocks(item.blocks(), depth.saturating_add(1));

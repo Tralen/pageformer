@@ -338,7 +338,7 @@ mod tests {
         fs::write(templates.join("letterhead.png"), b"letterhead")
             .expect("the letterhead must be written");
         let template =
-            Template::from_yaml("version: \"0.5\"\npage:\n  letterhead: letterhead.png\n")
+            Template::from_yaml("version: \"0.6\"\npage:\n  letterhead: letterhead.png\n")
                 .expect("the template must be valid");
         let document = Document::new(Metadata::default(), Vec::new());
 
@@ -351,7 +351,7 @@ mod tests {
     fn a_letterhead_without_a_template_directory_is_an_error() {
         let project = TempDir::new().expect("a temporary project");
         let template =
-            Template::from_yaml("version: \"0.5\"\npage:\n  letterhead: letterhead.png\n")
+            Template::from_yaml("version: \"0.6\"\npage:\n  letterhead: letterhead.png\n")
                 .expect("the template must be valid");
         let document = Document::new(Metadata::default(), Vec::new());
         let error = load_assets(&document, &template, project.path(), None)

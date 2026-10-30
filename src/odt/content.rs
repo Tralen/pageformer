@@ -24,8 +24,6 @@ const PREFIX: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
 <style:style style:name="Heading4Break" style:family="paragraph" style:parent-style-name="Heading4"><style:paragraph-properties fo:break-before="page"/></style:style>
 <style:style style:name="Heading5Break" style:family="paragraph" style:parent-style-name="Heading5"><style:paragraph-properties fo:break-before="page"/></style:style>
 <style:style style:name="Heading6Break" style:family="paragraph" style:parent-style-name="Heading6"><style:paragraph-properties fo:break-before="page"/></style:style>
-
-<style:style style:name="ListItem" style:family="paragraph" style:parent-style-name="Standard"><style:paragraph-properties fo:margin-bottom="0cm"/></style:style>
 "#;
 
 /// Generates the content part.
@@ -36,6 +34,7 @@ pub fn content_xml(document: &Document, template: &Template, assets: &Assets) ->
 
     let mut output = String::new();
     xml::push(&mut output, PREFIX);
+    list_item_styles(&mut output, template);
     block_styles(&mut output, template);
     cell_paragraph_styles(&mut output, template);
     horizontal_line_style(&mut output, template);
@@ -241,7 +240,7 @@ impl<'a> Builder<'a> {
     }
 
     fn item(&mut self, item: &ListItem, tight: bool) {
-        let base = if tight { "ListItem" } else { "Standard" };
+        let base = if tight { "ListItem" } else { "ListLooseItem" };
         let marker = match item.task() {
             Some(TaskState::Done) => "[x] ",
             Some(TaskState::Todo) => "[ ] ",
@@ -249,11 +248,7 @@ impl<'a> Builder<'a> {
         };
         match item.blocks().first() {
             Some(Block::Paragraph(inlines)) => {
-                let style = if self.pending_break {
-                    self.style_with_break("Standard")
-                } else {
-                    base.to_owned()
-                };
+                let style = self.style_with_break(base);
                 self.open_paragraph(&style);
                 self.text(marker);
                 self.inlines(inlines);
@@ -264,11 +259,7 @@ impl<'a> Builder<'a> {
             }
             _ => {
                 if !marker.is_empty() {
-                    let style = if self.pending_break {
-                        self.style_with_break("Standard")
-                    } else {
-                        base.to_owned()
-                    };
+                    let style = self.style_with_break(base);
                     self.paragraph_with(&style, &[Inline::Text(marker.trim_end().to_owned())]);
                 }
                 self.blocks(item.blocks());
@@ -557,6 +548,32 @@ fn cell_paragraph_styles(output: &mut String, template: &Template) {
             ),
         );
     }
+}
+
+/// The list item styles, with the face, color, fill and alignment of the template.
+fn list_item_styles(output: &mut String, template: &Template) {
+    let list = template.formatting().list();
+    let text = partial_properties(Some(list.text()), None);
+    let text = if text.is_empty() {
+        String::new()
+    } else {
+        format!("<style:text-properties {text}/>")
+    };
+    let background = background_attribute(list.text().background());
+    let align = alignment(list.alignment());
+    let loose_margin = list.spacing().map_or_else(String::new, |spacing| {
+        let after = crate::metrics::paragraph_after(
+            Some(spacing),
+            template.formatting().paragraph().leading(),
+        );
+        format!(" fo:margin-bottom=\"{}\"", xml::points_value(after))
+    });
+    xml::push_fmt(
+        output,
+        format_args!(
+            "<style:style style:name=\"ListItem\" style:family=\"paragraph\" style:parent-style-name=\"Standard\"><style:paragraph-properties fo:text-align=\"{align}\" fo:margin-bottom=\"0cm\"{background}/>{text}</style:style>\n<style:style style:name=\"ListLooseItem\" style:family=\"paragraph\" style:parent-style-name=\"Standard\"><style:paragraph-properties fo:text-align=\"{align}\"{loose_margin}{background}/>{text}</style:style>\n<style:style style:name=\"ListItemBreak\" style:family=\"paragraph\" style:parent-style-name=\"ListItem\"><style:paragraph-properties fo:break-before=\"page\"/></style:style>\n<style:style style:name=\"ListLooseItemBreak\" style:family=\"paragraph\" style:parent-style-name=\"ListLooseItem\"><style:paragraph-properties fo:break-before=\"page\"/></style:style>\n"
+        ),
+    );
 }
 
 /// The code and quote paragraph styles, patched by the template where it declares one.

@@ -19,7 +19,7 @@ Paths written in the template, such as the letterhead image, resolve relative to
 ## Schema
 
 ```yaml
-version: "0.5"
+version: "0.6"
 
 page:
   size: a4
@@ -75,6 +75,23 @@ formatting:
       bottom: 0.5pt
       color: "#bbbbbb"
       padding: 6
+  list:
+    foreground: "#222222"
+    background: "#f7f7f7"
+    alignment: left
+    indent: 0.6cm
+    marker_gap: 0.5cm
+    bullet:
+      - "•"
+      - "–"
+      - "◦"
+    numbering:
+      format:
+        - decimal
+        - lower-alpha
+        - lower-roman
+      suffix: "."
+    spacing: 6pt
   heading:
     font_families:
       - Linux Biolinum O
@@ -116,19 +133,18 @@ formatting:
     color: "#888888"
     spacing_before: 12
     spacing_after: 12
-
-table:
-  border: 0.5pt
-  border_color: "#bbbbbb"
-  header_fill: "#eeeeee"
-  cell_padding: 6pt
+  table:
+    border: 0.5pt
+    border_color: "#bbbbbb"
+    header_fill: "#eeeeee"
+    cell_padding: 6pt
 ```
 
 Every section and every key is optional except `version`. Missing keys take the defaults described below, but an unknown key is an error, so a typo never changes the layout silently.
 
 ### `version`
 
-The schema version is a string in the form `major.minor`, quoted so YAML cannot turn it into a float. This build accepts `"0.5"` and rejects every other value. Version 0.5 replaced the `text` section with `formatting`, made `paragraph` and `heading` explicit, added `weight` and `style`, and added the `emphasis` and `strong` inline overrides. The optional `page.header`, `page.footer`, `table` and `formatting.paragraph.link` sections and the frontmatter `date`, `subject` and `keywords` were added inside version 0.5, because omitting them keeps a valid template.
+The schema version is a string in the form `major.minor`, quoted so YAML cannot turn it into a float. This build accepts `"0.6"` and rejects every other value. Version 0.5 replaced the `text` section with `formatting`, made `paragraph` and `heading` explicit, added `weight` and `style`, and added the `emphasis` and `strong` inline overrides. The optional `page.header`, `page.footer` and `formatting.paragraph.link` sections and the frontmatter `date`, `subject` and `keywords` were added inside version 0.5. Version 0.6 added `formatting.list` and moved `table` under `formatting`, so one section owns every presentation field; a template written for 0.5 is rejected instead of being read with the old path.
 
 ### Document metadata
 
@@ -246,6 +262,26 @@ Block quotes and fenced code blocks are paragraphs with their own style, outside
 
 The recipe for the usual vertical quote rule is `border: { left: 3pt, color: "#cccccc", padding: 8 }`.
 
+### `formatting.list`
+
+List items are paragraphs with their own style. The section accepts `font_families`, `size`, `weight`, `style`, `foreground`, `background` and `alignment`, all inherited from `paragraph` when undeclared. `alignment` defaults to `left`, as for quotes and code blocks.
+
+The layout keys are:
+
+- `indent`: the marker indent, added again at each nesting level. The default is `0.5cm`.
+- `marker_gap`: the gap between the marker and the item text. The default is `0.5cm`. The PDF measures it after the marker, ODT reserves it as the label width and DOCX uses it as the hanging indent, so a wide marker can shift the text slightly differently in each engine.
+- `spacing`: the space between loose items, as a length. It follows the same convention as `paragraph.spacing`, so the three formats keep the same distance. When omitted, a loose list keeps the paragraph spacing. A tight list ignores it.
+
+The markers are declared as lists and cycled by nesting depth, so a two-entry list never depends on a hidden per-level multiplier:
+
+- `bullet`: a non-empty list of short strings for unordered lists. The default is `•`, `–`, `◦`.
+- `numbering.format`: a non-empty list of `decimal`, `lower-alpha`, `upper-alpha`, `lower-roman` or `upper-roman` for ordered lists. The default is `decimal`, `lower-alpha`, `lower-roman`.
+- `numbering.suffix`: the text after the number, such as `.` or `)`. It may be empty. The default is `.`.
+
+For example, `format: [decimal, lower-alpha]` and `suffix: "."` render `1.`, `2.` at the first level and `a.`, `b.` inside it. A third level cycles back to `1.` when only two formats are declared. Bullets follow the same rule: with `["•", "–"]`, the third level uses `•` again.
+
+`background` fills the first paragraph of each item. A later paragraph inside the same item keeps the normal body background. In a tight list, adjacent item fills meet, so the list reads as one band; in a loose list, `spacing` stays visible between the bands. The PDF starts a new band for a nested list, so a hairline can remain between a parent item and its nested list, while ODT and DOCX shade the paragraphs continuously.
+
 ### `formatting.rule`
 
 The thematic break, written as `---`, `***` or `___` in the Markdown body, is drawn as a horizontal rule across the text width. The same keys declare the rule under a heading level, in `formatting.heading.h1` to `h6`, and every format reads them the same way:
@@ -256,9 +292,9 @@ The thematic break, written as `---`, `***` or `___` in the Markdown body, is dr
 
 Under `formatting.heading.h1` to `h6`, the same map declares the rule below a heading, and it also accepts `none` to clear a rule inherited from the base heading map.
 
-### `table`
+### `formatting.table`
 
-The `table` section styles every table in the document:
+The `formatting.table` section styles every table in the document:
 
 - `border`: the border thickness as a length. The default is `0.5pt`; `0` removes the borders.
 - `border_color`: a color, as written below. The default is `#bbbbbb`.
@@ -297,7 +333,7 @@ Images in the Markdown body resolve relative to the Markdown file, not to the te
 
 ## Current backend
 
-Every format reads the text colors: the body, the headings, emphasis, strong, code, strikethrough and links. TXT has no color and ignores them. The PDF backend applies the paragraph face, leading, spacing and alignment. It emits one show rule per heading level with the resolved font, size, weight, style and spacing, show rules for `emph`, `strong`, `code` and `strike` from the inline overrides, and a `link` rule that carries the face, color, fill and underline. The ODT and DOCX writers map the same keys to their character styles. A level with `page_break_before` also gets a weak page-break show rule. The backend draws the running header and footer, expands their tokens, applies the table style and explicit page breaks, and writes the frontmatter title, author, subject, keywords, language and date into the PDF metadata. The thematic break follows `formatting.rule`. A heading background and a heading rule are drawn as one block: the fill wraps the text across the full width with a vertical padding of 0.24 of the heading size, so the fill does not hug the glyphs, and the rule sits below it. A quote or code block fill uses the same vertical padding, unless a top or bottom border already declares a larger padding for that side. Typst measures a zero-inset block by its cap height and baseline, while the DOCX fill covers the font's line box, so the padding makes up the difference; the DOCX fill is the reference for the other formats.
+Every format reads the text colors: the body, the headings, emphasis, strong, code, strikethrough and links. TXT has no color and ignores them. The PDF backend applies the paragraph face, leading, spacing and alignment. It emits one show rule per heading level with the resolved font, size, weight, style and spacing, show rules for `emph`, `strong`, `code` and `strike` from the inline overrides, and a `link` rule that carries the face, color, fill and underline. The ODT and DOCX writers map the same keys to their character styles. A level with `page_break_before` also gets a weak page-break show rule. List markers and numbering become `#set list` and `#set enum` rules, and each item paragraph takes the list face, color, fill and alignment. The backend draws the running header and footer, expands their tokens, applies the table style and explicit page breaks, and writes the frontmatter title, author, subject, keywords, language and date into the PDF metadata. The thematic break follows `formatting.rule`. A heading background and a heading rule are drawn as one block: the fill wraps the text across the full width with a vertical padding of 0.24 of the heading size, so the fill does not hug the glyphs, and the rule sits below it. A quote or code block fill uses the same vertical padding, unless a top or bottom border already declares a larger padding for that side. Typst measures a zero-inset block by its cap height and baseline, while the DOCX fill covers the font's line box, so the padding makes up the difference; the DOCX fill is the reference for the other formats.
 
 ## Example
 
@@ -307,7 +343,7 @@ Every format reads the text colors: the body, the headings, emphasis, strong, co
 pageformer --confidential-file assets/examples/confidencial/embargos.ini --output assets/examples/publicacao assets/examples/escritorio/
 ```
 
-The embargos declares confidential fields, so the command names the fictional values file and writes outside the source tree. `assets/examples/tecnico/.pageformer.yaml` is a second example, in a nested directory. It replaces the shared template for `Relatorio.md`, has no letterhead and demonstrates every running slot, the footer, the table style, a page break, a solid bar behind the level-one headings and a rule below the level-two headings. The rule is declared once on the base heading map and cleared on `h1`, where the bar replaces it:
+The embargos declares confidential fields, so the command names the fictional values file and writes outside the source tree. `assets/examples/tecnico/.pageformer.yaml` is a second example, in a nested directory. It replaces the shared template for `Relatorio.md`, has no letterhead and demonstrates every running slot, the footer, the table style under `formatting.table`, the list markers and numbering including a nested list, a page break, a solid bar behind the level-one headings and a rule below the level-two headings. The rule is declared once on the base heading map and cleared on `h1`, where the bar replaces it:
 
 ```sh
 pageformer assets/examples/tecnico/Relatorio.md
@@ -317,4 +353,4 @@ To use the same settings elsewhere, copy the file to the document directory as `
 
 ## Errors
 
-The template is validated before any document is rendered. A YAML syntax error, an unknown key, an unsupported version, a rejected weight, an unknown style, an invalid color, an unknown lowercase running token, a confidential field in running content, a negative spacing, a zero rule thickness or a missing font family all stop the run with a diagnostic. The YAML parser reports the line and the column, and the loader adds the template path.
+The template is validated before any document is rendered. A YAML syntax error, an unknown key, an unsupported version, a rejected weight, an unknown style, an invalid color, an unknown lowercase running token, a confidential field in running content, a negative spacing, a zero rule thickness, a missing font family, an empty bullet or numbering list or an unknown numbering format all stop the run with a diagnostic. The YAML parser reports the line and the column, and the loader adds the template path.

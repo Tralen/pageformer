@@ -185,7 +185,7 @@ fn a_template_change_is_visible_in_the_styles() {
     );
     let template = Template::from_yaml(
         r##"
-version: "0.5"
+version: "0.6"
 formatting:
   paragraph:
     size: 13
@@ -193,9 +193,9 @@ formatting:
   heading:
     h1:
       size: 27
-table:
-  header_fill: "#123456"
-  border: 2pt
+  table:
+    header_fill: "#123456"
+    border: 2pt
 "##,
     )
     .expect("the template must be valid");
@@ -214,7 +214,7 @@ fn a_rule_and_a_heading_background_follow_the_template() {
         markdown::parse("# Título\n\nTexto.\n\n---\n\nDepois.\n").expect("the document must parse");
     let template = Template::from_yaml(
         r##"
-version: "0.5"
+version: "0.6"
 formatting:
   heading:
     background: "#EEEEEE"
@@ -249,7 +249,7 @@ fn the_foreground_reaches_the_styles_and_the_runs() {
         .expect("the document must parse");
     let template = Template::from_yaml(
         r##"
-version: "0.5"
+version: "0.6"
 formatting:
   paragraph:
     foreground: "#112233"
@@ -297,7 +297,7 @@ fn the_paragraph_and_block_styles_reach_the_package() {
     .expect("the document must parse");
     let template = Template::from_yaml(
         r##"
-version: "0.5"
+version: "0.6"
 formatting:
   paragraph:
     background: "#fafafa"
@@ -382,7 +382,7 @@ fn a_heading_rule_is_a_bottom_border_of_its_level() {
     let document = markdown::parse("## Escopo\n\nTexto.\n").expect("the document must parse");
     let template = Template::from_yaml(
         r##"
-version: "0.5"
+version: "0.6"
 formatting:
   heading:
     h2:
@@ -428,6 +428,73 @@ fn two_lists_get_their_own_numbering_and_a_restart() {
 }
 
 #[test]
+fn lists_take_their_markers_layout_and_text_from_the_template() {
+    let document = markdown::parse("- Um\n    - Dois\n\n- Três\n\n1. Primeiro\n    1. Interno\n")
+        .expect("the document must parse");
+    let template = Template::from_yaml(
+        r##"
+version: "0.6"
+formatting:
+  list:
+    foreground: "#112233"
+    background: "#eeeeee"
+    alignment: justified
+    indent: 6mm
+    marker_gap: 3mm
+    bullet:
+      - "*"
+      - "+"
+    numbering:
+      format:
+        - upper-roman
+        - upper-alpha
+      suffix: ")"
+    spacing: 12pt
+"##,
+    )
+    .expect("the template must be valid");
+
+    let bytes = docx::render(&document, &template, &Assets::default()).expect("the package");
+    let mut archive = ZipArchive::new(Cursor::new(bytes)).expect("the package must be a ZIP");
+    let numbering = entry(&mut archive, "word/numbering.xml");
+    let styles = entry(&mut archive, "word/styles.xml");
+    let content = entry(&mut archive, "word/document.xml");
+
+    assert!(
+        numbering.contains("<w:lvlText w:val=\"*\"/>")
+            && numbering.contains("<w:lvlText w:val=\"+\"/>"),
+        "the bullets follow the template: {numbering}"
+    );
+    assert!(
+        numbering.contains("<w:numFmt w:val=\"upperRoman\"/>")
+            && numbering.contains("<w:lvlText w:val=\"%1)\"/>")
+            && numbering.contains("<w:numFmt w:val=\"upperLetter\"/>")
+            && numbering.contains("<w:lvlText w:val=\"%2)\"/>"),
+        "the ordered levels use the template formats and suffix: {numbering}"
+    );
+    assert!(
+        numbering.contains("<w:ind w:left=\"510\" w:hanging=\"170\"/>")
+            && numbering.contains("<w:ind w:left=\"850\" w:hanging=\"170\"/>"),
+        "the levels use the template indent and gap: {numbering}"
+    );
+    assert!(
+        numbering.contains("<w:color w:val=\"112233\"/>"),
+        "the marker inherits the list color: {numbering}"
+    );
+    assert!(
+        styles.contains("w:styleId=\"ListParagraph\"")
+            && styles.contains("<w:shd w:val=\"clear\" w:color=\"auto\" w:fill=\"eeeeee\"/>")
+            && styles.contains("<w:jc w:val=\"both\"/>")
+            && styles.contains("<w:spacing w:after=\"84\""),
+        "the list paragraph follows the template: {styles}"
+    );
+    assert!(
+        content.contains("<w:pStyle w:val=\"ListParagraph\"/>"),
+        "every list item uses the list paragraph style: {content}"
+    );
+}
+
+#[test]
 fn footnotes_and_links_are_packaged() {
     let source = "Texto[^1] e [site](https://example.org).\n\n[^1]: Nota.\n";
     let document = markdown::parse(source).expect("the document must parse");
@@ -460,7 +527,7 @@ fn links_take_the_template_style() {
         markdown::parse("Veja [o site](https://example.org).\n").expect("the document must parse");
     let template = Template::from_yaml(
         r##"
-version: "0.5"
+version: "0.6"
 formatting:
   paragraph:
     link:

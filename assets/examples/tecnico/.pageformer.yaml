@@ -4,7 +4,7 @@
 # parent folder. Without a letterhead, both margins are free for the running
 # header and footer.
 
-version: "0.5"
+version: "0.6"
 
 page:
   size: a4
@@ -59,6 +59,20 @@ formatting:
       bottom: 0.5pt
       color: "#999999"
       padding: 6
+  list:
+    indent: 0.7cm
+    marker_gap: 0.5cm
+    alignment: left
+    foreground: "#334455"
+    background: "#f5f7fa"
+    bullet:
+      - "•"
+      - "–"
+    numbering:
+      format:
+        - decimal
+        - lower-alpha
+      suffix: "."
   heading:
     font_families:
       - Liberation Sans
@@ -89,8 +103,8 @@ formatting:
       spacing_before: 12
       spacing_after: 4
 
-table:
-  border: 0.5pt
-  border_color: "#336699"
-  header_fill: "#e8eef5"
-  cell_padding: 6pt
+  table:
+    border: 0.5pt
+    border_color: "#336699"
+    header_fill: "#e8eef5"
+    cell_padding: 6pt

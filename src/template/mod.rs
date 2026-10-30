@@ -15,7 +15,7 @@ use serde::de::{self, Deserializer, MapAccess, Unexpected, Visitor};
 const MM_TO_POINTS: f64 = 72.0 / 25.4;
 
 /// The current schema version. A template for another version is rejected.
-pub const CURRENT_SCHEMA_VERSION: SchemaVersion = SchemaVersion { major: 0, minor: 5 };
+pub const CURRENT_SCHEMA_VERSION: SchemaVersion = SchemaVersion { major: 0, minor: 6 };
 
 const DEFAULT_MARGIN: Length = Length(20.0 * MM_TO_POINTS);
 const DEFAULT_FONT_SIZE: Length = Length(12.0);
@@ -28,6 +28,8 @@ const DEFAULT_TABLE_COLOR: Color = Color {
 };
 const DEFAULT_TABLE_PADDING: Length = Length(6.0);
 const DEFAULT_RULE_THICKNESS: Length = Length(0.5);
+const DEFAULT_LIST_INDENT: Length = Length(14.173_228_346_456_7);
+const DEFAULT_LIST_MARKER_GAP: Length = Length(14.173_228_346_456_7);
 const DEFAULT_RULE_COLOR: Color = Color {
     red: 0x00,
     green: 0x00,
@@ -64,7 +66,6 @@ pub struct Template {
     version: SchemaVersion,
     page: Page,
     formatting: Formatting,
-    table: TableStyle,
 }
 
 impl Template {
@@ -102,7 +103,6 @@ impl Template {
             version: SchemaVersion::CURRENT,
             page: convert_page(raw.page)?,
             formatting: convert_formatting(raw.formatting)?,
-            table: convert_table(raw.table)?,
         })
     }
 
@@ -119,7 +119,7 @@ impl Template {
     }
 
     pub fn table(&self) -> &TableStyle {
-        &self.table
+        self.formatting.table()
     }
 }
 
@@ -1421,15 +1421,20 @@ pub struct Formatting {
     rule: RuleStyle,
     quote: BlockStyle,
     code_block: BlockStyle,
+    list: ListStyle,
+    table: TableStyle,
 }
 
 impl Formatting {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         paragraph: ParagraphStyle,
         heading: HeadingStyles,
         rule: RuleStyle,
         quote: BlockStyle,
         code_block: BlockStyle,
+        list: ListStyle,
+        table: TableStyle,
     ) -> Self {
         Self {
             paragraph,
@@ -1437,6 +1442,8 @@ impl Formatting {
             rule,
             quote,
             code_block,
+            list,
+            table,
         }
     }
 
@@ -1460,6 +1467,175 @@ impl Formatting {
 
     pub fn rule(&self) -> &RuleStyle {
         &self.rule
+    }
+
+    /// The list style; undeclared text keys inherit the paragraph face.
+    pub fn list(&self) -> &ListStyle {
+        &self.list
+    }
+
+    /// The table style, now part of the formatting section.
+    pub fn table(&self) -> &TableStyle {
+        &self.table
+    }
+}
+
+/// The numbering format of an ordered list level.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum NumberingFormat {
+    Decimal,
+    LowerAlpha,
+    UpperAlpha,
+    LowerRoman,
+    UpperRoman,
+}
+
+impl NumberingFormat {
+    /// The ODF `style:num-format` value.
+    pub fn odf_code(self) -> &'static str {
+        match self {
+            Self::Decimal => "1",
+            Self::LowerAlpha => "a",
+            Self::UpperAlpha => "A",
+            Self::LowerRoman => "i",
+            Self::UpperRoman => "I",
+        }
+    }
+
+    /// The OOXML `w:numFmt` value.
+    pub fn ooxml_code(self) -> &'static str {
+        match self {
+            Self::Decimal => "decimal",
+            Self::LowerAlpha => "lowerLetter",
+            Self::UpperAlpha => "upperLetter",
+            Self::LowerRoman => "lowerRoman",
+            Self::UpperRoman => "upperRoman",
+        }
+    }
+
+    /// The Typst numbering symbol.
+    pub fn typst_symbol(self) -> char {
+        match self {
+            Self::Decimal => '1',
+            Self::LowerAlpha => 'a',
+            Self::UpperAlpha => 'A',
+            Self::LowerRoman => 'i',
+            Self::UpperRoman => 'I',
+        }
+    }
+}
+
+/// The list style: item text, marker layout and numbering.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ListStyle {
+    text: PartialTextStyle,
+    alignment: ParagraphAlignment,
+    indent: Length,
+    marker_gap: Length,
+    bullets: Vec<String>,
+    numbering: Vec<NumberingFormat>,
+    suffix: String,
+    spacing: Option<Length>,
+}
+
+impl ListStyle {
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        text: PartialTextStyle,
+        alignment: ParagraphAlignment,
+        indent: Length,
+        marker_gap: Length,
+        bullets: Vec<String>,
+        numbering: Vec<NumberingFormat>,
+        suffix: String,
+        spacing: Option<Length>,
+    ) -> Result<Self, ValueError> {
+        if bullets.iter().any(|bullet| bullet.trim().is_empty()) {
+            return Err(ValueError::EmptyText);
+        }
+        if bullets.is_empty() || numbering.is_empty() {
+            return Err(ValueError::EmptyList);
+        }
+        Ok(Self {
+            text,
+            alignment,
+            indent,
+            marker_gap,
+            bullets,
+            numbering,
+            suffix,
+            spacing,
+        })
+    }
+
+    pub fn text(&self) -> &PartialTextStyle {
+        &self.text
+    }
+
+    pub fn alignment(&self) -> ParagraphAlignment {
+        self.alignment
+    }
+
+    /// The marker indent, added per nesting level.
+    pub fn indent(&self) -> Length {
+        self.indent
+    }
+
+    /// The gap between the marker and the item text.
+    pub fn marker_gap(&self) -> Length {
+        self.marker_gap
+    }
+
+    pub fn bullets(&self) -> &[String] {
+        &self.bullets
+    }
+
+    /// The bullet character for a nesting depth, cycled from the declared list.
+    pub fn bullet(&self, depth: usize) -> &str {
+        self.bullets
+            .get(depth % self.bullets.len())
+            .map_or("", String::as_str)
+    }
+
+    pub fn numbering(&self) -> &[NumberingFormat] {
+        &self.numbering
+    }
+
+    /// The numbering format for a nesting depth, cycled from the declared list.
+    pub fn numbering_format(&self, depth: usize) -> NumberingFormat {
+        self.numbering
+            .get(depth % self.numbering.len())
+            .copied()
+            .unwrap_or(NumberingFormat::Decimal)
+    }
+
+    pub fn suffix(&self) -> &str {
+        &self.suffix
+    }
+
+    /// The spacing between loose items; undeclared keeps the paragraph spacing.
+    pub fn spacing(&self) -> Option<Length> {
+        self.spacing
+    }
+}
+
+impl Default for ListStyle {
+    fn default() -> Self {
+        Self {
+            text: PartialTextStyle::default(),
+            alignment: ParagraphAlignment::Left,
+            indent: DEFAULT_LIST_INDENT,
+            marker_gap: DEFAULT_LIST_MARKER_GAP,
+            bullets: vec!["•".to_owned(), "–".to_owned(), "◦".to_owned()],
+            numbering: vec![
+                NumberingFormat::Decimal,
+                NumberingFormat::LowerAlpha,
+                NumberingFormat::LowerRoman,
+            ],
+            suffix: ".".to_owned(),
+            spacing: None,
+        }
     }
 }
 
@@ -1559,7 +1735,6 @@ struct RawTemplate {
     page: RawPage,
     #[serde(default)]
     formatting: RawFormatting,
-    table: Option<RawTable>,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -1598,6 +1773,32 @@ struct RawFormatting {
     rule: Option<RawRule>,
     quote: Option<RawBlockStyle>,
     code_block: Option<RawBlockStyle>,
+    list: Option<RawListStyle>,
+    table: Option<RawTable>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawListStyle {
+    font_families: Option<Vec<String>>,
+    size: Option<String>,
+    weight: Option<String>,
+    style: Option<FontSlant>,
+    foreground: Option<String>,
+    background: Option<String>,
+    alignment: Option<ParagraphAlignment>,
+    indent: Option<String>,
+    marker_gap: Option<String>,
+    bullet: Option<Vec<String>>,
+    numbering: Option<RawListNumbering>,
+    spacing: Option<String>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawListNumbering {
+    format: Option<Vec<NumberingFormat>>,
+    suffix: Option<String>,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -1820,7 +2021,67 @@ fn convert_formatting(raw: RawFormatting) -> Result<Formatting, TemplateError> {
     let rule = convert_rule(raw.rule.unwrap_or_default(), "formatting.rule")?;
     let quote = convert_block(raw.quote, "formatting.quote", paragraph.face())?;
     let code_block = convert_block(raw.code_block, "formatting.code_block", paragraph.face())?;
-    Ok(Formatting::new(paragraph, heading, rule, quote, code_block))
+    let list = convert_list(raw.list, paragraph.face())?;
+    let table = convert_table(raw.table)?;
+    Ok(Formatting::new(
+        paragraph, heading, rule, quote, code_block, list, table,
+    ))
+}
+
+fn convert_list(raw: Option<RawListStyle>, base: &TextFace) -> Result<ListStyle, TemplateError> {
+    let Some(raw) = raw else {
+        return Ok(ListStyle::default());
+    };
+    let text = convert_partial(
+        RawInlineStyle {
+            font_families: raw.font_families,
+            size: raw.size,
+            weight: raw.weight,
+            style: raw.style,
+            foreground: raw.foreground,
+            background: raw.background,
+        },
+        "formatting.list",
+        base,
+    )?;
+    let indent = raw
+        .indent
+        .map(|text| parse_length_field(&text, "formatting.list.indent"))
+        .transpose()?
+        .unwrap_or(DEFAULT_LIST_INDENT);
+    let marker_gap = raw
+        .marker_gap
+        .map(|text| parse_length_field(&text, "formatting.list.marker_gap"))
+        .transpose()?
+        .unwrap_or(DEFAULT_LIST_MARKER_GAP);
+    let bullets = match raw.bullet {
+        Some(bullets) => bullets
+            .into_iter()
+            .map(|bullet| bullet.trim().to_owned())
+            .collect(),
+        None => ListStyle::default().bullets,
+    };
+    let (numbering, suffix) = match raw.numbering {
+        Some(numbering) => (
+            numbering
+                .format
+                .unwrap_or_else(|| ListStyle::default().numbering),
+            numbering.suffix.unwrap_or_else(|| ".".to_owned()),
+        ),
+        None => (ListStyle::default().numbering, ".".to_owned()),
+    };
+    let spacing = parse_optional_length(raw.spacing, "formatting.list.spacing")?;
+    ListStyle::new(
+        text,
+        raw.alignment.unwrap_or(ParagraphAlignment::Left),
+        indent,
+        marker_gap,
+        bullets,
+        numbering,
+        suffix,
+        spacing,
+    )
+    .map_err(|problem| value_error("formatting.list", problem))
 }
 
 fn convert_block(
@@ -2538,7 +2799,7 @@ mod tests {
 
     #[test]
     fn paragraph_and_heading_defaults_are_distinct() {
-        let template = Template::from_yaml("version: \"0.5\"\n").expect("the default template");
+        let template = Template::from_yaml("version: \"0.6\"\n").expect("the default template");
         let paragraph = template.formatting().paragraph();
         assert_eq!(paragraph.face().size().points(), 12.0);
         assert_eq!(paragraph.face().weight(), FontWeight::NORMAL);
@@ -2557,7 +2818,7 @@ mod tests {
     #[test]
     fn the_link_style_inherits_the_paragraph_face() {
         let template = Template::from_yaml(
-            "version: \"0.5\"\nformatting:\n  paragraph:\n    size: 11\n    link:\n      foreground: \"#112233\"\n",
+            "version: \"0.6\"\nformatting:\n  paragraph:\n    size: 11\n    link:\n      foreground: \"#112233\"\n",
         )
         .expect("the template");
         let link = template.formatting().paragraph().link();
@@ -2575,7 +2836,7 @@ mod tests {
     #[test]
     fn a_link_underline_is_declared_explicitly() {
         let template = Template::from_yaml(
-            "version: \"0.5\"\nformatting:\n  paragraph:\n    link:\n      underline: true\n",
+            "version: \"0.6\"\nformatting:\n  paragraph:\n    link:\n      underline: true\n",
         )
         .expect("the template");
         let link = template.formatting().paragraph().link();
@@ -2586,7 +2847,7 @@ mod tests {
     #[test]
     fn an_unknown_link_key_is_rejected() {
         let error = Template::from_yaml(
-            "version: \"0.5\"\nformatting:\n  paragraph:\n    link:\n      colour: navy\n",
+            "version: \"0.6\"\nformatting:\n  paragraph:\n    link:\n      colour: navy\n",
         )
         .expect_err("the typo must be rejected");
         assert!(matches!(error, TemplateError::Yaml { .. }), "{error}");

@@ -142,7 +142,7 @@ pub fn styles_xml(document: &Document, template: &Template, assets: &Assets) -> 
         );
     }
 
-    list_styles(&mut output);
+    list_styles(&mut output, template);
     xml::push(&mut output, "</office:styles>\n<office:automatic-styles>\n");
     page_layout(&mut output, template, assets);
     running_style(&mut output, template, document);
@@ -379,26 +379,32 @@ fn line_height_attribute(
     )
 }
 
-fn list_styles(output: &mut String) {
+fn list_styles(output: &mut String, template: &Template) {
+    let list = template.formatting().list();
+    let marker_gap = xml::centimetres(list.marker_gap());
+    let suffix = xml::escape_attribute(list.suffix());
     for (name, ordered) in [("UnorderedList", false), ("OrderedList", true)] {
         xml::push_fmt(
             output,
             format_args!("<text:list-style style:name=\"{name}\">\n"),
         );
         for level in 1..=10_u32 {
-            let indent = format!("{:.2}cm", 0.5 * f64::from(level));
+            let depth = usize::try_from(level.saturating_sub(1)).unwrap_or(0);
+            let indent = xml::centimetres_points(list.indent().points() * f64::from(level));
             if ordered {
+                let format = list.numbering_format(depth).odf_code();
                 xml::push_fmt(
                     output,
                     format_args!(
-                        "<text:list-level-style-number text:level=\"{level}\" style:num-format=\"1\" style:num-suffix=\".\"><style:list-level-properties text:space-before=\"{indent}\" text:min-label-width=\"0.6cm\"/></text:list-level-style-number>\n"
+                        "<text:list-level-style-number text:level=\"{level}\" style:num-format=\"{format}\" style:num-suffix=\"{suffix}\"><style:list-level-properties text:space-before=\"{indent}\" text:min-label-width=\"{marker_gap}\"/></text:list-level-style-number>\n"
                     ),
                 );
             } else {
+                let bullet = xml::escape_attribute(list.bullet(depth));
                 xml::push_fmt(
                     output,
                     format_args!(
-                        "<text:list-level-style-bullet text:level=\"{level}\" text:bullet-char=\"•\"><style:list-level-properties text:space-before=\"{indent}\" text:min-label-width=\"0.5cm\"/></text:list-level-style-bullet>\n"
+                        "<text:list-level-style-bullet text:level=\"{level}\" text:bullet-char=\"{bullet}\"><style:list-level-properties text:space-before=\"{indent}\" text:min-label-width=\"{marker_gap}\"/></text:list-level-style-bullet>\n"
                     ),
                 );
             }
@@ -602,7 +608,10 @@ mod tests {
     #[test]
     fn the_list_styles_define_ten_levels() {
         let mut output = String::new();
-        list_styles(&mut output);
+        list_styles(
+            &mut output,
+            &Template::embedded().expect("the embedded template"),
+        );
 
         assert_eq!(output.matches("text:level=").count(), 20);
     }

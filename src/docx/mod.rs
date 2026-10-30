@@ -65,7 +65,7 @@ pub fn render(
         built.footer.is_some(),
     );
     let styles = styles::styles_xml(document, template);
-    let numbering = built.numbering.xml();
+    let numbering = built.numbering.xml(template);
     let core = package::core_xml(document);
     let app = package::app_xml();
     let settings = package::settings_xml();

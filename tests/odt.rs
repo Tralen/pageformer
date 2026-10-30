@@ -160,7 +160,7 @@ fn a_template_change_is_visible_in_the_styles() {
     );
     let template = Template::from_yaml(
         r##"
-version: "0.5"
+version: "0.6"
 formatting:
   paragraph:
     size: 13
@@ -168,9 +168,9 @@ formatting:
   heading:
     h1:
       size: 27
-table:
-  header_fill: "#123456"
-  border: 2pt
+  table:
+    header_fill: "#123456"
+    border: 2pt
 "##,
     )
     .expect("the template must be valid");
@@ -248,7 +248,7 @@ fn a_rule_and_a_heading_background_follow_the_template() {
         markdown::parse("# Título\n\nTexto.\n\n---\n\nDepois.\n").expect("the document must parse");
     let template = Template::from_yaml(
         r##"
-version: "0.5"
+version: "0.6"
 formatting:
   heading:
     background: "#EEEEEE"
@@ -286,7 +286,7 @@ fn the_foreground_reaches_the_styles() {
         .expect("the document must parse");
     let template = Template::from_yaml(
         r##"
-version: "0.5"
+version: "0.6"
 formatting:
   paragraph:
     foreground: "#112233"
@@ -335,7 +335,7 @@ fn the_paragraph_and_block_styles_reach_the_package() {
     .expect("the document must parse");
     let template = Template::from_yaml(
         r##"
-version: "0.5"
+version: "0.6"
 formatting:
   paragraph:
     background: "#fafafa"
@@ -418,12 +418,81 @@ formatting:
 }
 
 #[test]
+fn lists_take_their_markers_layout_and_text_from_the_template() {
+    let document = markdown::parse("- Um\n    - Dois\n\n- Três\n\n1. Primeiro\n    1. Interno\n")
+        .expect("the document must parse");
+    let template = Template::from_yaml(
+        r##"
+version: "0.6"
+formatting:
+  list:
+    foreground: "#112233"
+    background: "#eeeeee"
+    alignment: justified
+    indent: 6mm
+    marker_gap: 3mm
+    bullet:
+      - "*"
+      - "+"
+    numbering:
+      format:
+        - upper-roman
+        - upper-alpha
+      suffix: ")"
+    spacing: 12pt
+"##,
+    )
+    .expect("the template must be valid");
+
+    let bytes = odt::render(&document, &template, &Assets::default()).expect("the package");
+    let mut archive = ZipArchive::new(Cursor::new(bytes)).expect("the package must be a ZIP");
+    let styles = entry(&mut archive, "styles.xml");
+    let content = entry(&mut archive, "content.xml");
+
+    assert!(
+        styles.contains("text:bullet-char=\"*\"") && styles.contains("text:bullet-char=\"+\""),
+        "the bullets follow the template: {styles}"
+    );
+    assert!(
+        styles.contains("style:num-format=\"I\" style:num-suffix=\")\""),
+        "the first ordered level is upper roman: {styles}"
+    );
+    assert!(
+        styles.contains("style:num-format=\"A\" style:num-suffix=\")\""),
+        "the second ordered level is upper alpha: {styles}"
+    );
+    assert!(
+        styles.contains("text:space-before=\"0.600cm\" text:min-label-width=\"0.300cm\""),
+        "the first level uses the template indent and gap: {styles}"
+    );
+    assert!(
+        styles.contains("text:space-before=\"1.200cm\" text:min-label-width=\"0.300cm\""),
+        "the second level adds one indent step: {styles}"
+    );
+    assert!(
+        content.contains("style:name=\"ListItem\"")
+            && content.contains("style:name=\"ListLooseItem\""),
+        "tight and loose items get their own styles: {content}"
+    );
+    assert!(
+        content.contains("fo:text-align=\"justify\"")
+            && content.contains("fo:background-color=\"#eeeeee\"")
+            && content.contains("fo:color=\"#112233\""),
+        "the item text follows the template: {content}"
+    );
+    assert!(
+        content.contains("fo:margin-bottom=\"4.20pt\""),
+        "the loose spacing is the template spacing minus the leading: {content}"
+    );
+}
+
+#[test]
 fn links_take_the_template_style() {
     let document =
         markdown::parse("Veja [o site](https://example.org).\n").expect("the document must parse");
     let template = Template::from_yaml(
         r##"
-version: "0.5"
+version: "0.6"
 formatting:
   paragraph:
     link:
@@ -459,7 +528,7 @@ fn a_heading_fill_scales_with_the_heading_size() {
         markdown::parse("# Um\n\nTexto.\n\n## Dois\n\nTexto.\n").expect("the document must parse");
     let template = Template::from_yaml(
         r##"
-version: "0.5"
+version: "0.6"
 formatting:
   paragraph:
     size: 12
@@ -494,7 +563,7 @@ fn a_heading_rule_is_a_bottom_border_of_its_level() {
     let document = markdown::parse("## Escopo\n\nTexto.\n").expect("the document must parse");
     let template = Template::from_yaml(
         r##"
-version: "0.5"
+version: "0.6"
 formatting:
   heading:
     h2:
@@ -522,7 +591,7 @@ formatting:
 #[test]
 fn the_line_spacing_follows_the_typst_leading_model() {
     let template = Template::from_yaml(
-        "version: \"0.5\"\nformatting:\n  paragraph:\n    size: 12\n    leading: 8\n    spacing: 24\n",
+        "version: \"0.6\"\nformatting:\n  paragraph:\n    size: 12\n    leading: 8\n    spacing: 24\n",
     )
     .expect("the template must be valid");
     let document = Document::new(Metadata::default(), Vec::new());
@@ -537,7 +606,7 @@ fn the_line_spacing_follows_the_typst_leading_model() {
 #[test]
 fn table_cells_absorb_the_leading_and_do_not_inherit_paragraph_spacing() {
     let template = Template::from_yaml(
-        "version: \"0.5\"\nformatting:\n  paragraph:\n    size: 12\n    leading: 8\ntable:\n  cell_padding: 6pt\n",
+        "version: \"0.6\"\nformatting:\n  paragraph:\n    size: 12\n    leading: 8\n  table:\n    cell_padding: 6pt\n",
     )
     .expect("the template must be valid");
     let document = Document::new(
@@ -562,7 +631,7 @@ fn table_cells_absorb_the_leading_and_do_not_inherit_paragraph_spacing() {
 #[test]
 fn a_running_header_reserves_its_band_from_the_page_margin() {
     let template = Template::from_yaml(
-        "version: \"0.5\"\npage:\n  margins:\n    top: 30mm\n  header:\n    right: \"{page}\"\n",
+        "version: \"0.6\"\npage:\n  margins:\n    top: 30mm\n  header:\n    right: \"{page}\"\n",
     )
     .expect("the template must be valid");
     let document = Document::new(Metadata::default(), Vec::new());
@@ -582,7 +651,7 @@ fn the_running_text_uses_the_paragraph_face_and_hyphenates_in_the_document_langu
         Some(pageformer::document::Language::parse("pt-BR").expect("a valid language tag")),
     );
     let template = Template::from_yaml(
-        "version: \"0.5\"\nformatting:\n  paragraph:\n    size: 13\npage:\n  header:\n    right: \"{page}\"\n",
+        "version: \"0.6\"\nformatting:\n  paragraph:\n    size: 13\npage:\n  header:\n    right: \"{page}\"\n",
     )
     .expect("the template must be valid");
     let document = Document::new(metadata, Vec::new());

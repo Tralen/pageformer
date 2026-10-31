@@ -4,6 +4,11 @@
 
 *Major updates and feature releases.*
 
+### 0.34.1
+
+- Added group comments to `assets/default.pageformer.yaml` explaining `page`, `formatting`, `paragraph`, `quote`, `code_block`, `list`, `heading`, `horizontal_rule` and `table`.
+- Regenerates the ODT examples for the version in `meta:generator`.
+
 ### 0.34.0
 
 - Fixed the PDF footnote: the marker now stays inline with the first footnote paragraph. The first paragraph is rendered without `#par` inside `#footnote`, so the marker no longer sits on its own line above the note.

@@ -11,6 +11,9 @@
 # Colors accept #rrggbb, #rgb or a CSS color name.
 version: "0.7"
 
+# Page geometry, the letterhead and the running header and footer.
+# Size and orientation describe the paper; the margins reserve the running
+# content band. Header and footer slots are drawn only when non-blank.
 page:
   size: a4
   orientation: portrait
@@ -33,7 +36,12 @@ page:
     center: ""
     right: ""
 
+# Presentation styles, grouped by document element. Undeclared keys inherit
+# the paragraph face; an unknown key is an error, so typos never change the
+# layout silently.
 formatting:
+  # Body text: the base face, spacing and alignment every other element inherits,
+  # plus the inline styles for emphasis, strong, code, strikethrough and links.
   paragraph:
     font_families:
       - Liberation Serif
@@ -81,6 +89,8 @@ formatting:
       underline: true
       # font_families, size, weight, style and background inherit the paragraph.
 
+  # Block quotes: the quote text inherits the paragraph face; alignment and the
+  # optional border and background live here.
   quote:
     alignment: left
     # font_families, size, weight, style and foreground inherit the paragraph.
@@ -91,6 +101,8 @@ formatting:
     #   padding: 8
     border: {}
 
+  # Fenced code blocks: a monospace family is declared here, not assumed, and a
+  # background and border can set the block apart.
   code_block:
     font_families:
       - Liberation Mono
@@ -105,6 +117,8 @@ formatting:
     #   padding: 6
     border: {}
 
+  # Ordered and unordered lists: item face and alignment, marker indent and gap,
+  # marker sets cycled by depth, loose-item spacing, and task markers.
   list:
     foreground: "#000000"
     # background: "#f7f7f7"
@@ -145,6 +159,8 @@ formatting:
         # style: normal
         # background: "#f5f5f5"
 
+  # Headings: the base face and spacing, then per-level size and spacing
+  # overrides. A level may also declare a background, a rule or a page break.
   heading:
     font_families:
       - Liberation Sans
@@ -195,6 +211,8 @@ formatting:
       spacing_before: 8
       spacing_after: 2
 
+  # Thematic breaks (`---`, `***`, `___` and `-horizontal-`) and the rule under a
+  # heading level. The same keys feed every format.
   horizontal_rule:
     thickness: 0.5pt
     color: "#000000"
@@ -202,6 +220,7 @@ formatting:
     # spacing_before: 12
     # spacing_after: 12
 
+  # Tables: the border and its color, the header-row fill and the cell inset.
   table:
     border: 0.5pt
     border_color: "#bbbbbb"

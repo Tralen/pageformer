@@ -150,7 +150,7 @@ formatting:
     cell_padding: 6pt
 ```
 
-Every section and every key is optional except `version`. Missing keys take the defaults described below, but an unknown key is an error, so a typo never changes the layout silently. The embedded default template, `assets/default.pageformer.yaml`, declares every key the schema accepts, so it doubles as a starting point; keys that are absent by design, such as a paragraph fill or a letterhead, appear commented there.
+Every section and every key is optional except `version`. Missing keys take the defaults described below, but an unknown key is an error, so a typo never changes the layout silently. The embedded default template, `assets/default.pageformer.yaml`, declares every key the schema accepts, with a short comment before each main group, so it doubles as a starting point; keys that are absent by design, such as a paragraph fill or a letterhead, appear commented there.
 
 ### `version`
 

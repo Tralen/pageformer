@@ -4,6 +4,13 @@
 
 *Major updates and feature releases.*
 
+### 0.41.4
+
+- Revised the documentation as one set: the README now walks through the pipeline, the formats, the Markdown markers, the confidential fields and the publisher window, and includes a screenshot of `pageformer-publisher`.
+- Rewrote `docs/architecture.md`, `docs/roadmap.md`, `docs/template.md` and `docs/verification.md` in a clearer structure, removed the historical spike notes and the completed phase work lists, and kept each document focused on one subject.
+- Clarified the page, template and confidentiality rules, fixed the description of pagination, and added a regeneration summary to the verification guide.
+- Regenerates the ODT examples for the version in `meta:generator`.
+
 ### 0.41.3
 
 - Audited the Rust sources against `LANGUAGE.md` 1.0.0 and replaced behavior-selecting booleans with explicit enums: `ColorSupport`, `Terminal`, `ColorEnvironment`, `ItemSpacing`, `ItemPosition`, `CellKind`, `ParagraphPlacement`, `RunningParts`, `ShadingMode`, `EscapeMode` and `ExportAction`.

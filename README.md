@@ -2,63 +2,139 @@
 
 *"One document, every format."*
 
-Generates documents from Markdown content and a single generic YAML template. One template drives every output format, so all of them stay consistent. A separate WYSIWYG editor, [Pageweaver](docs/pageweaver.md), uses the same library for authoring and is planned for after 1.0.0, while Pageformer keeps the minimal `pageformer-publisher` converter window for quick exports.
+Pageformer turns Markdown and a single YAML template into PDF, ODT, DOCX, HTML, EPUB and plain text. The same document model and the same template feed every backend, so the formats stay consistent instead of drifting apart as the project grows.
+
+The command line is the main workflow. A small desktop window, `pageformer-publisher`, handles quick exports, and the full WYSIWYG editor, [Pageweaver](docs/pageweaver.md), is a separate project planned for after 1.0.0.
 
 ## Stack
 
-Rust with egui for the minimal `pageformer-publisher` converter window; the main workflow runs in the terminal. The companion editor, Pageweaver, is a separate Tauri project. PDF rendering uses Typst as an internal library, and users never write Typst.
+Pageformer is written in Rust. The command line does the main work, and the minimal converter window uses egui. PDF rendering uses Typst as an internal library: users write Markdown and YAML, never Typst. Pageweaver is a separate Tauri project that consumes the same library.
 
 ## Build
 
-The development profile keeps line tables for this crate and no debug info for dependencies, because every test binary links Typst and would otherwise weigh hundreds of megabytes; incremental compilation is off because its state reached several gigabytes for little gain in a crate this small. `cargo clean` reclaims the cache when it grows, at the cost of a full rebuild. The workspace also builds `pageformer-publisher`, the minimal egui converter; its eframe dependencies follow the same profile, and `cargo build -p pageformer` builds only the engine and CLI.
+The development profile keeps line tables for this crate and no debug information for dependencies. Every test binary links Typst, so dependency debug information would make the artifacts weigh hundreds of megabytes. Incremental compilation is off because its state grew to several gigabytes with little benefit in a crate this size. When the cache becomes too large, `cargo clean` reclaims it at the cost of a full rebuild.
+
+The workspace also builds `pageformer-publisher`, the minimal egui converter. Its eframe dependencies follow the same profile. To build only the engine and the command line, use `cargo build -p pageformer`.
 
 ## Versioning
 
-SemVer; source: `Cargo.toml` (`[package].version`).
+Pageformer follows SemVer. The version lives in `Cargo.toml`, under `[package].version`.
 
-- Patch: fixes and minor refinements.
-- Minor: new user-facing features or output formats. While the project is 0.x, breaking changes to the template format or the document model also use the minor field.
-- Major: breaking changes to the template format or the document model after 1.0.0, or major release milestones.
+- Patch releases contain fixes and small refinements.
+- Minor releases add user-facing features or output formats. While the project is 0.x, breaking changes to the template format or the document model also use the minor field.
+- Major releases follow the 1.0.0 milestone and carry breaking changes to the template format or the document model.
 
-## Goal
+## How a document is produced
 
-Take a Markdown file or folder and render it through a template into PDF, ODT, DOCX, HTML, EPUB and plain text, with the same document model behind every backend. PDF is the primary output, ODT is the paged office format, DOCX is the review and exchange format, HTML is the self-contained semantic view, EPUB is the reflowable e-book package and plain text is the readable view behind copy-as-plain-text.
+The pipeline has a few clear stages:
 
-Documentation is stored in [`docs/`](docs/). The rendering pipeline and the settled decisions are described in [`docs/architecture.md`](docs/architecture.md), the YAML schema in [`docs/template.md`](docs/template.md), the confidential folder mapping in [`docs/confidential.md`](docs/confidential.md), the verification tools in [`docs/verification.md`](docs/verification.md), the boundary with the separate editor in [`docs/pageweaver.md`](docs/pageweaver.md), and the ordered path to 1.0.0 in [`docs/roadmap.md`](docs/roadmap.md).
+1. The Markdown file is parsed into a backend-independent document model. Raw HTML and malformed input become errors, not silent omissions.
+2. One YAML template is resolved for the document, validated and turned into typed styles. The nearest template wins entirely; there is no partial merge between directories.
+3. Confidential `{NAME}` fields are resolved once, after parsing and before rendering, so no backend ever sees a value store.
+4. The letterhead and the local images are loaded once and shared by the backends.
+5. One backend renders the resolved document and template into bytes. It never reads the source file, the environment or the clock.
+
+The details are in [`docs/architecture.md`](docs/architecture.md). The template schema is in [`docs/template.md`](docs/template.md), and the confidential folder mapping is in [`docs/confidential.md`](docs/confidential.md).
 
 ## Usage
 
-The command renders each Markdown file next to its source, as PDF/A by default or as plain text or ODT with `--format`, using the template resolved for it.
+The examples below use `cargo run --` because the crate is not published. In a built checkout, use the `pageformer` binary directly.
+
+Render a single file next to its source, as PDF/A by default:
+
+```sh
+cargo run -- assets/examples/tecnico/Relatorio.md
+```
+
+Choose another format and write the results to another directory:
+
+```sh
+cargo run -- --format odt --output /tmp/pageformer assets/examples/tecnico/Relatorio.md
+```
+
+Validate the Markdown and the template without writing anything:
+
+```sh
+cargo run -- --check assets/examples/tecnico/Relatorio.md
+```
+
+A confidential document needs its values file and an output directory outside the source tree:
 
 ```sh
 cargo run -- --confidential-file assets/examples/confidencial/embargos.ini --output assets/examples/publicacao assets/examples/escritorio/
-cargo run -- --check --confidential-file assets/examples/confidencial/embargos.ini assets/examples/escritorio/
-cargo run -- assets/examples/tecnico/Relatorio.md
-cargo run -- --output /tmp/pageformer --confidential-file assets/examples/confidencial/embargos.ini assets/examples/escritorio/
-cargo run -- --check --color=never --confidential-file assets/examples/confidencial/embargos.ini assets/examples/escritorio/Contrato.md
-cargo run -- --format txt --confidential-file assets/examples/confidencial/embargos.ini --output assets/examples/publicacao assets/examples/escritorio/
-cargo run -- --format odt --confidential-file assets/examples/confidencial/embargos.ini --output assets/examples/publicacao assets/examples/escritorio/
-cargo run -- --format docx --confidential-file assets/examples/confidencial/embargos.ini --output assets/examples/publicacao assets/examples/escritorio/
-cargo run -- --format html --confidential-file assets/examples/confidencial/embargos.ini --output assets/examples/publicacao assets/examples/escritorio/
-cargo run -- --format epub --confidential-file assets/examples/confidencial/embargos.ini --output assets/examples/publicacao assets/examples/escritorio/
 ```
 
-The first command writes each PDF under `assets/examples/publicacao/`, which keeps it outside the source tree, and regenerates the versioned examples. A file or a directory can be given; a directory is walked recursively and only `.md` files are read. Hidden directories and `target/` are skipped, and directory symlinks are not followed. A paragraph that contains only `-pagebreak-` starts a new page, and `-!-` is its shorthand; a paragraph that contains only `-horizontal-` draws a rule, as `---`, `***` and `___` already do. A paragraph that contains only an image becomes a block image, and the standalone lines directly below it set `-width:...-`, `-height:...-` or `-align:left|center|right-`; one dimension is enough, because the other follows the image ratio. The template's `formatting.image` supplies the default alignment, the maximum width, the border, the padding and the background.
+### Inputs and outputs
 
-The minimal converter window is a separate workspace member:
+The command accepts a file or a directory. A directory is walked recursively in path order, and only `.md` files are read. Hidden directories and `target/` are skipped, and directory symlinks are not followed, so a cycle cannot hang the run.
+
+Without `--output`, each file is written next to its source with the extension of the chosen format. With `--output`, a directory input mirrors its relative tree under the destination, while a direct file is written flat. A file reached from more than one input is processed once, and two inputs that would write the same output are an error instead of a silent overwrite.
+
+`--check` parses the Markdown and validates the template without writing. A failure in one file does not stop the rest of the batch, and the exit code is `1` when any input fails.
+
+The terminal output uses color, bold and italic only when the stream is a terminal. `--color=auto` is the default and respects `NO_COLOR` and `TERM=dumb`; use `--color=always` or `--color=never` to force or disable the styling.
+
+### Formats
+
+| Format | Extension | Role |
+|---|---|---|
+| PDF | `.pdf` | Primary output. Conforms to PDF/A-2b. |
+| ODT | `.odt` | Paged office format for review and editing. |
+| DOCX | `.docx` | Review and exchange format for Word users. |
+| HTML | `.html` | Self-contained semantic view with embedded CSS and data-URI images. |
+| EPUB | `.epub` | Reflowable EPUB 3 e-book with chapters split at first-level headings. |
+| TXT | `.txt` | Readable plain text for copy-as-plain-text. |
+
+`--format` selects the output; `pdf` is the default. TXT uses UTF-8 with LF line endings, no automatic wrapping and one blank line between blocks. Headings become their text, lists keep `-` and `1.` markers, tables use tab-separated cells with a separator row, quotes are prefixed with `>` and a space, links become `label (destination)`, images become `[alt]`, footnotes are collected at the end, and an explicit page break becomes a form feed.
+
+ODT and DOCX carry the template's page layout, fonts, headings, tables, letterhead and running header and footer. HTML keeps semantic headings, lists, tables, alerts, code blocks and endnotes, and makes no network request. EPUB splits chapters at first-level headings, generates its navigation, packages the body images and uses deterministic metadata; a frontmatter `identifier` overrides the derived UUID. TXT and the office formats ignore layout fields where the format has no equivalent, but the template is still validated, so a broken template fails the same way for every format.
+
+### Markdown markers
+
+A few standalone paragraphs extend ordinary CommonMark:
+
+- `-pagebreak-` or `-!-` starts a new page.
+- `-horizontal-` draws a horizontal rule, as `---`, `***` and `___` already do.
+- A paragraph that contains only an image becomes a block image. The standalone lines directly below it may set `-width:...-`, `-height:...-` or `-align:left|center|right-`. One dimension is enough, because the other follows the image ratio.
+
+The template's `formatting.image` section supplies the default alignment, the maximum width, the border, the padding and the background. A marker inside ordinary text stays ordinary text.
+
+### Confidential fields
+
+A `{NAME}` field in the body is a confidential field. Its value comes from a `PAGEFORMER_CONFIDENTIAL_NAME` environment variable or from an INI-style file of `NAME = value` lines passed with `--confidential-file`. Whitespace around `=` is ignored, a line whose first non-blank character is `#` or `;` is a comment, and a value keeps any `#`, `;` or further `=` after the first.
+
+Without the flag, the document can use the user-level folder mapping described in [`docs/confidential.md`](docs/confidential.md). The file, explicit or mapped, must sit outside the source tree and, on Unix, be readable only by its owner. A document with fields must be written with `--output` to a directory outside its source tree. `--check` lists the field names without their values, and an unknown field is an error.
+
+The committed `assets/examples/confidencial/embargos.ini` holds fictional values and must be `chmod 600` after a checkout, because Git does not preserve that mode.
+
+### The minimal converter window
+
+`pageformer-publisher` is a separate workspace member:
 
 ```sh
 cargo run -p pageformer-publisher
 ```
 
-`--output` writes under another directory; a directory input mirrors its relative tree there, while a direct file is written flat. `--check` parses the Markdown and validates the template without writing. A failure in one file does not stop the rest of the batch, and the exit code is `1` when any input fails.
+![The Pageformer Publisher window](assets/publisher.png)
 
-`--format` selects the output: `pdf` is the default and writes `.pdf`; `txt` writes UTF-8 with LF line endings, no automatic wrapping and one blank line between blocks. Headings become their text, lists keep `-` and `1.` markers, tables use tab-separated cells with a separator row, quotes are prefixed with `>` and a space, links become `label (destination)`, images become `[alt]`, footnotes are collected at the end, and an explicit page break becomes a form feed. `odt` writes an OpenDocument text package and `docx` an Office Open XML package, both with the template's page layout, fonts, headings, tables, letterhead and running header and footer; the same text, spacing and structure is preserved. `html` writes one self-contained HTML5 file with embedded CSS and data-URI images, semantic headings, lists, tables, alerts, code blocks and endnotes, and print rules from the template; it makes no network request. `epub` writes an EPUB 3 package with chapters split at first-level headings, a generated navigation, a reflowable CSS subset, packaged body images and deterministic metadata; the frontmatter `identifier` overrides the derived UUID. TXT and the office formats ignore layout fields where the format has no equivalent, but the template is still validated, so a broken template fails the same way for every format.
-
-A `{NAME}` field in the body is a confidential field. Its value comes from a `PAGEFORMER_CONFIDENTIAL_NAME` environment variable or from an INI-style file of `NAME = value` lines passed with `--confidential-file`; whitespace around `=` is ignored, a line whose first character is `#` or `;` is a comment, and a value keeps any `#`, `;` or further `=` after the first. Without the flag, the document can use a folder mapping from the user-level `config.yaml` and the confidential directories it lists; see [`docs/confidential.md`](docs/confidential.md). The file, explicit or mapped, must sit outside the source tree and, on Unix, be readable only by its owner. A document with fields must be written with `--output` to a directory outside its source tree. `--check` lists the field names without their values, and unknown fields are errors. The committed `assets/examples/confidencial/embargos.ini` holds fictional values and must be `chmod 600` after a checkout, because Git does not preserve that mode.
-
-The terminal output uses color, bold and italic when the stream is a terminal. `--color=auto` is the default and respects `NO_COLOR` and `TERM=dumb`; use `--color=always` or `--color=never` to force or disable it.
+The window is deliberately small: drop a Markdown file (or click the box to choose one), pick a format, and open the result. The Advanced section holds an optional template override, the output folder and the confidential INI file. Every label and control has a tooltip. The window calls the same pipeline as the command line and never parses, resolves or writes by itself. See [`docs/pageweaver.md`](docs/pageweaver.md) for the boundary with the editor.
 
 ## Examples
 
-The fixtures in [`assets/examples/`](assets/examples/) exercise the parser and the backends. `escritorio/` holds `Contrato.md` and `Embargos.md` with the shared `.pageformer.yaml`, its fictional `Timbre.png` letterhead, a warm page background and a page-number header. `confidencial/embargos.ini` holds the fictional values for the fields in `Embargos.md`, and `publicacao/` holds the generated `Contrato` and `Embargos` in PDF, ODT, DOCX, HTML, EPUB and TXT; the signature block of the contract is on its own page. The nested `tecnico/Relatorio.md` has its own template, which demonstrates a light blue page background, the running header and footer, the table style under `formatting.table`, the image frame under `formatting.image`, the list markers and numbering including a nested list, an explicit page break and first-level headings that start a new page, without a letterhead; its six outputs sit beside it. `Diagrama.png` is the block image used by the report. All three PDFs pass veraPDF as PDF/A-2b, the ODT and DOCX packages open in LibreOffice without repair, the HTML files open offline without a network request, the EPUB packages split and navigate by their first-level headings, and the text goldens are compared byte for byte.
+The fixtures in [`assets/examples/`](assets/examples/) exercise the parser and every backend.
+
+- `escritorio/` holds `Contrato.md` and `Embargos.md` with the shared `.pageformer.yaml`, its fictional `Timbre.png` letterhead, a warm page background and a page-number header.
+- `confidencial/embargos.ini` holds the fictional values for the fields in `Embargos.md`.
+- `publicacao/` holds the generated `Contrato` and `Embargos` in PDF, ODT, DOCX, HTML, EPUB and TXT. The signature block of the contract is on its own page.
+- `tecnico/Relatorio.md` has its own template and its six outputs beside it. It demonstrates a light blue page background, the running header and footer, the table style, the image frame, list markers and numbering with a nested list, an explicit page break and first-level headings that start a new page, without a letterhead. `Diagrama.png` is the block image used by the report.
+
+All three PDFs pass veraPDF as PDF/A-2b. The ODT and DOCX packages open in LibreOffice without repair, the HTML files open offline without a network request, the EPUB packages split and navigate by their first-level headings, and the text goldens are compared byte for byte.
+
+## Documentation
+
+- [`docs/architecture.md`](docs/architecture.md): the pipeline, the document model, the renderer boundary and the decisions behind each backend.
+- [`docs/template.md`](docs/template.md): the YAML schema, the resolution rules and every style key.
+- [`docs/confidential.md`](docs/confidential.md): the confidential values file and the two-level folder mapping.
+- [`docs/verification.md`](docs/verification.md): the test commands, the external validators and the example regeneration.
+- [`docs/pageweaver.md`](docs/pageweaver.md): the boundary with the separate WYSIWYG editor.
+- [`docs/roadmap.md`](docs/roadmap.md): what is done and what remains before 1.0.0.

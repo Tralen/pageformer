@@ -1,277 +1,110 @@
-# Implementation Map
+# Roadmap
 
-Pageformer reaches 1.0.0 through ten phases, in the order below. The order is a dependency chain, not a wish list: each phase removes an uncertainty that the next one would otherwise inherit. This map starts from the state at 0.5.0. The settled decisions live in [`architecture.md`](architecture.md), the schema in [`template.md`](template.md) and the verification tools in [`verification.md`](verification.md); this file only orders the work and states what closes each phase.
+Pageformer is close to 1.0.0. The engine, the command line, the six output formats and the minimal converter window are implemented and tested. This page records what each phase delivered, why the work happened in that order, and what still has to be true before the project promises a stable template and document model.
 
 ## Status at a glance
 
-| Phase | Scope | Status | Starts after |
-|---|---|---|---|
-| 1. CLI | Input discovery, format selection, output rules | Done in 0.6.0: files and directories, path-ordered batches, mirrored output, ANSI styling | 0.5.0 |
-| 2. PDF | Primary output and reference backend | Done in 0.12.0: running header and footer with tokens, explicit page breaks, per-level page starts, table styling and the frontmatter `date`, `subject` and `keywords`; PDF/A-2b stays the declared profile | CLI output rules |
-| 3. Confidentiality | Placeholder resolution and leak prevention | Done in 0.13.0: `{NAME}` fields, environment and file loading, output rule, redaction | PDF pipeline |
-| 4. TXT | Plain-text view and the renderer boundary | Done in 0.15.0: the renderer trait, `--format txt` and plain-text goldens | Confidentiality |
-| 5. ODT | Second-priority paged format | Done in 0.16.0: internal ODF writer, deterministic package, styles from the template | Renderer boundary |
-| 6. DOCX | Office format for review and exchange | Done in 0.17.0: internal OOXML writer, numbering instances, repeating table headers, footnotes and a deterministic package | ODT style mapping |
-| 7. Minimal GUI | Converter window over the pipeline; Pageweaver is separate | Done in 0.35.0 | Every format it exposes |
-| 8. HTML | Self-contained semantic view | Done in 0.35.0 | GUI and renderer boundary |
-| 9. EPUB | HTML packaged with chapters and metadata | Done in 0.36.0 | HTML |
-| 10. Release 1.0.0 | Stability review and release | Not started | Every phase above |
+| Phase | Outcome | Released |
+|---|---|---|
+| 1. CLI | Files and directories, deterministic batches, atomic writes, ANSI output | 0.6.0 |
+| 2. PDF | The primary backend, PDF/A-2b, running content and page control | 0.12.0, expanded through 0.41 |
+| 3. Confidentiality | `{NAME}` fields, the INI file and the user-level folder mapping | 0.13.0, mapping in 0.40.0 |
+| 4. TXT | The renderer boundary and the plain-text view | 0.15.0 |
+| 5. ODT | The internal ODF writer and deterministic packaging | 0.16.0 |
+| 6. DOCX | The internal OOXML writer and deterministic packaging | 0.17.0 |
+| 7. Publisher | The minimal egui converter over the shared pipeline | 0.35.0 |
+| 8. HTML | The self-contained semantic view | 0.35.0 |
+| 9. EPUB | The EPUB 3 package built on the HTML conversion | 0.36.0 |
+| 10. Release 1.0.0 | Stability review, full verification and a signed tag | Pending |
 
 ```mermaid
 flowchart TD
     CLI[1. CLI] --> PDF[2. PDF]
     PDF --> Confidentiality[3. Confidentiality]
-    Confidentiality --> TXT[4. TXT and renderer boundary]
+    Confidentiality --> TXT[4. TXT]
     TXT --> ODT[5. ODT]
     ODT --> DOCX[6. DOCX]
-    DOCX --> GUI[7. GUI]
-    GUI --> HTML[8. HTML]
+    DOCX --> Publisher[7. Publisher]
+    Publisher --> HTML[8. HTML]
     HTML --> EPUB[9. EPUB]
     EPUB --> Release[10. Release 1.0.0]
-    Confidentiality -. placeholders resolved once .-> ODT
-    Confidentiality -. placeholders resolved once .-> HTML
-    TXT -. same backend contract .-> HTML
 ```
 
 ## Why this order
 
-The CLI comes first because input discovery, format selection and output rules are the contract every backend sits behind. Changing them after five backends exist would touch every test and every usage example.
+The command line came first because input discovery, format selection and output rules are the contract every backend sits behind. Changing them after five backends existed would have touched every test and every usage example.
 
-PDF comes second because it is the primary output and the reference for the document model. Every later backend copies decisions about headings, lists, tables, footnotes, images and metadata that the PDF backend forces us to make now.
+PDF came second because it is the primary output and the reference for the document model. The later backends copied decisions about headings, lists, tables, footnotes, images and metadata that the PDF forced the project to make.
 
-Confidentiality comes third, before the remaining backends. Placeholder resolution belongs to the pipeline, after parsing and before rendering. Implementing it after TXT, ODT or DOCX would mean writing the same scanner into several backends and then removing it.
+Confidentiality came third, before the remaining backends. Placeholder resolution belongs to the pipeline, after parsing and before rendering. Implementing it later would have meant writing the same scanner into several backends and then removing it.
 
-TXT comes fourth because it is the cheapest backend and the first one that justifies a shared renderer boundary. It proves the trait with the least machinery, and it supplies the copy-as-plain-text action the GUI needs later.
+TXT came fourth because it is the cheapest backend and the first one that justified a shared renderer boundary. It proved the contract with little machinery and supplied the copy-as-plain-text action the window later exposed.
 
-ODT and DOCX come next because they are the office formats with the highest legal value and the closest semantic match to the PDF. They also force the shared style mapping, the deterministic ZIP packaging and the structural tests that HTML and EPUB will reuse.
+ODT and DOCX came next because they are the office formats with the highest legal value and the closest semantic match to the PDF. They also forced the shared style mapping, deterministic ZIP packaging and structural tests that HTML and EPUB reused.
 
-The minimal GUI comes after the formats it exposes, so its buttons map to a stable pipeline instead of to promises. HTML follows because a correct HTML view is the real prerequisite for EPUB; EPUB is HTML packaged with chapters and metadata. The separate WYSIWYG editor, Pageweaver, is not part of this roadmap's release; it consumes the same library for export and preview.
+The minimal window came after the formats it exposes, so its buttons mapped to a stable pipeline instead of promises. HTML followed because a correct HTML view is the prerequisite for EPUB; EPUB is HTML packaged with chapters and metadata. Pageweaver, the separate editor, is not part of this roadmap's release; it consumes the same library for export and preview.
 
 Release 1.0.0 comes last and is not a feature. It is the point where the template schema and the document model are stable enough to promise compatibility.
 
-## Contract for every phase
+## What remains for 1.0.0
 
-A phase is closed only when all of the following hold:
+The remaining work is a stability pass, not a new format:
 
-- The new behavior has a test that fails before the change and passes after it; the full Rust suite, `cargo fmt --check`, `cargo clippy --all-targets --all-features -- -D warnings`, `cargo test --doc` and `cargo doc --no-deps` pass.
-- A backend receives a parsed document, a validated template and resolved assets, and returns bytes plus warnings. It never parses Markdown, reads a file, reads the environment or writes to disk.
-- Expected failures are error values with domain variants. No `unwrap`, `expect`, `panic!` or unchecked indexing is added to library code.
+1. **Review stability.** Confirm that no breaking change to the template schema or the document model is pending. Optional template keys may still be added without breaking existing documents; removing or changing an existing key cannot happen after 1.0.0 without a major release.
+2. **Run the full verification matrix.** Run the Rust checks, Markdown lint, veraPDF on the three examples, the LibreOffice conversion for ODT and DOCX, the EPUB structural checks, and a smoke test on Windows and macOS. The commands are in [`verification.md`](verification.md).
+3. **Refresh the documentation.** Read the README and every file in `docs/` as one set, remove stale statements and make sure the examples match the current behavior.
+4. **Consolidate the changelog.** Keep the user-visible history and make the 1.0.0 notes state the compatibility promise.
+5. **Set the version and tag.** Set `1.0.0` in `Cargo.toml`, create a signed tag, push it to the canonical bare and publish the project.
+
+The compatibility promise after 1.0.0 is intentionally simple: an additive optional template key is a minor application release and keeps the current schema version; removing a key or changing its meaning is a major release and bumps the schema version; a deprecated key keeps working for one minor cycle.
+
+## Contract for a release
+
+A release is ready when all of the following are true:
+
+- The new behavior has a test that fails before the change and passes after it.
+- `cargo fmt --check`, `cargo clippy --workspace --all-targets --all-features -- -D warnings`, `cargo test --workspace --all-features -- --test-threads=1`, `cargo test --doc` and `cargo doc --no-deps` pass.
+- Markdown lint passes and the examples are regenerated when the output changed.
+- Expected failures are error values with domain variants. Library code has no `unwrap`, `expect`, `panic!` or unchecked indexing.
 - User-visible changes update `README.md`; settled decisions update `docs/architecture.md`; schema changes update `docs/template.md`; new validation tools update `docs/verification.md`.
-- Output changes regenerate the examples and re-run their verification. Deterministic outputs stay byte-identical across two runs.
 - `CHANGELOG.md` records the change, and the version follows the rules in `README.md`.
-
-## Phase 1: CLI
-
-**Goal.** Make one invocation the stable contract for every format: what is read, which format is produced, where it is written and what the exit code means.
-
-**Current state.** Positional file arguments, `--template`, `--output`, `--check`, per-file diagnostics, atomic writes and `--version`. Each input is parsed and resolved independently.
-
-**Status.** Done in 0.6.0: directory discovery, output planning, generalized atomic writes and ANSI-styled output.
-
-**Work.**
-
-- Accept directories as inputs, walk them recursively, collect `.md` files in lexicographic path order and skip hidden directories and `target/`. Do not follow directory symlinks, so a cycle cannot hang the run. A directory with no Markdown is a warning, not a failure.
-- Introduce an internal `OutputFormat` enum now, with `Pdf` as the only exposed variant. Add `--format` when the second backend lands. The enum keeps the CLI free of stringly-typed branches later.
-- Generalize `write_atomic`: it currently hardcodes `pdf.tmp`. Derive the temporary name from the final extension and keep the same-directory rename, so the write stays atomic for every format.
-- Keep the current overwrite policy: an existing output is replaced atomically. Add a flag only if a real user need appears.
-- Keep processing the batch after a failure, report one error per input on stderr, and exit with `1` when any input fails. `--check` keeps reporting success without writing.
-- Keep help and error strings in English, stable enough to test, and never print document content.
-
-**Done when.** `pageformer docs/` renders every Markdown file under the tree in a deterministic order, one bad file does not stop the others, both modes are covered by CLI tests that write only to temporary directories, and no test writes into `assets/examples/`.
-
-## Phase 2: PDF
-
-**Goal.** Turn the current backend into the reference implementation: the schema fields every paged format needs, with PDF/A conformance and deterministic bytes preserved.
-
-**Current state.** PDF/A-2b through Typst 0.15.1, page size, orientation, margins, letterhead, body and title styles, leading, paragraph spacing, header spacing, alignment, local images, headings, lists, tables, quotes, code, footnotes, embedded fonts and a fixed document date.
-
-**Status.** Started in 0.7.0 and expanded in 0.9.0 with schema 0.5, `formatting.paragraph`, `formatting.heading` with `h1` to `h6`, weight, style, inline emphasis and strong overrides, point lengths and a length-based leading. In 0.10.0 the optional `page.header`, `page.footer` and `table` sections, the `Block::PageBreak` model block and the frontmatter `date`, `subject` and `keywords` landed inside schema 0.5, because omitting them preserves the output of an existing template. In 0.27.0 schema 0.6 added `formatting.list` and moved `table` under `formatting`, so every presentation field lives in one section. In 0.29.0 schema 0.7 renamed `formatting.rule` to `formatting.horizontal_rule` and replaced the `{pagebreak}` marker with `-pagebreak-`, with `-!-` as a shorthand and `-horizontal-` for the thematic break. The examples demonstrate them in 0.10.1: the shared template adds a page-number header clear of the letterhead, and the nested `tecnico/` example uses its own template without a letterhead to show the full header, footer, table style and page break. In 0.11.0 the page-break marker became `{pagebreak}`, later replaced in 0.29.0. Phase 2 closed in 0.12.0 with `page_break_before` per heading level, a weak break that does not create a blank page. An inline audit in 0.12.1 added tests for every inline construct and documented the exclusions: math, superscript, subscript, highlight, wikilinks and inline HTML stay outside the contract. Superscript and subscript are deferred until after 1.0.0, because the Zed preview does not render them and `~x~` is already strikethrough. Typst already avoids widows and orphans through its paragraph costs, so no field is exposed, and PDF/A-2u is not declared: veraPDF reports only the conformance identifier for 2u when the file declares B.
-
-**Work.**
-
-- Add optional template fields with defaults that preserve the current output: `page.header` and `page.footer` with left, center and right slots; `table` for borders, header fill and cell padding; and a per-level heading flag that starts a new page.
-- Define template tokens separately from document confidential fields. Lowercase tokens such as `{page}`, `{pages}`, `{title}` and `{author}` are expanded only in header and footer slots, and an unknown lowercase token is a template error. Uppercase `{NAME}` is a body field and is rejected in running content.
-- Set the Typst text language from the frontmatter, pass image alternative text, keep table header rows and footnotes semantic, and let Typst build the outline from headings. Check that the tagged output survives these changes.
-- Extend the frontmatter only when a backend needs the field. Candidate fields for this phase are `date`, which replaces the fixed date when present and must also drive the Typst world date so deterministic output holds, plus `subject` and `keywords`. Each new field is validated and documented in `docs/template.md`.
-- Expose Typst's widow and orphan handling only through template fields that the examples actually use. Do not add knobs speculatively.
-- Keep PDF/A-2b as the default. Decide whether to emit PDF/A-2u when every character maps to Unicode, as the architecture allows, and keep PDF/UA-1 out unless a user need appears.
-
-**Done when.** Every new field has a schema test, a source-generation test and an example that uses it; all fixtures still pass veraPDF as PDF/A-2b; two runs produce identical bytes; the page-break and token rules are documented in `docs/architecture.md` and `docs/template.md`.
-
-## Phase 3: Confidentiality
-
-**Goal.** Resolve placeholders once, in the model, before any backend, and make a leak impossible by construction.
-
-**Status.** Done in 0.13.0, with the values file moved to an INI-style format in 0.14.0. The user-level folder mapping arrived in 0.40.0. The design is described in [`architecture.md`](architecture.md#confidentiality) and [`confidential.md`](confidential.md), and the implementation lives in `src/confidential.rs`, `src/confidential/loader.rs` and `src/confidential/config.rs`. The example workflow lives in `escritorio/`, `confidencial/` and `publicacao/`: `Embargos.md` uses fields for the fictional names, documents, addresses, court, process number, lawyers and case identifiers, and `embargos.ini` supplies the values.
-
-**Work.**
-
-- `ConfidentialName` is an uppercase `[A-Z][A-Z0-9_]*` newtype, and `ConfidentialValue` never prints itself through `Debug` or `Display`. The value is built only by the loader.
-- Only text inlines are scanned. Code spans, code blocks, link destinations, link titles, image destinations and frontmatter are excluded. A lowercase or spaced brace such as `{nome}` stays ordinary text.
-- An unknown placeholder is fatal. The error names the placeholder and its block location, never a value, and never leaves the token in the output.
-- The public `config.yaml` lists confidential directories; each confidential directory contains a `confidential.yaml` mapping an INI file name to the absolute source folder it serves. The `.ini` suffix is implicit when absent and may be explicit; names may contain spaces, so the template never knows the file. The map resolves by the longest source-folder prefix. An explicit `--confidential-file` or GUI field wins. The confidential directory is `700` and its map and INIs are `600` on Unix. The mapping is read only from the user configuration directory, never from the project.
-- Values come from `PAGEFORMER_CONFIDENTIAL_<NAME>` environment variables or from an INI-style `NAME = value` file outside the source tree; no value is accepted on the command line. Whitespace around the name, the `=` and the value is trimmed, `#` and `;` start a comment only at the beginning of the line, and sections, quotes and escapes are not supported. The file overrides the environment, duplicate names are rejected and Unix requires `chmod 600`.
-- Substitution happens after parsing and before asset loading, so every backend receives final text. The model returns a new document; the store never reaches a backend.
-- A document with confidential fields requires an output directory outside its source tree. Paths are canonicalized before the comparison, so `.` and `..` cannot disguise an output inside the tree. `--check` lists field names only.
-- Known values are redacted from warnings and errors before they reach stderr, because Typst diagnostics can quote the generated source.
-- Tests cover substitution in every container, code and destinations untouched, frontmatter rejection, the output rule, `--check` names only, the permission check and the file and environment precedence. The CLI test asserts that no value appears in stdout, stderr or the PDF XMP metadata.
-
-**Done when.** A confidential document cannot be written next to its source, no output path can expose a value, and every later backend receives substituted text from the model without ever seeing the store.
-
-## Phase 4: TXT
-
-**Goal.** Prove the renderer boundary with the cheapest format and supply the copy-as-plain-text action the GUI will expose.
-
-**Status.** Done in 0.15.0. `src/render.rs` holds the `Renderer` trait and the backend-neutral `Rendered` value; `src/txt.rs` implements the text view without assets and without failure; `--format` selects `pdf` or `txt`; the office and technical examples have text goldens beside their PDFs.
-
-**Work.**
-
-- Introduce the `Format` enum and the renderer contract, and move PDF under it. The pipeline resolves the document, template and assets, then calls one backend that returns bytes and warnings. Keep the trait small and backend-neutral.
-- Extract asset resolution from `src/pdf/assets.rs` only as far as the new backends need it. The per-format policy stays explicit, for example PDF and ODT reject PDF images while HTML can embed them.
-- Decide and document the plain-text rules: UTF-8 with LF, no automatic wrapping, one blank line between blocks, headings as their text, dash and ordered markers followed by a space (for example `-` and `1.`), nested indentation, tables as tab-separated cells with a separator row, quotes prefixed by a greater-than sign and a space, code blocks preserved, links as `label (destination)`, images as `[alt]`, footnotes collected at the end, soft breaks as spaces and hard breaks as newlines.
-- TXT ignores layout fields, but the semantic template is still resolved, so a broken template fails the same way for every format.
-- Add `--format txt` and the `.txt` output rule. The default output stays next to the source unless `--output` is given.
-- Add golden text fixtures for both examples and focused cases for tables, lists, quotes and footnotes. Normalize line endings in the comparison, not in the output.
-
-**Done when.** `--format txt` writes a readable file for both fixtures, the PDF output is unchanged by the new boundary, and the GUI can call the same pure function without a second conversion path.
-
-## Phase 5: ODT
-
-**Goal.** Deliver the second-priority format with the same semantic styles as the PDF.
-
-**Status.** Done in 0.16.0. `src/odt/` writes the ODF parts and `src/zip.rs` packages them with stored entries and fixed timestamps. Page layout, fonts, headings, tables, letterhead, running header and footer, footnotes, images and metadata are mapped from the template and the model. The three examples are generated as ODT, open in LibreOffice without repair, and the packages are byte-identical across runs.
-
-**Work.**
-
-- Choose the writer before coding. Prefer a small internal ODF writer, with a minimal ZIP dependency, over a full ODT library, unless a maintained crate covers styles, images, footnotes and deterministic packaging; record the decision in `docs/architecture.md`. Reject a crate that cannot express the template fields.
-- Build the package with `mimetype` first and stored, then `META-INF/manifest.xml`, `content.xml`, `styles.xml` and `meta.xml`. Fix the entry order and timestamps.
-- Map the template to ODF styles: page layout, font faces with a generic fallback, size, leading, paragraph spacing, alignment, headings, lists, tables, letterhead and footnotes.
-- Map the document to ODF content: blocks, inlines, images under `Pictures/`, links and footnotes. Alerts become block quotes with a visible label, because ODF has no alert concept.
-- Write title, author, language and generator to the metadata. Never write a confidential value.
-- Test the package structurally: unzip, parse every XML part, assert that `mimetype` is first and stored, and compare two renders byte for byte. Add an optional LibreOffice headless conversion as a smoke test and document the command in `docs/verification.md`.
-
-**Done when.** Both fixtures open without repair, the text and structure match the model, a style change in the template is visible in the ODT, and two runs are byte-identical.
-
-## Phase 6: DOCX
-
-**Goal.** Produce the format reviewers expect, with lists, tables and footnotes intact.
-
-**Status.** Done in 0.17.0. `src/docx/` writes the OOXML parts and package, reusing `src/zip.rs` and the shared metrics. Every list has its own numbering instance with start overrides, table header rows repeat, the template supplies borders, fill and padding, footnotes and hyperlinks are packaged, and the letterhead floats behind the header. The three examples open in LibreOffice without repair and are byte-identical across runs.
-
-**Work.**
-
-- Choose between `docx-rs` and a hand-written OOXML writer, judged by determinism and coverage of the template fields. Reuse the semantic style resolution from ODT, never the ODF XML.
-- Build the package: content types, relationships, `word/document.xml`, `word/styles.xml`, `word/numbering.xml`, `word/footnotes.xml`, media, and the core and app properties.
-- Give each list its own numbering instance, so legal numbering restarts where the document says and tight and loose lists stay distinct.
-- Repeat table header rows, apply borders and cell padding from the template, and take cell alignment from Markdown.
-- Fix the core properties, the relationship ids, the numbering ids and the ZIP timestamps for determinism.
-- Test the package structurally, smoke-test it in LibreOffice on Linux and in Word on Windows when available, and optionally round-trip it to text. DOCX has no conformance profile comparable to PDF/A.
-
-**Done when.** Both fixtures open in Word and LibreOffice without repair, lists and footnotes survive the round trip, and two runs produce identical bytes.
-
-## Phase 7: Minimal GUI
-
-**Goal.** Expose the pipeline in a minimal egui converter without duplicating any of it. The WYSIWYG editor, Pageweaver, is a separate project; it calls the same library for export and starts only after 1.0.0.
-
-**Status.** Started in 0.31.0. In 0.31.1 the window followed `SKETCH.md`, with the format buttons in a column on the right, a clickable drop box backed by zenity on Linux, and the output folder prefilled from the source. In 0.31.3 Confidential moved under Advanced, every label, field and button gained a tooltip, and Output gained a folder picker. In 0.31.4 Output also moved under Advanced and keeps the automatic fill from the selected file, the redundant manual Markdown path was removed, and the tooltips got their own compact high-contrast frame. In 0.32.0 Advanced gained a template override, the path rows became aligned with right padding, the tooltip text grew, and the window became compact. In 0.32.1 the window height follows the content exactly, so the scroll area and the empty band are gone, and the selected file is shown in a quiet baby blue. In 0.32.2 the tooltip uses a regular-weight face and the 520-point minimum width is enforced programmatically. In 0.32.3 the window embeds Liberation Sans Regular for every proportional label, button and tooltip, so the interface is consistent and crisp without system fonts. In 0.32.4 the tooltip text and frame use softer grays, so the hint no longer jumps against the dark window. In 0.33.0 the format column lists six colored buttons in the requested order, HTML and EPUB are disabled placeholders, the TXT button gained a `Copy` half for the clipboard, and the pipeline exposes `render` for bytes without a file. The drop box matches the button column. In 0.34.0 the PDF footnote marker stays inline with the first note paragraph, and the embedded default template declares every schema key as a complete reference. In 0.34.1 each main group in that template carries a short explanatory comment. In 0.35.0 the user accepted the interface and the HTML button became active; the windowed smoke test is no longer a blocker. In 0.36.0 the EPUB button became active, so every format button has a backend. The state machine and paths are tested, and Pageweaver starts after 1.0.0.
-
-**Work.**
-
-- The pipeline and the export API are in the library (`src/pipeline.rs`); the CLI, the minimal GUI and Pageweaver call the same functions.
-- Ship a small converter window, `pageformer-publisher`: a clickable drop box with the format buttons in a column on the right, a template label with edit and open-folder actions, a status line, an open-output action and a tooltip on every label, field and button. The CLI remains the main workflow.
-- Model the window as a state machine with `Idle`, `Working`, `Succeeded` and `Failed`. Render on a worker thread and communicate through a channel, so the frame loop never blocks; a second request while working is disabled, not queued.
-- Call the same pipeline. The GUI never parses Markdown, resolves a template or writes a file itself.
-- Require an output directory outside the source tree when the document contains placeholders, default the field to the source folder, give it a Choose folder button, and never display a confidential value.
-- Show errors in the status line and never panic on a bad file, a missing template or a failed render.
-- Test the pure state transitions, input validation and button enablement. Keep the manual smoke test documented; use snapshot tests only if they stay deterministic.
-
-**Deferred.** A guided `Remember for this folder` action that saves the selected INI into the confidential map is a roadmap note, not a decision. Open questions: which confidential directory to use, whether to copy an INI that lives outside it or only accept one already inside, and whether an existing folder mapping may be replaced after confirmation. Nothing is implemented.
-
-**Done when.** A file can be dragged in and every implemented format generated, a template failure is visible without a crash, and the window stays responsive during a render.
-
-## Phase 8: HTML
-
-**Goal.** Produce a self-contained HTML view, the base for EPUB and the CSS boundary for the Pageweaver preview.
-
-**Status.** Done in 0.35.0. `src/html/` writes one semantic HTML5 file with embedded CSS and data-URI images. The screen view follows the template in a page-like container; the print rules carry the page size, margins, page breaks, the letterhead as a page background and the running header and footer as `@page` margin boxes. Links allow relative destinations and `http`, `https` and `mailto`; any other scheme becomes text with a warning. Footnotes use `role="doc-endnotes"` with backlinks, and `html::stylesheet` exposes the CSS to the Pageweaver preview. The three fixtures render deterministically, and the examples are committed.
-
-**Work.**
-
-- Write one `.html` file with embedded CSS and data-URI images. The output makes no network request and is suitable for email.
-- Use semantic HTML: headings, paragraphs, lists, tables with `thead`, block quotes, alerts, code with language classes, footnotes with `role="doc-endnotes"` and images with `alt`.
-- Derive CSS from the template: page size and margins for print, fonts, size, leading, paragraph spacing, alignment, heading styles and table styling. Decide how the letterhead appears on screen and in print, and do not fake pagination.
-- Escape all text and attributes. Link destinations may be remote and are emitted escaped, never fetched; images stay local and embedded. Restrict schemes to `http`, `https` and `mailto` and reject `javascript:` and `data:` at the boundary.
-- Take title, author and language from the frontmatter.
-- Expose the generated CSS to Pageweaver's preview, so the editor does not reparse the template; the preview is visually close, not byte-identical to the PDF.
-- Fix the order of style rules and attributes for deterministic bytes.
-- Compare the rendered HTML as normalized text for both fixtures, and add focused tests for escaping, tables and footnotes.
-
-**Done when.** The file opens offline, print preview follows the template, and the block and inline conversion is reusable by the EPUB backend.
-
-## Phase 9: EPUB
-
-**Goal.** Package the HTML view as an EPUB 3 without a second converter.
-
-**Status.** Done in 0.36.0. `src/epub/` splits at first-level headings, reuses the HTML content with a relative image source, writes a reflowable CSS subset, and builds a deterministic package with `mimetype` first, `container.xml`, `content.opf`, `nav.xhtml`, chapters, CSS and images. Footnotes stay per chapter. The frontmatter `identifier` overrides a UUID v5 derived from the metadata and chapter bodies; the modified timestamp comes from the frontmatter date or the fixed date. The three examples are committed and the package is tested structurally.
-
-**Work.**
-
-- Split at each first-level heading; content before the first heading becomes the introduction; empty chapters are skipped. Build the navigation from the same headings.
-- Reuse the HTML block and inline conversion, adding a chapter wrapper, a CSS subset and the metadata.
-- Build the package with `mimetype` first and stored, then `META-INF/container.xml`, `content.opf`, `nav.xhtml`, chapters, CSS and images.
-- Take title, language and author from the frontmatter. Settle the identifier: the architecture proposes a random UUID v4 per build, which conflicts with deterministic output; prefer a UUID v5 derived from a stable content hash unless the frontmatter supplies an identifier. Record the decision.
-- Validate with `epubcheck` when installed, test the package structurally, and compare two renders byte for byte.
-
-**Done when.** The EPUB passes `epubcheck`, chapters and navigation match the headings, images display offline, and two runs produce identical bytes.
-
-## Phase 10: Release 1.0.0
-
-**Goal.** Declare the document model and the template schema stable.
-
-**Work.**
-
-- Review stability: no pending breaking change to the template schema or the document model, and every promised format implemented and documented.
-- Run the full verification matrix: the Rust checks, Markdown lint, veraPDF on both examples, DOCX, ODT and EPUB validation, a Linux smoke test and a Windows and macOS check.
-- Set `1.0.0` in `Cargo.toml`, consolidate `CHANGELOG.md`, refresh the README usage and examples, and create a signed tag.
-- State the compatibility promise for after 1.0.0: additive optional template keys are minor app releases and keep the current schema version; removing or changing a key is a major release and bumps it; a deprecated key keeps working for one minor cycle.
-
-**Done when.** The full verification matrix passes on a clean checkout and the release notes state the compatibility promise.
 
 ## Template schema map
 
-| Area | Keys | Phase | Notes |
-|---|---|---|---|
-| Version | `version` | 0.9.0 | Two-part string; schema `0.7` is current. |
-| Page | `page.size`, `page.orientation`, `page.margins`, `page.background`, `page.letterhead` | 0.5.0 | Shared by every paged format; the page fill arrived in 0.37.0 and also reaches the HTML page and the EPUB body. |
-| Paragraph | `formatting.paragraph` | 0.9.0 | Font families, size, weight, style, leading, spacing, alignment, `foreground` (0.21.0), `background`, `code` and `strikethrough` (0.23.0) and the inline overrides. |
-| Inline spans | `formatting.paragraph.emphasis`, `formatting.paragraph.strong` | 0.9.0 | Inherit the paragraph face and its `foreground`; style italic and weight bold are the semantic defaults; `background` since 0.23.0. |
-| Code and strikethrough | `formatting.paragraph.code`, `formatting.paragraph.strikethrough` | 0.23.0 | Inherit the paragraph face; since 0.25.0 an undeclared key follows the paragraph instead of a renderer default. |
-| Blocks | `formatting.quote`, `formatting.code_block` | 0.23.0 | Face and colors for block quotes and fenced code blocks; `alignment` and per-side `border` since 0.24.0; the face inherits the paragraph since 0.25.0. |
-| Headings | `formatting.heading`, `formatting.heading.h1` to `h6` | 0.12.0 | Base plus per-level overrides for fonts, size, weight, style, spacing, `page_break_before`, `background` and `rule`; since 0.20.0 the base map carries `background` and `rule`, and a level clears them with `none`; `foreground` arrived in 0.21.0 and follows the same inheritance. |
-| Rule | `formatting.horizontal_rule`, `formatting.heading.h1` to `h6` `rule` | 0.18.0 | Thematic break thickness, color and optional spacing, and a rule below each heading level, shared by every format; the level rule arrived in 0.19.0 and `none` in 0.20.0. `formatting.rule` was renamed to `formatting.horizontal_rule` in 0.29.0. |
-| Header and footer | `page.header`, `page.footer` | 0.10.0 | Running content in left, center and right slots; lowercase tokens only. |
-| Lists | `formatting.list` | 0.27.0 | Item face, colors and alignment, indent, marker gap, per-level bullets, numbering formats with a suffix, and loose-item spacing. |
-| Images | `formatting.image` | 0.38.0 | Block images: alignment (default center), maximum width, per-side border with padding and background; the Markdown markers set width, height and alignment. |
-| Tables | `formatting.table` | 0.10.0 | Border, border color, header fill and cell padding; moved under `formatting` in 0.27.0. |
-| EPUB | `epub.split_at` | After 1.0.0 | Defaults to first-level headings. |
+The schema version is `0.7`. The embedded `assets/default.pageformer.yaml` is the complete reference: every accepted key is declared there, and keys that are absent by design are commented.
 
-Schema evolution follows one rule: an optional key that preserves the meaning and the output of existing templates keeps the current schema version; removing a key or changing the meaning of an existing one bumps the schema version and is a breaking change. A newer template with an unknown key is rejected by an older build, which is the intended failure.
+| Area | Keys | Notes |
+|---|---|---|
+| Version | `version` | A quoted two-part string; this build accepts only `"0.7"`. |
+| Page | `page.size`, `page.orientation`, `page.margins`, `page.background`, `page.letterhead` | Size, orientation and margins reach the paged formats and HTML; EPUB uses only the background. The letterhead is shared by the paged formats and the HTML print page. |
+| Running content | `page.header`, `page.footer` | Left, center and right slots with the lowercase page and metadata tokens. |
+| Paragraph | `formatting.paragraph` | Font families, size, weight, style, leading, spacing, alignment, foreground, background and the inline overrides. |
+| Inline spans | `emphasis`, `strong`, `code`, `strikethrough`, `link` | Inherit the paragraph face; only declared keys override it. A link adds `underline`, off by default. |
+| Blocks | `formatting.quote`, `formatting.code_block` | Face, colors, alignment and per-side border. Both are left aligned by default. |
+| Headings | `formatting.heading`, `h1` to `h6` | A base map plus per-level overrides for font, size, weight, style, spacing, page break, background and rule. A level clears an inherited value with `none`. |
+| Horizontal rule | `formatting.horizontal_rule` | Thickness, color and spacing for the thematic break and for a heading rule. |
+| Lists | `formatting.list` | Item face, colors and alignment, indent, marker gap, bullets, numbering formats with a suffix, and loose-item spacing. |
+| Task lists | `formatting.list.task` | Gap, bullet visibility, and the done and todo marker strings and styles. |
+| Images | `formatting.image` | Block image alignment, maximum width, per-side border with padding, and background. |
+| Tables | `formatting.table` | Border, border color, header fill and cell padding. |
+
+Schema evolution follows one rule: an optional key that preserves the meaning and the output of existing templates keeps the current schema version; removing a key or changing its meaning bumps the schema version and is a breaking change. A newer template with an unknown key is rejected by an older build, which is the intended failure.
 
 ## Frontmatter map
 
-| Field | Phase | Purpose |
-|---|---|---|
-| `title`, `author`, `language` | 0.5.0 | Document metadata; the PDF uses the title as metadata, and level-1 headings use `formatting.heading.h1`. |
-| `date` | 0.10.0 | Document date; replaces the fixed date when present. |
-| `subject`, `keywords` | 0.10.0 | PDF metadata and HTML meta tags. |
-| `identifier` | 9 | Stable EPUB identifier; overrides the derived UUID. |
+| Field | Purpose |
+|---|---|
+| `title`, `author`, `language` | Document metadata. The PDF uses the title as metadata, and the visible title is the first-level heading. |
+| `date` | The document date. It replaces the fixed PDF date when present. |
+| `subject`, `keywords` | PDF metadata and HTML meta tags. |
+| `identifier` | The stable EPUB identifier. Without it, EPUB derives a UUID v5 from the content. |
 
 ## Risks to watch
 
-- **Repeated escaping.** Each output language needs its own escaper: Typst markup and strings, XML, HTML and JSON in EPUB metadata. Share nothing between them except the tests and the rule that user text is never trusted.
-- **Broken determinism.** ZIP timestamps, random identifiers, map iteration order and current time are the usual causes. Fix the first three as soon as the first ZIP format lands, and assert byte equality in every output test.
-- **Confidential leaks through diagnostics.** Compilers quote source text. Redact known values at the error boundary, not only in the happy path.
-- **Unsafe link schemes.** The parser accepts any link destination today. HTML must reject `javascript:` and `data:`, and the shared model should validate schemes once so no backend can emit a dangerous target.
-- **Blocking the GUI.** A render takes long enough to freeze a frame loop. Keep it on a worker thread from the first version.
-- **Schema drift.** Adding fields without updating `docs/template.md` and the tests makes the version meaningless. Treat the schema map above as part of the phase contract.
-- **Premature abstraction.** Do not add a backend-specific hook to the renderer before two backends need it, and do not start the GUI before the formats it exposes exist.
+- **Repeated escaping.** Each output language needs its own escaper: Typst markup and strings, XML, HTML and JSON in EPUB metadata. Share the rule that user text is never trusted, not the escaping code.
+- **Broken determinism.** ZIP timestamps, random identifiers, map iteration order and the current time are the usual causes. Keep them fixed in every ZIP format, and assert byte equality in every output test.
+- **Confidential leaks through diagnostics.** Compilers quote source text. Redact known values at the error boundary, not only on the happy path.
+- **Unsafe link schemes.** Reject `javascript:` and `data:` at the shared model boundary, so no backend can emit a dangerous target.
+- **Blocking the window.** A render can take long enough to freeze a frame loop. Keep it on a worker thread.
+- **Schema drift.** Adding fields without updating `docs/template.md` and the tests makes the version meaningless. Treat the schema map above as part of the release contract.
+- **Premature abstraction.** Do not add a backend-specific hook before two backends need it, and do not start the editor before the formats it exposes exist.

@@ -68,7 +68,7 @@ The INI name is a single file name with an optional `.ini` suffix; it cannot con
 3. The folder mapping in the confidential directories.
 4. No file, with only the `PAGEFORMER_CONFIDENTIAL_*` variables.
 
-The environment is read first and the INI overrides it, as before. An explicit file wins over the mapping and is loaded once for the run.
+The environment is read first, and an INI file overrides it for the names it declares. An explicit file wins over the folder mapping and is loaded once for the run.
 
 ## Failures
 
@@ -78,7 +78,7 @@ For a batch, an INI mapping that fails to load affects the documents that use it
 
 ## Values
 
-The INI format is one `NAME = value` per line, with `#` or `;` starting a comment. `--check` lists the field names only. Values never appear in the terminal output, the warnings, the PDF XMP metadata, the office properties, the HTML head, the EPUB OPF, the navigation or an error message.
+The INI format is one `NAME = value` per line, with `#` or `;` starting a comment. A field must stay within one text run: inline formatting or a line break inside the name splits it, and the parts stay literal text. An unknown field is an error, never text left in the final document. `--check` lists the field names only. Values never appear in the terminal output, the warnings, the PDF XMP metadata, the office properties, the HTML head, the EPUB OPF, the navigation or an error message.
 
 ## GUI and Pageweaver
 

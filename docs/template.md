@@ -1,6 +1,6 @@
 # Template
 
-One YAML template drives every output format. The schema is versioned, and a template written for another version is rejected instead of being interpreted with different rules.
+One YAML template drives every output format. The schema is versioned, and a template written for another version is rejected instead of being interpreted with different rules. The embedded `assets/default.pageformer.yaml` is the complete reference: it declares every accepted key, with a short comment before each main group, and commented keys show what is available but absent by design.
 
 ## Resolution
 
@@ -16,163 +16,54 @@ Without either, the fallback embedded in the binary is used. It is the same file
 
 Paths written in the template, such as the letterhead image, resolve relative to the template file, never to the working directory.
 
-## Schema
+To use the same settings in another project, copy the template to the document directory as `.pageformer.yaml`, pass it with `--template`, or choose it under Advanced in `pageformer-publisher`.
+
+## A small example
+
+The file is a set of named sections. Every section and every key is optional except `version`:
 
 ```yaml
 version: "0.7"
 
 page:
   size: a4
-  orientation: portrait
   margins:
     top: 30mm
     bottom: 30mm
     left: 30mm
     right: 25mm
-  background: "#fdfdfd"
-  letterhead: images/letterhead.png
   header:
-    left: "{title}"
     right: "Page {page} of {pages}"
-  footer:
-    center: "{author}"
 
 formatting:
   paragraph:
     font_families:
-      - Linux Libertine O
       - Liberation Serif
     size: 12
-    weight: normal
-    style: normal
-    foreground: "#222222"
-    background: "#fdfdfd"
     leading: 7.8
     spacing: 24
     alignment: justified
-    emphasis:
-      style: italic
-    strong:
-      weight: bold
-    code:
-      size: 10.5
-      foreground: "#7a2a5a"
-      background: "#f2eef6"
-    strikethrough:
-      foreground: "#7a2a2a"
-    link:
-      foreground: "#0563c1"
-      underline: true
-  quote:
-    foreground: "#2a4d7a"
-    background: "#eef4fb"
-    border:
-      left: 3pt
-      color: "#bbbbbb"
-      padding: 8
-  code_block:
-    size: 10.5
-    background: "#f4f4f4"
-    border:
-      top: 0.5pt
-      bottom: 0.5pt
-      color: "#bbbbbb"
-      padding: 6
-  image:
-    alignment: center
-    max_width: 100%
-    background: "#ffffff"
-    border:
-      top: 1pt
-      right: 1pt
-      bottom: 1pt
-      left: 1pt
-      color: "#336699"
-      padding: 6
-  list:
-    foreground: "#222222"
-    background: "#f7f7f7"
-    alignment: left
-    indent: 0.6cm
-    marker_gap: 0.5cm
-    bullet:
-      - "•"
-      - "–"
-      - "◦"
-    numbering:
-      format:
-        - decimal
-        - lower-alpha
-        - lower-roman
-      suffix: "."
-    spacing: 6pt
-    task:
-      gap: 1
-      bullet: false
-      done:
-        marker: "[x]"
-        foreground: "#2e7d32"
-        weight: bold
-      todo:
-        marker: "[ ]"
-        foreground: "#777777"
   heading:
-    font_families:
-      - Linux Biolinum O
-      - Liberation Sans
     weight: bold
-    style: normal
-    foreground: "#222222"
-    spacing_before: 18
-    spacing_after: 6
     h1:
       size: 18
       background: "#eeeeee"
-    h2:
-      size: 14
-      spacing_before: 12
-      spacing_after: 4
-      rule:
-        thickness: 0.5pt
-        color: "#888888"
-        spacing_before: 3
-    h3:
-      size: 12
-      spacing_before: 10
-      spacing_after: 4
-    h4:
-      size: 12
-      spacing_before: 8
-      spacing_after: 2
-    h5:
-      size: 12
-      spacing_before: 8
-      spacing_after: 2
-    h6:
-      size: 12
-      spacing_before: 8
-      spacing_after: 2
-  horizontal_rule:
-    thickness: 0.5pt
-    color: "#888888"
-    spacing_before: 12
-    spacing_after: 12
   table:
     border: 0.5pt
-    border_color: "#bbbbbb"
     header_fill: "#eeeeee"
-    cell_padding: 6pt
 ```
 
-Every section and every key is optional except `version`. Missing keys take the defaults described below, but an unknown key is an error, so a typo never changes the layout silently. The embedded default template, `assets/default.pageformer.yaml`, declares every key the schema accepts, with a short comment before each main group, so it doubles as a starting point; keys that are absent by design, such as a paragraph fill or a letterhead, appear commented there.
+Missing keys take the defaults described below. An unknown key is an error, so a typo never changes the layout silently. A map with no keys, such as `rule: {}`, means the defaults for that section, not `none`. The value `none` is a sentinel that clears an inherited fill or rule; it is not a color.
 
-### `version`
+The template carries presentation only. Document metadata, such as the title, the author and the language, comes from the Markdown frontmatter, so one template can serve many documents.
 
-The schema version is a string in the form `major.minor`, quoted so YAML cannot turn it into a float. This build accepts `"0.7"` and rejects every other value. Version 0.5 replaced the `text` section with `formatting`, made `paragraph` and `heading` explicit, added `weight` and `style`, and added the `emphasis` and `strong` inline overrides. The optional `page.header`, `page.footer` and `formatting.paragraph.link` sections and the frontmatter `date`, `subject` and `keywords` were added inside version 0.5. Version 0.6 added `formatting.list` and moved `table` under `formatting`, so one section owns every presentation field; a template written for 0.5 is rejected instead of being read with the old path. Version 0.7 renamed `formatting.rule` to `formatting.horizontal_rule`, so the key names the horizontal rule it styles; a template written for 0.6 is rejected instead of being read with the old path.
+## `version`
 
-### Document metadata
+The schema version is a string in the form `major.minor`, quoted so YAML cannot turn it into a float. This build accepts `"0.7"` and rejects every other value, including older templates. Rejecting an old template is deliberate: reading it with the current rules could change the layout silently. The changelog records the schema history.
 
-The template carries no title, author or language, so one template serves many documents. Those values come only from the Markdown YAML frontmatter:
+## Document metadata
+
+The template carries no title, author or language. Those values come only from the Markdown YAML frontmatter:
 
 ```yaml
 ---
@@ -196,22 +87,20 @@ identifier: urn:isbn:9780000000000
 
 `identifier` is an optional non-empty identifier such as an ISBN, a URN or a UUID. It becomes the EPUB `dc:identifier`; without it, the EPUB derives a UUID v5 from the metadata and the rendered chapters, so two runs stay identical.
 
-A confidential field such as `{NOME}` is not allowed in any frontmatter value; fields belong to the document body. See the confidentiality section in [`architecture.md`](architecture.md#confidentiality).
+A confidential field such as `{NOME}` is not allowed in any frontmatter value. Fields belong to the document body; see [`confidential.md`](confidential.md). The frontmatter `title` is document metadata, while the visible title is the first-level heading, styled by `formatting.heading.h1`.
 
-The frontmatter `title` is document metadata. The visible title is the first-level heading, styled by `formatting.heading.h1`.
-
-### `page`
+## `page`
 
 - `size`: `a4`, `a5`, `letter`, `legal` or `oficio`, or a map with `width` and `height`. A custom size uses the same units as a length.
 - `orientation`: `portrait` or `landscape`. Landscape swaps the width and the height.
 - `margins`: `top`, `bottom`, `left` and `right`. A missing side defaults to `20mm` (`56.69pt`); a negative value is invalid.
-- `background`: the page fill, as a [color](#colors). It sits under the text and the letterhead. When omitted, the page has no declared fill and the paper stays white. PDF fills the page, ODT fills the page layout, DOCX sets the document background, HTML paints the screen page and the printed paper, and EPUB paints the reflowable body.
+- `background`: the page fill, as a [color](#colors). It sits under the text and the letterhead. When omitted, the page has no declared fill and the paper stays white. The PDF fills the page, ODT fills the page layout, DOCX sets the document background, HTML paints the screen page and the printed paper, and EPUB paints the reflowable body.
 - `letterhead`: a path relative to the template file. The file must be `png`, `jpg`, `gif`, `svg` or `webp`.
 - `header` and `footer`: running content above and below the body, each with `left`, `center` and `right` slot strings. The slots are the same on every page, while their tokens expand per page.
 
-The default size is A4 in portrait orientation. The size and the margins describe the paged formats and the HTML screen and print page; EPUB is reflowable, so it leaves the text column and its margins to the reader.
+The default size is A4 in portrait orientation. The size and the margins describe the paged formats and the HTML screen and print page. EPUB is reflowable, so it leaves the text column and its margins to the reader.
 
-### Running header and footer
+## Running header and footer
 
 A `header` or `footer` map holds up to three slots. Only declared and non-blank slots are drawn; the other positions stay empty, so the remaining slots keep their place.
 
@@ -228,7 +117,9 @@ Any other lowercase token, such as `{nome}`, is a template error, because a typo
 
 The header and footer use the paragraph face. Their content sits inside the top and bottom margins, so a letterhead that already fills those margins needs no running content.
 
-### `formatting.paragraph`
+## `formatting.paragraph`
+
+This section is the base for the body text:
 
 - `font_families`: a non-empty list of font names, tried in order. The default is `Liberation Serif`, `DejaVu Serif` and `Libertinus Serif`.
 - `size`: a positive length. The default is `12pt`.
@@ -237,23 +128,21 @@ The header and footer use the paragraph face. Their content sits inside the top 
 - `foreground`: the text color, as a [color](#colors). When omitted, the text is black.
 - `background`: the fill behind each body paragraph, as a [color](#colors). It covers the text width and applies to body paragraphs only: quotes, lists and table cells keep the background their own style declares. When omitted, there is no fill.
 - `leading`: extra space between lines, as a length. The default is `7.8pt`.
-- `spacing`: space between paragraphs. When omitted, Typst's default spacing applies (`1.2em`).
+- `spacing`: space between paragraphs. When omitted, the PDF falls back to Typst's `1.2em`; the office writers use no extra paragraph spacing in that case.
 - `alignment`: `justified` or `left`. The default is `justified`.
-- `emphasis`: a map of overrides for `*...*` and `_..._`. It inherits from `paragraph`; its `style` defaults to `italic`.
-- `strong`: a map of overrides for `**...**` and `__...__`. It inherits from `paragraph`; its `weight` defaults to `bold`.
-- `link`: a map of overrides for links. It inherits from `paragraph`; its `underline` defaults to `false`.
+- `emphasis`: overrides for `*...*` and `_..._`. It inherits from `paragraph`; its `style` defaults to `italic`.
+- `strong`: overrides for `**...**` and `__...__`. It inherits from `paragraph`; its `weight` defaults to `bold`.
+- `code`: overrides for inline code spans.
+- `strikethrough`: overrides for `~~...~~` text.
+- `link`: overrides for links. It inherits from `paragraph`; its `underline` defaults to `false`.
 
-Inside `emphasis` and `strong`, the allowed keys are `font_families`, `size`, `weight`, `style`, `foreground` and `background`. Only the declared keys override the paragraph values, so an empty map is valid and changes nothing beyond the semantic default. Without its own `foreground`, an inline span keeps the surrounding color: the paragraph color in body text, and the heading color inside a heading. A `background` fills the span itself.
+Inside `emphasis`, `strong`, `code` and `strikethrough`, the allowed keys are `font_families`, `size`, `weight`, `style`, `foreground` and `background`. Only the declared keys override the paragraph values, so an empty map is valid and changes nothing beyond the semantic default. Without its own `foreground`, an inline span keeps the surrounding color: the paragraph color in body text, and the heading color inside a heading. A `background` fills the span itself.
 
-`code` and `strikethrough` style inline code spans and strikethrough text. They accept the same keys as `emphasis` and `strong`, including `font_families`, and every undeclared key inherits the paragraph face: there is no hidden renderer default. A map with only `foreground` changes the color and keeps the paragraph font.
-
-A monospace face has a larger x-height than a proportional one, so at the same point size it looks larger. The reference template sets `code` and `code_block` to 0.875 of the paragraph size, which is `10.5pt` against a `12pt` body; the technical example uses `9.5pt` against `11pt`. The size is explicit in the template, not a hidden backend default.
+A monospace face has a larger x-height than a proportional one, so at the same point size it looks larger. The reference template sets `code` and `code_block` to 0.875 of the paragraph size, which is `10.5pt` against a `12pt` body; the technical example uses `9.5pt` against `11pt`. The size is explicit in the template, not a hidden backend default. Code is monospaced only when the template declares a monospace family.
 
 `link` styles every link, including autolinks and reference links. It accepts the same keys as the other inline styles plus `underline`, a boolean that defaults to `false`. The color, the fill and the underline stay declared-only, so a link with no declaration keeps the surrounding face and color without an underline; the destination never changes the label.
 
-Because of that, code is monospaced only when the template says so. The default template declares a monospace family for `code`, so the different font has a visible reason in the file instead of being a surprise.
-
-### `formatting.heading`
+## `formatting.heading`
 
 The `heading` map is the base for every heading level:
 
@@ -278,7 +167,7 @@ Below a heading, `spacing_before` is the gap between the text and the line, whic
 
 The template sets explicit values for each level. There is no hidden multiplier per level: what the YAML declares is what the PDF uses.
 
-### `formatting.quote` and `formatting.code_block`
+## `formatting.quote` and `formatting.code_block`
 
 Block quotes and fenced code blocks are paragraphs with their own style, outside `paragraph`. Both accept `font_families`, `size`, `weight`, `style`, `foreground`, `background`, `alignment` and `border`. Every undeclared text key inherits the paragraph face, and a quote keeps its one centimeter indent. A code block is monospaced only when the template declares a monospace family, which the default template does.
 
@@ -292,20 +181,20 @@ Block quotes and fenced code blocks are paragraphs with their own style, outside
 
 The recipe for the usual vertical quote rule is `border: { left: 3pt, color: "#cccccc", padding: 8 }`.
 
-### `formatting.image`
+## `formatting.image`
 
-A standalone image becomes an image block with its own geometry. The section applies to block images only; an image written inside a paragraph stays inline and keeps the text flow.
+A standalone image becomes an image block with its own geometry. This section applies to block images only; an image written inside a paragraph stays inline and keeps the text flow.
 
 - `alignment`: `left`, `center` or `right`. The default is `center`, and a per-image `-align:...-` marker overrides it.
 - `max_width`: the maximum width of the image, as a length or a percentage of the text width. The default is `100%`.
 - `border`: the border around the image, with the keys of [`formatting.quote` and `formatting.code_block`](#formattingquote-and-formattingcode_block). The border padding is also the inset between the image and the background fill.
 - `background`: a color behind the image box. When omitted, the box has no fill.
 
-The border and the fill wrap the image, they do not span the full text column. An image with neither a border nor a fill has no extra inset, even when the border padding is declared.
+The border and the fill wrap the image; they do not span the full text column. An image with neither a border nor a fill has no extra inset, even when the border padding is declared.
 
-The per-image markers set the width or the height and the alignment; the colors, the border and the padding stay in the template, so one document keeps a consistent image style.
+The per-image markers set the width or the height and the alignment; the colors, the border and the padding stay in the template, so one document keeps a consistent image style. The marker rules are in [Image files and markers](#image-files-and-markers).
 
-### `formatting.list`
+## `formatting.list`
 
 List items are paragraphs with their own style. The section accepts `font_families`, `size`, `weight`, `style`, `foreground`, `background` and `alignment`, all inherited from `paragraph` when undeclared. `alignment` defaults to `left`, as for quotes and code blocks.
 
@@ -313,7 +202,7 @@ The layout keys are:
 
 - `indent`: the marker indent, added again at each nesting level. The default is `0.5cm`.
 - `marker_gap`: the gap between the marker and the item text. The default is `0.5cm`. The PDF measures it after the marker, ODT reserves it as the label width and DOCX uses it as the hanging indent, so a wide marker can shift the text slightly differently in each engine.
-- `spacing`: the space between loose items, as a length. It follows the same convention as `paragraph.spacing`, so the three formats keep the same distance. When omitted, a loose list keeps the paragraph spacing. A tight list ignores it.
+- `spacing`: the space between loose items, as a length. It follows the same convention as `paragraph.spacing`, so the formats keep the same distance. When omitted, a loose list keeps the paragraph spacing. A tight list ignores it.
 
 The markers are declared as lists and cycled by nesting depth, so a two-entry list never depends on a hidden per-level multiplier:
 
@@ -325,7 +214,7 @@ For example, `format: [decimal, lower-alpha]` and `suffix: "."` render `1.`, `2.
 
 `background` fills the first paragraph of each item. A later paragraph inside the same item keeps the normal body background. In a tight list, adjacent item fills meet, so the list reads as one band; in a loose list, `spacing` stays visible between the bands. A nested list continues the parent band in every format.
 
-### `formatting.list.task`
+## `formatting.list.task`
 
 Task list items are a GFM extension, not CommonMark: the `[x]` and `[ ]` markers become `TaskState` on the item. The `task` map styles the marker itself:
 
@@ -337,7 +226,7 @@ The marker is inline at the start of the item, so a wrapped line aligns with the
 
 `marker` is a string, so it accepts any Unicode glyph, such as `☑`, `☐`, `✔` or `✗`. The PDF embeds it through Typst's font fallback; when the output must be deterministic, declare a `font_families` that contains the glyph. Prefer a monochrome symbol for PDF/A, because a color emoji may not embed with the required profile.
 
-### `formatting.horizontal_rule`
+## `formatting.horizontal_rule`
 
 The thematic break, written as `---`, `***`, `___` or `-horizontal-` in the Markdown body, is drawn as a horizontal rule across the text width. The same keys declare the rule under a heading level, in `formatting.heading.h1` to `h6`, and every format reads them the same way:
 
@@ -347,7 +236,7 @@ The thematic break, written as `---`, `***`, `___` or `-horizontal-` in the Mark
 
 Under `formatting.heading.h1` to `h6`, the same map declares the rule below a heading, and it also accepts `none` to clear a rule inherited from the base heading map.
 
-### `formatting.table`
+## `formatting.table`
 
 The `formatting.table` section styles every table in the document:
 
@@ -358,7 +247,9 @@ The `formatting.table` section styles every table in the document:
 
 ## Page breaks
 
-A paragraph that contains only `-pagebreak-` starts a new page; `-!-` is the shorthand with the same effect. The marker becomes a page break in the document model, so every paged backend reads the same block. Dashes and the exclamation mark are ordinary text to CommonMark, so the Zed preview shows the marker and no raw HTML is involved. Any other occurrence, such as `-pagebreak-` or `-!-` inside a sentence, stays literal text. The old brace form `{pagebreak}` and the backslash form `\pagebreak` are ordinary text.
+A paragraph that contains only `-pagebreak-` starts a new page; `-!-` is the shorthand with the same effect. The marker becomes a page break in the document model, so every paged backend reads the same block. Dashes and the exclamation mark are ordinary text to CommonMark, so the Zed preview shows the marker and no raw HTML is involved.
+
+A marker inside a sentence stays literal text. The old brace form `{pagebreak}` and the backslash form `\pagebreak` are ordinary text too.
 
 ## Colors
 
@@ -382,7 +273,7 @@ An unknown name is an error that names the field, never a silent black. `transpa
 
 A length is a number optionally followed by `mm`, `cm`, `in` or `pt`. A number without a unit is in points, so `30` and `30pt` are the same length. Negative values are rejected, and a font size must be greater than zero.
 
-## Images
+## Image files and markers
 
 Images in the Markdown body resolve relative to the Markdown file, not to the template. Absolute paths are accepted. The supported formats are `png`, `jpg`, `gif`, `svg` and `webp`; `pdf` images are rejected because PDF/A output does not accept them. Remote images are rejected because the program never performs network requests.
 
@@ -406,21 +297,9 @@ A value is a number in pixels, optionally followed by `px`, `mm`, `cm`, `in`, `p
 
 The technical report uses `Diagrama.png` with `-width:70%-` and `-align:center-`; its template declares a white background and a blue border around the image.
 
-## Current backend
+## How the backends use the template
 
-Every format reads the text colors: the body, the headings, emphasis, strong, code, strikethrough and links. TXT has no color and ignores them. A block image is sized by its marker and `formatting.image`, and its border, fill and alignment are shared by the backends; TXT writes `[alt]`. The PDF backend applies the paragraph face, leading, spacing and alignment. It emits one show rule per heading level with the resolved font, size, weight, style and spacing, show rules for `emph`, `strong`, `code` and `strike` from the inline overrides, and a `link` rule that carries the face, color, fill and underline. The ODT and DOCX writers map the same keys to their character styles. A level with `page_break_before` also gets a weak page-break show rule. List markers and numbering become `#set list` and `#set enum` rules, and each item paragraph takes the list face, color, fill and alignment. A task marker is inline `#text`/`#box` content with only its declared overrides; a task-only unordered list with `task.bullet: false` passes `marker: []` and `body-indent: 0pt` to the list. The backend draws the running header and footer, expands their tokens, applies the table style and explicit page breaks, and writes the frontmatter title, author, subject, keywords, language and date into the PDF metadata. The thematic break follows `formatting.horizontal_rule`. A heading background and a heading rule are drawn as one block: the fill wraps the text across the full width with a vertical padding of 0.24 of the heading size, so the fill does not hug the glyphs, and the rule sits below it. A quote or code block fill uses the same vertical padding, unless a top or bottom border already declares a larger padding for that side. Typst measures a zero-inset block by its cap height and baseline, while the DOCX fill covers the font's line box, so the padding makes up the difference; the DOCX fill is the reference for the other formats.
-
-## HTML
-
-The HTML backend maps the same resolved template to CSS. The page size, orientation, margins and background become the screen container and the print `@page` rule; the paragraph, inline, heading, rule, quote, code block, image, list, task and table keys keep their meaning. A block image becomes a `figure` with an inner `image-frame` span, so the border and the fill wrap the image instead of the full column. The span carries the requested width and the template `max-width`, and the image fills the span with `width: 100%`; this keeps the box at the requested size instead of expanding to the column. Lists use CSS counter styles for the declared bullets, numbering formats and suffix; `marker_gap` is folded into the list padding because CSS has no portable marker-gap property. A list fill applies to the first paragraph of each item, not to the whole item, so it follows the indentation and leaves a nested list unpainted. An empty table cell keeps a line box, so a signature grid does not collapse. On screen the document is a page-like container without fake pagination. In print, explicit page breaks and `page_break_before` become CSS page breaks.
-
-The page background paints the screen page container, the printed paper and the `@page` box, so the fill survives a print engine that honors page backgrounds. The letterhead is print-only, as an `@page` background, because the example is a full-page image and a banner would distort it. The running header and footer are also print-only, as `@page` margin boxes: `{page}` and `{pages}` become CSS page counters, and `{title}` and `{author}` come from the frontmatter. A browser that does not implement those Paged Media features omits the decoration without breaking the document. Links allow relative destinations and `http`, `https` and `mailto`; other schemes are rendered as text. HTML has no script and no external resource.
-
-## EPUB
-
-The EPUB backend splits the document at each first-level heading, puts the content before the first heading into an introduction and builds the navigation from those headings. A document without a first-level heading stays one chapter. Chapters use the HTML block and inline conversion and a reflowable CSS subset; each chapter carries its own endnotes, so footnote numbering restarts per chapter.
-
-EPUB omits the letterhead, the running header and footer, the page size and the margins because it is reflowable and the reader controls pagination and the text column. The page background becomes the `html` and `body` fill, so the declared paper color survives in the reader while the margins stay with the reader. The page background is optional, so a template that declares none leaves the reader theme in control. Block images keep their figure, frame, relative source and percentage width; an absolute width is capped by the reader viewport. Explicit page breaks are hidden. Body images are packaged under `images/` and referenced relatively. The package uses `mimetype` first and stored, `META-INF/container.xml`, `OEBPS/content.opf`, `OEBPS/nav.xhtml`, `OEBPS/style.css`, the chapters and the images. The frontmatter title, author, language, date, subject, keywords and identifier supply the metadata; the title falls back to the first heading or `Untitled`, and a missing language becomes `und`.
+The template is resolved and validated once. Each backend then reads the same resolved values and maps them to its own language: Typst rules for the PDF, ODF and OOXML styles for the office packages, CSS for HTML and a reflowable subset for EPUB. The differences between formats come from their engines, not from hidden template defaults: a browser decides line breaks, an office suite decides pagination, and an EPUB reader decides the text column. The backend notes are in [`architecture.md`](architecture.md).
 
 ## Example
 
@@ -430,13 +309,13 @@ EPUB omits the letterhead, the running header and footer, the page size and the 
 pageformer --confidential-file assets/examples/confidencial/embargos.ini --output assets/examples/publicacao assets/examples/escritorio/
 ```
 
-The embargos declares confidential fields, so the command names the fictional values file and writes outside the source tree. `assets/examples/tecnico/.pageformer.yaml` is a second example, in a nested directory. It replaces the shared template for `Relatorio.md`, has no letterhead, paints the page in a light blue and demonstrates every running slot, the footer, the table style under `formatting.table`, the image frame under `formatting.image`, the list markers and numbering including a nested list, a page break, a solid bar behind the level-one headings and a rule below the level-two headings. `Relatorio.md` uses `Diagrama.png` with `-width:70%-` and `-align:center-`. The rule is declared once on the base heading map and cleared on `h1`, where the bar replaces it:
+The embargos declares confidential fields, so the command names the fictional values file and writes outside the source tree.
+
+`assets/examples/tecnico/.pageformer.yaml` is a second example, in a nested directory. It replaces the shared template for `Relatorio.md`, has no letterhead, paints the page in a light blue and demonstrates every running slot, the footer, the table style under `formatting.table`, the image frame under `formatting.image`, the list markers and numbering including a nested list, a page break, a solid bar behind the level-one headings and a rule below the level-two headings. `Relatorio.md` uses `Diagrama.png` with `-width:70%-` and `-align:center-`. The rule is declared once on the base heading map and cleared on `h1`, where the bar replaces it:
 
 ```sh
 pageformer assets/examples/tecnico/Relatorio.md
 ```
-
-To use the same settings elsewhere, copy the file to the document directory as `.pageformer.yaml`, pass `--template` in the terminal, or choose the file under Advanced in `pageformer-publisher`.
 
 ## Errors
 

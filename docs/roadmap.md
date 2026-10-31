@@ -185,6 +185,8 @@ A phase is closed only when all of the following hold:
 - Show errors in the status line and never panic on a bad file, a missing template or a failed render.
 - Test the pure state transitions, input validation and button enablement. Keep the manual smoke test documented; use snapshot tests only if they stay deterministic.
 
+**Deferred.** A guided `Remember for this folder` action that saves the selected INI into the confidential map is a roadmap note, not a decision. Open questions: which confidential directory to use, whether to copy an INI that lives outside it or only accept one already inside, and whether an existing folder mapping may be replaced after confirmation. Nothing is implemented.
+
 **Done when.** A file can be dragged in and every implemented format generated, a template failure is visible without a crash, and the window stays responsive during a render.
 
 ## Phase 8: HTML

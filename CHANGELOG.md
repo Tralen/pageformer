@@ -4,6 +4,11 @@
 
 *Major updates and feature releases.*
 
+### 0.41.1
+
+- Documented the deferred publisher action that would save a selected confidential INI into the folder map as a roadmap note in `docs/roadmap.md`; nothing is decided or implemented.
+- Regenerates the ODT examples for the version in `meta:generator`.
+
 ### 0.41.0
 
 - The confidential `files` map now accepts an explicit `.ini` file name as the key, so `"escritório particular.ini"` uses that exact file and `escritorio` keeps the implicit `escritorio.ini` default.

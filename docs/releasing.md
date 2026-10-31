@@ -6,21 +6,20 @@ Pageformer releases are source releases on GitHub. The crates are `publish = fal
 
 - The version source is `Cargo.toml`, under `[workspace.package].version`. The scheme is in the README.
 - The canonical history lives in the `operador` bare. The GitHub repository is `Tralen/pageformer` and is the public release target.
-- The GitHub repository is `Tralen/pageformer`. Configure it as `origin` before the first push:
+- The GitHub repository is `Tralen/pageformer`, configured as `origin` (`git@github.com:Tralen/pageformer.git`). If the remote is missing, add it with:
 
 ```sh
 git remote add origin git@github.com:Tralen/pageformer.git
 ```
 
-- If the repository is still empty, the first push establishes `main`; do it only with explicit authorization.
-- The tag convention is `v<version>`, such as `v1.0.0`. No earlier tag exists, so the first tag sets the convention.
+- The first push established `main`. The tag convention is `v<version>`, such as `v1.0.0`.
 - CI is test-only. The workflows are `.github/workflows/ci.yml` and `.github/workflows/gitleaks.yml`; neither publishes anything.
 
 ## What may be released
 
 A release must change the library or an executable. Documentation, CI and tooling changes are held and shipped with the next behavior-changing release. Registries and release pages keep every version, and a tag that only updates prose is noise.
 
-The project is in this situation now: `0.41.4` revised the documentation, and `0.41.5` added the release tooling and CI. Neither should be tagged on its own. The first public release should be `1.0.0`, or a later `0.x` that changes behavior, after the stability review in [`roadmap.md`](roadmap.md).
+The `0.41.4` to `0.41.11` commits were documentation, tooling and test portability work. They were folded into `1.0.0` instead of being tagged separately. The same rule applies to future changes of that kind.
 
 ## Candidate checklist
 

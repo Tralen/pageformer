@@ -4,6 +4,16 @@
 
 *Major updates and feature releases.*
 
+### 1.0.0
+
+Pageformer 1.0.0 is the first stable release. The template schema `0.7` and the document model are the compatibility contract: additive optional template keys are minor application releases and keep the schema version; removing a key or changing its meaning is a major release and bumps the schema version; a deprecated key keeps working for one minor cycle.
+
+- Ships PDF, ODT, DOCX, HTML, EPUB and TXT from one Markdown document and one YAML template through the shared pipeline.
+- The PDF remains PDF/A-2b; the ODT and DOCX packages are deterministic; HTML and EPUB are offline and self-contained.
+- Includes the minimal `pageformer-publisher` window, the test-only CI matrix and the secret scan.
+- The documentation and release guide are current, and the template and document model have passed the compliance audit against `LANGUAGE.md` 1.0.0.
+- Regenerates the ODT examples for the version in `meta:generator`.
+
 ### 0.41.11
 
 - Forced LF checkout for the committed HTML and TXT examples and marked the generated packages as binary in `.gitattributes`, so a Windows checkout keeps the example bytes identical to a fresh render.

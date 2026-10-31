@@ -1,6 +1,6 @@
 # Roadmap
 
-Pageformer is close to 1.0.0. The engine, the command line, the six output formats and the minimal converter window are implemented and tested. This page records what each phase delivered, why the work happened in that order, and what still has to be true before the project promises a stable template and document model.
+Pageformer is at 1.0.0. The engine, the command line, the six output formats and the minimal converter window are implemented, tested on Linux, macOS and Windows, and released. This page records what each phase delivered, why the work happened in that order, and the compatibility promise that starts with the release.
 
 ## Status at a glance
 
@@ -15,7 +15,7 @@ Pageformer is close to 1.0.0. The engine, the command line, the six output forma
 | 7. Publisher | The minimal egui converter over the shared pipeline | 0.35.0 |
 | 8. HTML | The self-contained semantic view | 0.35.0 |
 | 9. EPUB | The EPUB 3 package built on the HTML conversion | 0.36.0 |
-| 10. Release 1.0.0 | Stability review, full verification and a signed tag | Pending |
+| 10. Release 1.0.0 | Stability review, full verification and a signed tag | Done in 1.0.0 |
 
 ```mermaid
 flowchart TD
@@ -46,15 +46,11 @@ The minimal window came after the formats it exposes, so its buttons mapped to a
 
 Release 1.0.0 comes last and is not a feature. It is the point where the template schema and the document model are stable enough to promise compatibility.
 
-## What remains for 1.0.0
+## The 1.0.0 release
 
-The remaining work is a stability pass, not a new format:
+1.0.0 passed the Rust checks, Markdown lint, veraPDF, the LibreOffice conversion and the structural HTML, EPUB and TXT checks. The same test suite ran on Ubuntu, macOS on Apple Silicon and Intel, and Windows. `epubcheck` is optional and was not installed.
 
-1. **Review stability.** Confirm that no breaking change to the template schema or the document model is pending. Optional template keys may still be added without breaking existing documents; removing or changing an existing key cannot happen after 1.0.0 without a major release.
-2. **Run the full verification matrix.** Run the Rust checks, Markdown lint, veraPDF on the three examples, the LibreOffice conversion for ODT and DOCX, the EPUB structural checks, and a smoke test on Windows and macOS. The commands are in [`verification.md`](verification.md).
-3. **Refresh the documentation.** Read the README and every file in `docs/` as one set, remove stale statements and make sure the examples match the current behavior.
-4. **Consolidate the changelog.** Keep the user-visible history and make the 1.0.0 notes state the compatibility promise.
-5. **Set the version and tag.** Set `1.0.0` in `Cargo.toml`, create a signed tag, push it to the canonical bare and publish the project.
+The release is a GitHub source release with a signed `v1.0.0` tag and a source archive. The crates stay `publish = false`, so nothing is uploaded to crates.io. CI is test-only and does not publish.
 
 The compatibility promise after 1.0.0 is intentionally simple: an additive optional template key is a minor application release and keeps the current schema version; removing a key or changing its meaning is a major release and bumps the schema version; a deprecated key keeps working for one minor cycle.
 

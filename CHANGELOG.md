@@ -4,6 +4,11 @@
 
 *Major updates and feature releases.*
 
+### 0.37.1
+
+- The embedded default template now declares `page.background: "#fdfdfd"` with a comment, so the fallback document has the page fill enabled and the key is visible as a starting point.
+- Regenerates the ODT examples for the version in `meta:generator`.
+
 ### 0.37.0
 
 - Added the optional `page.background` color: PDF fills the page, ODT fills the page layout, DOCX writes the document background with `displayBackgroundShape`, HTML paints the screen page and the printed paper, and EPUB paints the reflowable body. The letterhead stays above the fill.

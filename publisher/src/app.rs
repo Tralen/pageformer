@@ -134,6 +134,9 @@ const COPY_BUTTON_WIDTH: f32 = 48.0;
 const COPY_FILL: egui::Color32 = egui::Color32::from_rgb(0x45, 0x45, 0x45);
 /// The title shown at the top of the window.
 const TITLE: &str = "Pageformer Publisher";
+/// The title color: a light gray that separates the title from the body text
+/// without the glare of pure white.
+const TITLE_COLOR: egui::Color32 = egui::Color32::from_gray(200);
 
 /// The version shown at the top right of the window.
 fn version_label() -> String {
@@ -393,7 +396,12 @@ impl Publisher {
         egui::Sides::new().shrink_left().truncate().show(
             ui,
             |ui| {
-                ui.label(egui::RichText::new(TITLE).size(20.0).strong());
+                ui.label(
+                    egui::RichText::new(TITLE)
+                        .size(20.0)
+                        .strong()
+                        .color(TITLE_COLOR),
+                );
             },
             |ui| {
                 ui.label(egui::RichText::new(version_label()).small());

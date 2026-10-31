@@ -53,6 +53,9 @@ fn screen(template: &Template) -> String {
     output.push_str("html { background: #f2f2f2; }\n");
     output.push_str("body { margin: 0; background: #f2f2f2; }\n");
 
+    let page_background = page
+        .background()
+        .map_or_else(|| "#ffffff".to_owned(), |color| color.hex());
     let mut main = vec![
         format!("width: {};", length(dimensions.width())),
         "max-width: 100%;".to_owned(),
@@ -64,7 +67,7 @@ fn screen(template: &Template) -> String {
             length(margins.bottom()),
             length(margins.left())
         ),
-        "background: #ffffff;".to_owned(),
+        format!("background: {page_background};"),
     ];
     main.extend(face_declarations(face));
     main.push(format!("line-height: {line_height:.4};"));
@@ -95,6 +98,12 @@ pub(crate) fn epub_stylesheet(template: &Template) -> String {
 
     let mut output = String::from("/* Pageformer EPUB stylesheet. */\n");
     output.push_str("html, body { margin: 0; padding: 0; }\n");
+    if let Some(background) = template.page().background() {
+        output.push_str(&rule(
+            "html, body",
+            &[format!("background-color: {};", background.hex())],
+        ));
+    }
     output.push_str(&rule("body", &body));
     output.push_str("img { max-width: 100%; height: auto; }\n");
     output.push_str(&content_rules(template, paragraph_after));
@@ -503,8 +512,13 @@ fn print(template: &Template, document: Option<(&Metadata, &Assets)>) -> String 
     let face = paragraph.face();
     let mut output = String::new();
 
+    let page_background = page
+        .background()
+        .map_or_else(|| "#ffffff".to_owned(), |color| color.hex());
     output.push_str("@media print {\n");
-    output.push_str("  html, body { background: #ffffff; }\n");
+    output.push_str(&format!(
+        "  html, body {{ background: {page_background}; }}\n"
+    ));
     output.push_str(
         "  main.pageformer { width: auto; max-width: none; margin: 0; padding: 0; background: transparent; }\n",
     );
@@ -522,6 +536,9 @@ fn print(template: &Template, document: Option<(&Metadata, &Assets)>) -> String 
         length(margins.bottom()),
         length(margins.left())
     ));
+    if page.background().is_some() {
+        output.push_str(&format!("    background-color: {page_background};\n"));
+    }
 
     if let Some((metadata, assets)) = document {
         if let Some(letterhead) = letterhead_uri(assets) {

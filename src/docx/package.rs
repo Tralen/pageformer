@@ -4,6 +4,7 @@ use std::collections::BTreeSet;
 
 use crate::assets::media_type;
 use crate::document::Document;
+use crate::template::Color;
 use crate::xml;
 
 use super::DocxError;
@@ -271,16 +272,21 @@ pub(crate) fn app_xml() -> String {
     .to_owned()
 }
 
-/// Generates `word/settings.xml`.
-pub(crate) fn settings_xml() -> String {
-    concat!(
-        "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n",
-        "<w:settings xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\">\n",
-        "<w:updateFields w:val=\"true\"/>\n",
-        "<w:compat/>\n",
-        "</w:settings>\n"
+/// Generates `word/settings.xml`; a page background also asks the editor to
+/// display the document background.
+pub(crate) fn settings_xml(background: Option<Color>) -> String {
+    let display = if background.is_some() {
+        "<w:displayBackgroundShape/>\n"
+    } else {
+        ""
+    };
+    format!(
+        "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n\
+         <w:settings xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\">\n\
+         {display}<w:updateFields w:val=\"true\"/>\n\
+         <w:compat/>\n\
+         </w:settings>\n"
     )
-    .to_owned()
 }
 
 #[cfg(test)]

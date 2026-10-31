@@ -209,6 +209,30 @@ formatting:
 }
 
 #[test]
+fn a_page_background_becomes_the_document_background() {
+    let template = Template::from_yaml("version: \"0.7\"\npage:\n  background: \"#fafafa\"\n")
+        .expect("the template must be valid");
+    let document = Document::new(Metadata::default(), Vec::new());
+    let bytes = docx::render(&document, &template, &Assets::default()).expect("the package");
+    let mut archive = ZipArchive::new(Cursor::new(bytes)).expect("the package must be a ZIP");
+    let content = entry(&mut archive, "word/document.xml");
+    let settings = entry(&mut archive, "word/settings.xml");
+
+    assert!(
+        content.contains("<w:background w:color=\"fafafa\"/>"),
+        "the document carries the fill: {content}"
+    );
+    assert!(
+        content.find("<w:background").unwrap_or(usize::MAX) < content.find("<w:body>").unwrap_or(0),
+        "the background precedes the body: {content}"
+    );
+    assert!(
+        settings.contains("<w:displayBackgroundShape/>"),
+        "the editor is asked to display the background: {settings}"
+    );
+}
+
+#[test]
 fn a_rule_and_a_heading_background_follow_the_template() {
     let document =
         markdown::parse("# Título\n\nTexto.\n\n---\n\nDepois.\n").expect("the document must parse");

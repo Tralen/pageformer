@@ -490,6 +490,7 @@ pub struct Page {
     size: PageSize,
     orientation: Orientation,
     margins: Margins,
+    background: Option<Color>,
     letterhead: Option<TemplatePath>,
     header: Option<RunningText>,
     footer: Option<RunningText>,
@@ -506,10 +507,15 @@ impl Page {
             size,
             orientation,
             margins,
+            background: None,
             letterhead,
             header: None,
             footer: None,
         }
+    }
+
+    pub fn with_background(self, background: Option<Color>) -> Self {
+        Self { background, ..self }
     }
 
     pub fn with_header(self, header: Option<RunningText>) -> Self {
@@ -530,6 +536,10 @@ impl Page {
 
     pub fn margins(&self) -> Margins {
         self.margins
+    }
+
+    pub fn background(&self) -> Option<Color> {
+        self.background
     }
 
     pub fn letterhead(&self) -> Option<&TemplatePath> {
@@ -1842,6 +1852,7 @@ struct RawPage {
     size: Option<PageSize>,
     orientation: Option<Orientation>,
     margins: Option<RawMargins>,
+    background: Option<String>,
     letterhead: Option<String>,
     header: Option<RawRunning>,
     footer: Option<RawRunning>,
@@ -2059,6 +2070,7 @@ fn convert_page(raw: RawPage) -> Result<Page, TemplateError> {
         ),
         None => Margins::default(),
     };
+    let background = parse_optional_color(raw.background, "page.background")?;
     let letterhead = raw
         .letterhead
         .map(|text| TemplatePath::parse(&text))
@@ -2072,6 +2084,7 @@ fn convert_page(raw: RawPage) -> Result<Page, TemplateError> {
         margins,
         letterhead,
     )
+    .with_background(background)
     .with_header(header)
     .with_footer(footer))
 }

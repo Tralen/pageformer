@@ -22,6 +22,9 @@ page:
     bottom: 57
     left: 71
     right: 57
+  # The page fill, under the text and the letterhead. It is off when omitted,
+  # which leaves the paper white.
+  # background: "#fdfdfd"
   # A letterhead is an image path relative to the template file. It is off when
   # omitted; the file must be png, jpg, gif, svg or webp.
   # letterhead: images/letterhead.png
@@ -73,11 +76,14 @@ formatting:
       # style: normal
       # foreground: "#000000"
       # background: "#fdfdfd"
-    # Code is monospaced only because this template declares the family.
+    # Code is monospaced only because this template declares the family. A
+    # monospace face has a larger x-height, so the size is reduced to 0.875 of
+    # the body size to keep the apparent text size close.
     code:
       font_families:
         - Liberation Mono
         - DejaVu Sans Mono
+      size: 10.5
       # foreground: "#7a2a5a"
       # background: "#f2eef6"
     # An empty map keeps the paragraph face and color. Strikethrough accepts
@@ -107,8 +113,9 @@ formatting:
     font_families:
       - Liberation Mono
       - DejaVu Sans Mono
+    size: 10.5
     alignment: left
-    # size, weight, style, foreground and background inherit the paragraph.
+    # weight, style, foreground and background inherit the paragraph.
     # background: "#f4f4f4"
     # border:
     #   top: 0.5pt

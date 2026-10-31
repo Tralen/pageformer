@@ -96,9 +96,18 @@ pub(crate) fn build(
     xml::push(
         &mut body,
         "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n\
-         <w:document xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\" xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\" xmlns:wp=\"http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing\" xmlns:a=\"http://schemas.openxmlformats.org/drawingml/2006/main\" xmlns:pic=\"http://schemas.openxmlformats.org/drawingml/2006/picture\">\n\
-         <w:body>\n",
+         <w:document xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\" xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\" xmlns:wp=\"http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing\" xmlns:a=\"http://schemas.openxmlformats.org/drawingml/2006/main\" xmlns:pic=\"http://schemas.openxmlformats.org/drawingml/2006/picture\">\n",
     );
+    if let Some(background) = template.page().background() {
+        xml::push_fmt(
+            &mut body,
+            format_args!(
+                "<w:background w:color=\"{}\"/>\n",
+                background.hex().trim_start_matches('#')
+            ),
+        );
+    }
+    xml::push(&mut body, "<w:body>\n");
     xml::push(&mut body, &builder.document);
     xml::push(&mut body, &sect);
     xml::push(&mut body, "</w:body>\n</w:document>\n");

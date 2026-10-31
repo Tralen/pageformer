@@ -10,6 +10,7 @@ use pageformer::document::{Block, Destination, Document, Inline, Metadata};
 use pageformer::html::{self, HtmlRenderer};
 use pageformer::markdown;
 use pageformer::render::Renderer;
+use pageformer::template::Template;
 use pageformer::template::loader;
 use tempfile::TempDir;
 
@@ -154,6 +155,28 @@ fn the_contract_is_a_self_contained_semantic_document() {
     );
     assert!(normalized_text(&document).contains("Das partes"));
     assert!(normalized_text(&document).contains("Contrato de Prestação de Serviços"));
+}
+
+#[test]
+fn a_page_background_reaches_the_screen_page_and_the_print_paper() {
+    let template = Template::from_yaml("version: \"0.7\"\npage:\n  background: \"#fafafa\"\n")
+        .expect("the template must be valid");
+    let document = markdown::parse("Texto.\n").expect("the document must parse");
+    let rendered = html::render(&document, &template, &pageformer::assets::Assets::default());
+    let html = String::from_utf8(rendered.into_bytes()).expect("the HTML must be UTF-8");
+
+    assert!(
+        html.contains("background: #fafafa;"),
+        "the screen page carries the fill: {html}"
+    );
+    assert!(
+        html.contains("html, body { background: #fafafa; }"),
+        "the print paper carries the fill: {html}"
+    );
+    assert!(
+        html.contains("background-color: #fafafa;"),
+        "the print page carries the fill: {html}"
+    );
 }
 
 #[test]

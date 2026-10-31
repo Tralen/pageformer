@@ -466,13 +466,16 @@ fn page_layout(output: &mut String, template: &Template, assets: &Assets) {
     xml::push_fmt(
         output,
         format_args!(
-            "<style:page-layout-properties fo:page-width=\"{width}\" fo:page-height=\"{height}\" style:print-orientation=\"{orientation}\" fo:margin-top=\"{top}\" fo:margin-bottom=\"{bottom}\" fo:margin-left=\"{left}\" fo:margin-right=\"{right}\" style:writing-mode=\"lr-tb\">\n",
+            "<style:page-layout-properties fo:page-width=\"{width}\" fo:page-height=\"{height}\" style:print-orientation=\"{orientation}\" fo:margin-top=\"{top}\" fo:margin-bottom=\"{bottom}\" fo:margin-left=\"{left}\" fo:margin-right=\"{right}\"{background} style:writing-mode=\"lr-tb\">\n",
             width = xml::centimetres(dimensions.width()),
             height = xml::centimetres(dimensions.height()),
             top = xml::centimetres_points(top),
             bottom = xml::centimetres_points(bottom),
             left = xml::centimetres(margins.left()),
             right = xml::centimetres(margins.right()),
+            background = page.background().map_or_else(String::new, |color| {
+                format!(" fo:background-color=\"{}\"", color.hex())
+            }),
         ),
     );
     if let Some(letterhead) = assets.map().letterhead() {

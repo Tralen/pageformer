@@ -4,6 +4,13 @@
 
 *Major updates and feature releases.*
 
+### 0.37.0
+
+- Added the optional `page.background` color: PDF fills the page, ODT fills the page layout, DOCX writes the document background with `displayBackgroundShape`, HTML paints the screen page and the printed paper, and EPUB paints the reflowable body. The letterhead stays above the fill.
+- Reduced the monospace size in the reference and example templates to 0.875 of the body size, because a monospace face has a larger x-height and looked larger at the same point size. The embedded template uses `10.5pt` against `12pt`, and the technical report uses `9.5pt` against `11pt`.
+- Documented the page background and the monospace size guidance, and clarified that the template margins describe the paged formats and HTML while EPUB leaves the text column to the reader.
+- Regenerates the PDF, ODT, DOCX, HTML and EPUB examples; the ODT examples carry the version in `meta:generator`.
+
 ### 0.36.0
 
 - Added the EPUB 3 backend and `--format epub`: chapters split at first-level headings, a generated navigation, a reflowable CSS subset, packaged body images and deterministic metadata.

@@ -37,10 +37,12 @@ formatting:
     strong:
       weight: bold
     # Inline styles inherit this face; code declares monospace explicitly.
+    # Monospace has a larger x-height, so it uses 0.875 of the body size.
     code:
       font_families:
         - Liberation Mono
         - DejaVu Sans Mono
+      size: 10.5
     link:
       foreground: "#0563c1"
       underline: true
@@ -48,6 +50,7 @@ formatting:
     font_families:
       - Liberation Mono
       - DejaVu Sans Mono
+    size: 10.5
   list:
     indent: 0.6cm
     marker_gap: 0.5cm

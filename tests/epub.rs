@@ -88,6 +88,24 @@ fn entry(archive: &mut ZipArchive<Cursor<Vec<u8>>>, name: &str) -> String {
 }
 
 #[test]
+fn a_page_background_reaches_the_reflowable_body() {
+    let template = pageformer::template::Template::from_yaml(
+        "version: \"0.7\"\npage:\n  background: \"#fafafa\"\n",
+    )
+    .expect("the template must be valid");
+    let document = markdown::parse("Texto.\n").expect("the document must parse");
+    let rendered = epub::render(&document, &template, &pageformer::assets::Assets::default())
+        .expect("the package must be produced");
+    let mut archive = archive(rendered.into_bytes());
+    let css = entry(&mut archive, "OEBPS/style.css");
+
+    assert!(
+        css.contains("html, body {\n  background-color: #fafafa;\n}"),
+        "the reflowable body carries the fill: {css}"
+    );
+}
+
+#[test]
 fn the_package_starts_with_a_stored_mimetype() {
     let (bytes, warnings) = render_example("escritorio", CONTRACT);
     assert!(warnings.is_empty(), "{warnings:?}");

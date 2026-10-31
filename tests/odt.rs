@@ -708,6 +708,21 @@ fn table_cells_absorb_the_leading_and_do_not_inherit_paragraph_spacing() {
 }
 
 #[test]
+fn a_page_background_becomes_the_page_layout_fill() {
+    let template = Template::from_yaml("version: \"0.7\"\npage:\n  background: \"#fafafa\"\n")
+        .expect("the template must be valid");
+    let document = Document::new(Metadata::default(), Vec::new());
+    let bytes = odt::render(&document, &template, &Assets::default()).expect("the package");
+    let mut archive = ZipArchive::new(Cursor::new(bytes)).expect("the package must be a ZIP");
+    let styles = entry(&mut archive, "styles.xml");
+
+    assert!(
+        styles.contains("fo:background-color=\"#fafafa\""),
+        "the page layout carries the fill: {styles}"
+    );
+}
+
+#[test]
 fn a_running_header_reserves_its_band_from_the_page_margin() {
     let template = Template::from_yaml(
         "version: \"0.7\"\npage:\n  margins:\n    top: 30mm\n  header:\n    right: \"{page}\"\n",

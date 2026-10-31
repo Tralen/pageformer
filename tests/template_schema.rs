@@ -73,6 +73,7 @@ page:
     bottom: 20mm
     left: 30mm
     right: 25mm
+  background: '#fafafa'
   letterhead: images/letterhead.png
 
 formatting:
@@ -110,6 +111,14 @@ formatting:
     assert_eq!(template.page().orientation(), Orientation::Landscape);
     assert_millimetres(millimetres(template.page().margins().right()), 25.0);
     assert_eq!(
+        template
+            .page()
+            .background()
+            .map(|color| color.hex())
+            .as_deref(),
+        Some("#fafafa")
+    );
+    assert_eq!(
         template.page().letterhead().map(|path| path.as_str()),
         Some("images/letterhead.png")
     );
@@ -145,6 +154,25 @@ formatting:
     assert_eq!(heading[2].face().size().points(), 20.0);
     assert_eq!(heading[2].face().weight(), FontWeight::NORMAL);
     assert_eq!(heading[2].spacing_before().points(), 14.0);
+}
+
+#[test]
+fn a_page_background_is_optional_and_validated() {
+    let template = parse("version: \"0.7\"\npage:\n  background: \"#abc\"\n");
+    assert_eq!(
+        template.page().background().map(|color| color.hex()),
+        Some("#aabbcc".to_owned())
+    );
+
+    let plain = parse("version: \"0.7\"\n");
+    assert_eq!(plain.page().background(), None);
+
+    let error = Template::from_yaml("version: \"0.7\"\npage:\n  background: transparent\n")
+        .expect_err("transparent is not a page color");
+    assert!(
+        value_error_is(&error, "page.background", ValueError::InvalidColor),
+        "{error}"
+    );
 }
 
 #[test]
@@ -1204,6 +1232,16 @@ fn the_embedded_template_matches_the_project_defaults() {
     assert_eq!(paragraph.face().font_families().len(), 3);
     assert_eq!(paragraph.face().size().points(), 12.0);
     assert_eq!(paragraph.leading().points(), 7.8);
+    assert_eq!(paragraph.code().size().map(Length::points), Some(10.5));
+    assert_eq!(
+        template
+            .formatting()
+            .code_block()
+            .text()
+            .size()
+            .map(Length::points),
+        Some(10.5)
+    );
 
     let heading = template.formatting().heading().levels();
     assert_eq!(heading[0].face().size().points(), 18.0);

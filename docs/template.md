@@ -29,6 +29,7 @@ page:
     bottom: 30mm
     left: 30mm
     right: 25mm
+  background: "#fdfdfd"
   letterhead: images/letterhead.png
   header:
     left: "{title}"
@@ -54,6 +55,7 @@ formatting:
     strong:
       weight: bold
     code:
+      size: 10.5
       foreground: "#7a2a5a"
       background: "#f2eef6"
     strikethrough:
@@ -69,6 +71,7 @@ formatting:
       color: "#bbbbbb"
       padding: 8
   code_block:
+    size: 10.5
     background: "#f4f4f4"
     border:
       top: 0.5pt
@@ -191,10 +194,11 @@ The frontmatter `title` is document metadata. The visible title is the first-lev
 - `size`: `a4`, `a5`, `letter`, `legal` or `oficio`, or a map with `width` and `height`. A custom size uses the same units as a length.
 - `orientation`: `portrait` or `landscape`. Landscape swaps the width and the height.
 - `margins`: `top`, `bottom`, `left` and `right`. A missing side defaults to `20mm` (`56.69pt`); a negative value is invalid.
+- `background`: the page fill, as a [color](#colors). It sits under the text and the letterhead. When omitted, the page has no declared fill and the paper stays white. PDF fills the page, ODT fills the page layout, DOCX sets the document background, HTML paints the screen page and the printed paper, and EPUB paints the reflowable body.
 - `letterhead`: a path relative to the template file. The file must be `png`, `jpg`, `gif`, `svg` or `webp`.
 - `header` and `footer`: running content above and below the body, each with `left`, `center` and `right` slot strings. The slots are the same on every page, while their tokens expand per page.
 
-The default size is A4 in portrait orientation.
+The default size is A4 in portrait orientation. The size and the margins describe the paged formats and the HTML screen and print page; EPUB is reflowable, so it leaves the text column and its margins to the reader.
 
 ### Running header and footer
 
@@ -231,6 +235,8 @@ The header and footer use the paragraph face. Their content sits inside the top 
 Inside `emphasis` and `strong`, the allowed keys are `font_families`, `size`, `weight`, `style`, `foreground` and `background`. Only the declared keys override the paragraph values, so an empty map is valid and changes nothing beyond the semantic default. Without its own `foreground`, an inline span keeps the surrounding color: the paragraph color in body text, and the heading color inside a heading. A `background` fills the span itself.
 
 `code` and `strikethrough` style inline code spans and strikethrough text. They accept the same keys as `emphasis` and `strong`, including `font_families`, and every undeclared key inherits the paragraph face: there is no hidden renderer default. A map with only `foreground` changes the color and keeps the paragraph font.
+
+A monospace face has a larger x-height than a proportional one, so at the same point size it looks larger. The reference template sets `code` and `code_block` to 0.875 of the paragraph size, which is `10.5pt` against a `12pt` body; the technical example uses `9.5pt` against `11pt`. The size is explicit in the template, not a hidden backend default.
 
 `link` styles every link, including autolinks and reference links. It accepts the same keys as the other inline styles plus `underline`, a boolean that defaults to `false`. The color, the fill and the underline stay declared-only, so a link with no declaration keeps the surrounding face and color without an underline; the destination never changes the label.
 
@@ -362,15 +368,15 @@ Every format reads the text colors: the body, the headings, emphasis, strong, co
 
 ## HTML
 
-The HTML backend maps the same resolved template to CSS. The page size, orientation and margins become the screen container and the print `@page` rule; the paragraph, inline, heading, rule, quote, code block, list, task and table keys keep their meaning. Lists use CSS counter styles for the declared bullets, numbering formats and suffix; `marker_gap` is folded into the list padding because CSS has no portable marker-gap property. A list fill applies to the first paragraph of each item, not to the whole item, so it follows the indentation and leaves a nested list unpainted. An empty table cell keeps a line box, so a signature grid does not collapse. On screen the document is a page-like container without fake pagination. In print, explicit page breaks and `page_break_before` become CSS page breaks.
+The HTML backend maps the same resolved template to CSS. The page size, orientation, margins and background become the screen container and the print `@page` rule; the paragraph, inline, heading, rule, quote, code block, list, task and table keys keep their meaning. Lists use CSS counter styles for the declared bullets, numbering formats and suffix; `marker_gap` is folded into the list padding because CSS has no portable marker-gap property. A list fill applies to the first paragraph of each item, not to the whole item, so it follows the indentation and leaves a nested list unpainted. An empty table cell keeps a line box, so a signature grid does not collapse. On screen the document is a page-like container without fake pagination. In print, explicit page breaks and `page_break_before` become CSS page breaks.
 
-The letterhead is print-only, as an `@page` background, because the example is a full-page image and a banner would distort it. The running header and footer are also print-only, as `@page` margin boxes: `{page}` and `{pages}` become CSS page counters, and `{title}` and `{author}` come from the frontmatter. A browser that does not implement those Paged Media features omits the decoration without breaking the document. Links allow relative destinations and `http`, `https` and `mailto`; other schemes are rendered as text. HTML has no script and no external resource.
+The page background paints the screen page container, the printed paper and the `@page` box, so the fill survives a print engine that honors page backgrounds. The letterhead is print-only, as an `@page` background, because the example is a full-page image and a banner would distort it. The running header and footer are also print-only, as `@page` margin boxes: `{page}` and `{pages}` become CSS page counters, and `{title}` and `{author}` come from the frontmatter. A browser that does not implement those Paged Media features omits the decoration without breaking the document. Links allow relative destinations and `http`, `https` and `mailto`; other schemes are rendered as text. HTML has no script and no external resource.
 
 ## EPUB
 
 The EPUB backend splits the document at each first-level heading, puts the content before the first heading into an introduction and builds the navigation from those headings. A document without a first-level heading stays one chapter. Chapters use the HTML block and inline conversion and a reflowable CSS subset; each chapter carries its own endnotes, so footnote numbering restarts per chapter.
 
-EPUB omits the letterhead and the running header and footer because it is reflowable and the reader controls pagination. Explicit page breaks are hidden. Body images are packaged under `images/` and referenced relatively. The package uses `mimetype` first and stored, `META-INF/container.xml`, `OEBPS/content.opf`, `OEBPS/nav.xhtml`, `OEBPS/style.css`, the chapters and the images. The frontmatter title, author, language, date, subject, keywords and identifier supply the metadata; the title falls back to the first heading or `Untitled`, and a missing language becomes `und`.
+EPUB omits the letterhead, the running header and footer, the page size and the margins because it is reflowable and the reader controls pagination and the text column. The page background becomes the `html` and `body` fill, so the declared paper color survives in the reader while the margins stay with the reader. The page background is optional, so a template that declares none leaves the reader theme in control. Explicit page breaks are hidden. Body images are packaged under `images/` and referenced relatively. The package uses `mimetype` first and stored, `META-INF/container.xml`, `OEBPS/content.opf`, `OEBPS/nav.xhtml`, `OEBPS/style.css`, the chapters and the images. The frontmatter title, author, language, date, subject, keywords and identifier supply the metadata; the title falls back to the first heading or `Untitled`, and a missing language becomes `und`.
 
 ## Example
 

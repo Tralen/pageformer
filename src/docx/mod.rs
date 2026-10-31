@@ -68,7 +68,7 @@ pub fn render(
     let numbering = built.numbering.xml(template);
     let core = package::core_xml(document);
     let app = package::app_xml();
-    let settings = package::settings_xml();
+    let settings = package::settings_xml(template.page().background());
     let root = package::root_relationships();
 
     let mut entries = vec![

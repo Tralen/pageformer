@@ -141,6 +141,9 @@ impl<'a> SourceBuilder<'a> {
             typst_length(margins.left()),
             typst_length(margins.right()),
         );
+        if let Some(background) = page.background() {
+            let _ = writeln!(self.output, "  fill: rgb(\"{}\"),", background.hex());
+        }
         if let Some(letterhead) = self.assets.letterhead() {
             let _ = writeln!(
                 self.output,
@@ -1315,6 +1318,15 @@ mod tests {
         assert!(source.contains("height: 419.528pt"), "{source}");
         assert!(source.contains("top: 28.346pt"), "{source}");
         assert!(source.contains("right: 113.386pt"), "{source}");
+    }
+
+    #[test]
+    fn a_page_background_becomes_the_page_fill() {
+        let template = Template::from_yaml("version: \"0.7\"\npage:\n  background: \"#fafafa\"\n")
+            .expect("the template");
+        let document = Document::new(Metadata::default(), Vec::new());
+        let source = typst_source(&document, &template, &AssetMap::new()).expect("the source");
+        assert!(source.contains("fill: rgb(\"#fafafa\"),"), "{source}");
     }
 
     #[test]

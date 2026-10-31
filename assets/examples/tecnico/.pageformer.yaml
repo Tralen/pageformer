@@ -31,10 +31,12 @@ formatting:
     leading: 7
     spacing: 10
     # Inline styles inherit this face; code declares monospace explicitly.
+    # Monospace has a larger x-height, so it uses 0.875 of the body size.
     code:
       font_families:
         - Liberation Mono
         - DejaVu Sans Mono
+      size: 9.5
       foreground: "#7a2a5a"
       background: "#f2eef6"
     strikethrough:
@@ -53,6 +55,7 @@ formatting:
     font_families:
       - Liberation Mono
       - DejaVu Sans Mono
+    size: 9.5
     background: "#f4f4f4"
     border:
       top: 0.5pt

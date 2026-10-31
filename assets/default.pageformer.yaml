@@ -1,8 +1,14 @@
 # Pageformer fallback template, embedded in the binary.
 #
-# A local `.pageformer.yaml` replaces this file entirely: there is no merge.
+# This file declares every key the schema accepts, so it doubles as a reference:
+# copy it as `.pageformer.yaml` next to a document, or as the global template,
+# and edit the values you need. A local or global template replaces this file
+# entirely: there is no merge. Keys that are inherently absent (a fill, a rule,
+# a letterhead) are shown commented; uncomment them to turn them on.
+#
 # The schema version is a string with the form `major.minor`.
 # Lengths accept mm, cm, in or pt; a number without a unit is points.
+# Colors accept #rrggbb, #rgb or a CSS color name.
 version: "0.7"
 
 page:
@@ -13,6 +19,19 @@ page:
     bottom: 57
     left: 71
     right: 57
+  # A letterhead is an image path relative to the template file. It is off when
+  # omitted; the file must be png, jpg, gif, svg or webp.
+  # letterhead: images/letterhead.png
+  # Only declared and non-blank slots are drawn. Tokens: {page}, {pages},
+  # {title} and {author}.
+  header:
+    left: ""
+    center: ""
+    right: ""
+  footer:
+    left: ""
+    center: ""
+    right: ""
 
 formatting:
   paragraph:
@@ -23,34 +42,75 @@ formatting:
     size: 12
     weight: normal
     style: normal
+    foreground: "#000000"
+    # background: "#fdfdfd"
     leading: 7.8
+    # 1.2em at 12pt, which is Typst's default when this key is omitted.
+    spacing: 14.4
     alignment: justified
+    # Inline styles inherit this face; only the keys they declare override it.
     emphasis:
       style: italic
+      # font_families:
+      #   - Liberation Serif
+      # size: 12
+      # weight: normal
+      # foreground: "#000000"
+      # background: "#fdfdfd"
     strong:
       weight: bold
-    # Every inline style inherits this face; code declares monospace explicitly,
-    # so the different font is visible in the template and not a hidden default.
+      # font_families:
+      #   - Liberation Serif
+      # size: 12
+      # style: normal
+      # foreground: "#000000"
+      # background: "#fdfdfd"
+    # Code is monospaced only because this template declares the family.
     code:
       font_families:
         - Liberation Mono
         - DejaVu Sans Mono
-    # Links inherit this face. The template states the color and the underline,
-    # so neither is an invisible default.
+      # foreground: "#7a2a5a"
+      # background: "#f2eef6"
+    # An empty map keeps the paragraph face and color. Strikethrough accepts
+    # font_families, size, weight, style, foreground and background.
+    strikethrough: {}
+    # Links inherit the paragraph face; color and underline are declared-only.
     link:
       foreground: "#0563c1"
       underline: true
+      # font_families, size, weight, style and background inherit the paragraph.
+
+  quote:
+    alignment: left
+    # font_families, size, weight, style and foreground inherit the paragraph.
+    # background: "#eef4fb"
+    # border:
+    #   left: 3pt
+    #   color: "#bbbbbb"
+    #   padding: 8
+    border: {}
+
   code_block:
     font_families:
       - Liberation Mono
       - DejaVu Sans Mono
-  # Lists inherit the paragraph face unless they declare their own. The marker
-  # indent, the gap and both marker sets are stated here instead of relying on
-  # a backend default.
+    alignment: left
+    # size, weight, style, foreground and background inherit the paragraph.
+    # background: "#f4f4f4"
+    # border:
+    #   top: 0.5pt
+    #   bottom: 0.5pt
+    #   color: "#bbbbbb"
+    #   padding: 6
+    border: {}
+
   list:
+    foreground: "#000000"
+    # background: "#f7f7f7"
+    alignment: left
     indent: 0.5cm
     marker_gap: 0.5cm
-    alignment: left
     bullet:
       - "•"
       - "–"
@@ -61,6 +121,8 @@ formatting:
         - lower-alpha
         - lower-roman
       suffix: "."
+    # The same 1.2em as the paragraph spacing; a tight list ignores it.
+    spacing: 14.4
     task:
       gap: 1
       bullet: false
@@ -68,24 +130,54 @@ formatting:
         marker: "[x]"
         foreground: "#2e7d32"
         weight: bold
+        # font_families:
+        #   - Liberation Mono
+        # size: 12
+        # style: normal
+        # background: "#e8f5e9"
       todo:
         marker: "[ ]"
         foreground: "#777777"
+        weight: normal
+        # font_families:
+        #   - Liberation Mono
+        # size: 12
+        # style: normal
+        # background: "#f5f5f5"
+
   heading:
     font_families:
       - Liberation Sans
       - DejaVu Sans
       - Libertinus Serif
+    size: 12
     weight: bold
     style: normal
+    # `none` keeps the paragraph color; a level may set its own color or clear it.
+    foreground: none
     spacing_before: 18
     spacing_after: 6
+    page_break_before: false
+    # `none` clears an inherited fill or rule; `{}` would use their defaults.
+    background: none
+    rule: none
+    # Each level accepts the same keys as this base map, plus background and
+    # rule, and may clear an inherited color, fill or rule with `none`.
     h1:
       size: 18
+      # background: "#eeeeee"
+      # rule:
+      #   thickness: 0.5pt
+      #   color: "#888888"
+      #   spacing_before: 3
     h2:
       size: 14
       spacing_before: 12
       spacing_after: 4
+      # rule:
+      #   thickness: 0.5pt
+      #   color: "#888888"
+      #   spacing_before: 3
     h3:
       size: 12
       spacing_before: 10
@@ -102,3 +194,16 @@ formatting:
       size: 12
       spacing_before: 8
       spacing_after: 2
+
+  horizontal_rule:
+    thickness: 0.5pt
+    color: "#000000"
+    # When omitted, each backend keeps its own spacing for that side.
+    # spacing_before: 12
+    # spacing_after: 12
+
+  table:
+    border: 0.5pt
+    border_color: "#bbbbbb"
+    # header_fill: "#eeeeee"
+    cell_padding: 6pt

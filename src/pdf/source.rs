@@ -643,11 +643,20 @@ impl<'a> SourceBuilder<'a> {
                 match definition {
                     Some(blocks) => {
                         self.footnote_stack.push(id.as_str().to_owned());
-                        self.output.push_str("#footnote[\n");
-                        let rendered = self.blocks(&blocks);
+                        self.output.push_str("#footnote[");
+                        // The first paragraph stays inline with the footnote marker;
+                        // wrapping it in `#par` would put the marker on its own line.
+                        let mut rest = blocks.as_slice();
+                        if let Some((Block::Paragraph(inlines), remaining)) = blocks.split_first() {
+                            self.inlines(inlines)?;
+                            rest = remaining;
+                        }
+                        if !rest.is_empty() {
+                            self.output.push('\n');
+                            self.blocks(rest)?;
+                        }
                         self.output.push(']');
                         self.footnote_stack.pop();
-                        rendered?;
                     }
                     None => {
                         self.output
@@ -1402,10 +1411,8 @@ mod tests {
             source.contains("#link(\"https://example.org\")[site]"),
             "{source}"
         );
-        assert!(
-            source.contains("#footnote[\n#par[Explicação\\.]"),
-            "{source}"
-        );
+        assert!(source.contains("#footnote[Explicação\\.]"), "{source}");
+        assert!(!source.contains("#footnote[\n#par"), "{source}");
         assert!(
             source.contains("#box(image(\"assets/image-0.png\", alt: \"Logo\"))"),
             "{source}"
@@ -1500,6 +1507,31 @@ mod tests {
         assert!(
             source.contains("inset: (left: 8.000pt, top: 2.880pt, bottom: 2.880pt)"),
             "the fill keeps the font box and the border keeps its own padding: {source}"
+        );
+    }
+
+    #[test]
+    fn a_footnote_keeps_the_marker_inline_and_wraps_later_blocks() {
+        let id = FootnoteId::parse("nota").expect("a footnote id");
+        let document = Document::new(
+            Metadata::default(),
+            vec![
+                Block::Paragraph(vec![Inline::FootnoteReference(id.clone())]),
+                Block::FootnoteDefinition(FootnoteDefinition::new(
+                    id,
+                    vec![
+                        Block::Paragraph(vec![Inline::Text("Primeiro.".to_owned())]),
+                        Block::Paragraph(vec![Inline::Text("Segundo.".to_owned())]),
+                    ],
+                )),
+            ],
+        );
+
+        let source = source(&document, &AssetMap::new());
+
+        assert!(
+            source.contains("#footnote[Primeiro\\.\n#par[Segundo\\.]"),
+            "{source}"
         );
     }
 

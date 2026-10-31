@@ -4,6 +4,12 @@
 
 *Major updates and feature releases.*
 
+### 0.34.0
+
+- Fixed the PDF footnote: the marker now stays inline with the first footnote paragraph. The first paragraph is rendered without `#par` inside `#footnote`, so the marker no longer sits on its own line above the note.
+- Expanded `assets/default.pageformer.yaml` to declare every key the schema accepts, with absent-by-design keys such as fills, rules and the letterhead shown commented. The embedded template is now a complete reference the user can copy and edit.
+- Regenerates the technical report PDF and the ODT examples for the version in `meta:generator`.
+
 ### 0.33.0
 
 - The `pageformer-publisher` format column now lists PDF, ODT, DOCX, HTML, EPUB and TXT in that order, colored red, green, blue, orange, yellow and gray. HTML and EPUB are disabled placeholders until their backends exist.

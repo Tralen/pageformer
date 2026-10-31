@@ -34,9 +34,12 @@ version: 1
 files:
   escritorio: "/home/user/Documentos/escritorio"
   tecnico: "/home/user/Documentos/tecnico"
+  "escritório particular.ini": "/home/user/Documentos/particular"
 ```
 
-The key is the INI stem, so `escritorio` means `escritorio.ini` in the same directory. The value is the absolute source folder served by that INI. The suffix is implicit, which keeps a path, a separator or a traversal out of the key.
+The key is the INI file name. When it has no `.ini` suffix, the suffix is implicit: `escritorio` means `escritorio.ini` in the same directory. When the key already ends with `.ini`, that exact file name is used, so an explicit name is possible. The value is the absolute source folder served by that INI.
+
+The file name may contain spaces, including `escritório particular.ini`; quote the key in YAML when it has spaces or punctuation. Leading or trailing spaces are rejected, as are path separators, `:`, `*`, `?`, `"`, `<`, `>`, `|`, control characters and names that are only dots. An explicit `.INI` suffix is accepted and the case is preserved.
 
 The inner map is sensitive because it reveals which folders belong to which client, case or project. That is why it stays inside the confidential directory instead of the general configuration.
 
@@ -56,7 +59,7 @@ The source root of the job is canonicalized and compared with each mapped folder
 
 Two files cannot map the same source folder, and two entries cannot list the same confidential directory. An ambiguous map is an error instead of a silent choice.
 
-The INI names are letters, digits, `_` and `-`. Paths in both configuration files must be absolute. A `confidential.yaml` or INI that escapes its confidential directory through a symlink is rejected.
+The INI name is a single file name with an optional `.ini` suffix; it cannot contain a path separator. Paths in both configuration files must be absolute. A `confidential.yaml` or INI that escapes its confidential directory through a symlink is rejected.
 
 ## Precedence
 

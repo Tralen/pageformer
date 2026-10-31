@@ -4,6 +4,13 @@
 
 *Major updates and feature releases.*
 
+### 0.41.0
+
+- The confidential `files` map now accepts an explicit `.ini` file name as the key, so `"escritório particular.ini"` uses that exact file and `escritorio` keeps the implicit `escritorio.ini` default.
+- INI names may contain spaces and Unicode; leading or trailing spaces, path separators, Windows-reserved characters and all-dot names are rejected. An explicit `.INI` suffix is accepted and preserves its case.
+- Documented the key form in `docs/confidential.md` and added tests for spaces, explicit names and invalid characters.
+- Regenerates the ODT examples for the version in `meta:generator`.
+
 ### 0.40.0
 
 - Added the user-level confidential folder mapping. The public `config.yaml` lists confidential directories; each directory owns a `confidential.yaml` with a `files` map from an INI stem to its absolute source folder, so the INI is implicit and the template never knows it.

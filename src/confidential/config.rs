@@ -152,22 +152,39 @@ struct IniName(String);
 
 impl IniName {
     fn parse(text: &str) -> Option<Self> {
-        let mut characters = text.chars();
-        let first = characters.next()?;
-        if !first.is_ascii_alphanumeric() {
+        if text.is_empty()
+            || text.trim() != text
+            || text == "."
+            || text == ".."
+            || text.ends_with('.')
+            || text.chars().all(|character| character == '.')
+            || text.chars().any(|character| {
+                character.is_control()
+                    || matches!(
+                        character,
+                        '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|'
+                    )
+            })
+        {
             return None;
         }
-        if characters.all(|character| {
-            character.is_ascii_alphanumeric() || character == '_' || character == '-'
-        }) {
-            Some(Self(text.to_owned()))
+        let name = if text.to_ascii_lowercase().ends_with(".ini") {
+            text.to_owned()
         } else {
-            None
+            format!("{text}.ini")
+        };
+        let stem = name.get(..name.len().saturating_sub(4))?;
+        if stem.is_empty()
+            || stem.trim().is_empty()
+            || stem.chars().all(|character| character == '.')
+        {
+            return None;
         }
+        Some(Self(name))
     }
 
-    fn file_name(&self) -> String {
-        format!("{}.ini", self.0)
+    fn file_name(&self) -> &str {
+        &self.0
     }
 }
 
@@ -416,7 +433,7 @@ impl fmt::Display for ConfigError {
             ),
             Self::InvalidIniName { name } => write!(
                 formatter,
-                "confidential file name `{name}` must use letters, digits, `_` or `-`"
+                "confidential file name `{name}` must be a single file name without path separators or reserved characters; the .ini suffix is optional"
             ),
             Self::DuplicateDirectory { path } => write!(
                 formatter,
@@ -476,7 +493,7 @@ mod tests {
     fn write_secret(directory: &Path, files: &[(&str, &Path)]) {
         let mut text = String::from("version: 1\nfiles:\n");
         for (name, folder) in files {
-            text.push_str(&format!("  {name}: \"{}\"\n", folder.display()));
+            text.push_str(&format!("  \"{name}\": \"{}\"\n", folder.display()));
         }
         let path = directory.join(SECRET_FILE_NAME);
         fs::write(&path, text).expect("the secret map must be written");
@@ -484,7 +501,11 @@ mod tests {
     }
 
     fn write_ini(directory: &Path, name: &str) {
-        let path = directory.join(format!("{name}.ini"));
+        write_ini_file(directory, &format!("{name}.ini"));
+    }
+
+    fn write_ini_file(directory: &Path, file_name: &str) {
+        let path = directory.join(file_name);
         fs::write(&path, "NOME = Fulano\n").expect("the INI must be written");
         set_mode(&path, 0o600);
     }
@@ -558,6 +579,65 @@ mod tests {
             config.file_for(source.path()),
             Some(secret.path().join("outside.ini").as_path())
         );
+    }
+
+    #[test]
+    fn the_ini_suffix_is_implicit_but_can_be_written_explicitly() {
+        let temp = TempDir::new().expect("a configuration directory");
+        let secret = secret_directory();
+        let source = project();
+        let nested = source.path().join("nested");
+        fs::create_dir(&nested).expect("the nested folder must exist");
+        let public = temp.path().join(PUBLIC_FILE_NAME);
+        write_public(&public, &[secret.path()]);
+        write_secret(
+            secret.path(),
+            &[
+                ("escritorio", source.path()),
+                ("escritório particular.ini", &nested),
+            ],
+        );
+        write_ini(secret.path(), "escritorio");
+        write_ini_file(secret.path(), "escritório particular.ini");
+        let config =
+            ConfidentialConfig::from_public_file(&public).expect("the configuration must load");
+
+        assert_eq!(
+            config.file_for(&nested),
+            Some(secret.path().join("escritório particular.ini").as_path())
+        );
+        assert_eq!(
+            config.file_for(source.path()),
+            Some(secret.path().join("escritorio.ini").as_path())
+        );
+    }
+
+    #[test]
+    fn ini_names_keep_inner_spaces_and_the_optional_suffix() {
+        assert_eq!(
+            IniName::parse("escritório particular")
+                .expect("an implicit name")
+                .file_name(),
+            "escritório particular.ini"
+        );
+        assert_eq!(
+            IniName::parse("escritório particular.ini")
+                .expect("an explicit name")
+                .file_name(),
+            "escritório particular.ini"
+        );
+        assert_eq!(
+            IniName::parse("escritório particular.INI")
+                .expect("an explicit upper-case suffix")
+                .file_name(),
+            "escritório particular.INI"
+        );
+        for invalid in [
+            ".", "..", ".ini", "foo.", "foo ", " foo", "foo/bar", "foo\\bar", "foo:bar", "foo*bar",
+            "foo\nbar",
+        ] {
+            assert!(IniName::parse(invalid).is_none(), "{invalid}");
+        }
     }
 
     #[test]

@@ -77,8 +77,7 @@ struct ExportButton {
     copy: bool,
 }
 
-/// The export buttons, in display order. EPUB is a placeholder until its
-/// backend exists, so it carries no `Format` and renders disabled.
+/// The export buttons, in display order. Every format now has a backend.
 const EXPORT_BUTTONS: [ExportButton; 6] = [
     ExportButton {
         label: "PDF",
@@ -112,7 +111,7 @@ const EXPORT_BUTTONS: [ExportButton; 6] = [
         label: "EPUB",
         fill: egui::Color32::from_rgb(0xf9, 0xa8, 0x25),
         text: egui::Color32::BLACK,
-        format: None,
+        format: Some(Format::Epub),
         copy: false,
     },
     ExportButton {
@@ -1038,7 +1037,7 @@ mod tests {
 
         assert_eq!(labels, ["PDF", "ODT", "DOCX", "HTML", "EPUB", "TXT"]);
         assert_eq!(EXPORT_BUTTONS[3].format, Some(Format::Html));
-        assert_eq!(EXPORT_BUTTONS[4].format, None);
+        assert_eq!(EXPORT_BUTTONS[4].format, Some(Format::Epub));
         assert!(EXPORT_BUTTONS[5].copy);
     }
 

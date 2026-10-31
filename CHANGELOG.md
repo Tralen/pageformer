@@ -4,6 +4,14 @@
 
 *Major updates and feature releases.*
 
+### 0.36.0
+
+- Added the EPUB 3 backend and `--format epub`: chapters split at first-level headings, a generated navigation, a reflowable CSS subset, packaged body images and deterministic metadata.
+- Added the `identifier` frontmatter field; without it, the EPUB identifier is a UUID v5 derived from the metadata and the rendered chapters.
+- EPUB uses per-chapter endnotes, omits the letterhead and running content, and hides explicit page breaks because it is reflowable.
+- `pageformer-publisher` EPUB button now exports, and every format button has a backend.
+- Regenerates the EPUB, HTML and ODT examples; the ODT examples carry the version in `meta:generator`.
+
 ### 0.35.1
 
 - Fixed empty HTML table cells collapsing: `th:empty::after` and `td:empty::after` add a non-breaking line box, so a signature grid keeps the row height of the other formats.

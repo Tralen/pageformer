@@ -83,6 +83,13 @@ impl AssetMap {
     pub fn image(&self, destination: &str) -> Option<&str> {
         self.images.get(destination).map(String::as_str)
     }
+
+    /// The body images in destination order.
+    pub fn images(&self) -> impl Iterator<Item = (&str, &str)> {
+        self.images
+            .iter()
+            .map(|(destination, asset)| (destination.as_str(), asset.as_str()))
+    }
 }
 
 /// The resolved assets and their bytes.
@@ -102,17 +109,13 @@ impl Assets {
     }
 }
 
-/// Reads the letterhead and the images of a document.
+/// Reads the body images of a document.
 ///
-/// Image destinations resolve relative to the Markdown file and the letterhead
-/// resolves relative to the template file. Remote destinations are rejected
-/// because the binary never performs network requests.
-pub fn load_assets(
-    document: &Document,
-    template: &Template,
-    source_directory: &Path,
-    template_directory: Option<&Path>,
-) -> Result<Assets, AssetError> {
+/// Image destinations resolve relative to the Markdown file. Remote
+/// destinations are rejected because the binary never performs network
+/// requests. The letterhead is not loaded here, so a reflowable backend that
+/// ignores it does not require the template directory.
+pub fn load_images(document: &Document, source_directory: &Path) -> Result<Assets, AssetError> {
     let mut map = AssetMap::new();
     let mut files = BTreeMap::new();
     let mut destinations = Vec::new();
@@ -132,16 +135,32 @@ pub fn load_assets(
         map = map.with_image(destination, asset);
     }
 
+    Ok(Assets { map, files })
+}
+
+/// Reads the letterhead and the images of a document.
+///
+/// Image destinations resolve relative to the Markdown file and the letterhead
+/// resolves relative to the template file. Remote destinations are rejected
+/// because the binary never performs network requests.
+pub fn load_assets(
+    document: &Document,
+    template: &Template,
+    source_directory: &Path,
+    template_directory: Option<&Path>,
+) -> Result<Assets, AssetError> {
+    let mut assets = load_images(document, source_directory)?;
+
     if let Some(letterhead) = template.page().letterhead() {
         let directory = template_directory.ok_or(AssetError::MissingTemplateDirectory)?;
         let path = directory.join(letterhead.as_str());
         let extension = supported_extension(&path)?;
         let asset = format!("assets/letterhead.{extension}");
-        files.insert(asset.clone(), read_asset(&path)?);
-        map = map.with_letterhead(asset);
+        assets.files.insert(asset.clone(), read_asset(&path)?);
+        assets.map = assets.map.clone().with_letterhead(asset);
     }
 
-    Ok(Assets { map, files })
+    Ok(assets)
 }
 
 fn collect_block_images<'a>(blocks: &'a [Block], destinations: &mut Vec<&'a str>) {

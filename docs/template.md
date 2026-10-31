@@ -170,6 +170,7 @@ subject: Prestação de serviços
 keywords:
   - contrato
   - prestação de serviços
+identifier: urn:isbn:9780000000000
 ---
 ```
 
@@ -178,6 +179,8 @@ keywords:
 `date` is a calendar date written as `YYYY-MM-DD`, such as `2026-02-01`, and must be a real day. It replaces the fixed document date in the PDF metadata and drives the Typst world date, so the output stays deterministic. Without it, the fixed date `2026-01-01` is used.
 
 `subject` reaches the PDF document description and `keywords` reaches its keyword list. Both are optional and omitted from the PDF when absent.
+
+`identifier` is an optional non-empty identifier such as an ISBN, a URN or a UUID. It becomes the EPUB `dc:identifier`; without it, the EPUB derives a UUID v5 from the metadata and the rendered chapters, so two runs stay identical.
 
 A confidential field such as `{NOME}` is not allowed in any frontmatter value; fields belong to the document body. See the confidentiality section in [`architecture.md`](architecture.md#confidentiality).
 
@@ -362,6 +365,12 @@ Every format reads the text colors: the body, the headings, emphasis, strong, co
 The HTML backend maps the same resolved template to CSS. The page size, orientation and margins become the screen container and the print `@page` rule; the paragraph, inline, heading, rule, quote, code block, list, task and table keys keep their meaning. Lists use CSS counter styles for the declared bullets, numbering formats and suffix; `marker_gap` is folded into the list padding because CSS has no portable marker-gap property. A list fill applies to the first paragraph of each item, not to the whole item, so it follows the indentation and leaves a nested list unpainted. An empty table cell keeps a line box, so a signature grid does not collapse. On screen the document is a page-like container without fake pagination. In print, explicit page breaks and `page_break_before` become CSS page breaks.
 
 The letterhead is print-only, as an `@page` background, because the example is a full-page image and a banner would distort it. The running header and footer are also print-only, as `@page` margin boxes: `{page}` and `{pages}` become CSS page counters, and `{title}` and `{author}` come from the frontmatter. A browser that does not implement those Paged Media features omits the decoration without breaking the document. Links allow relative destinations and `http`, `https` and `mailto`; other schemes are rendered as text. HTML has no script and no external resource.
+
+## EPUB
+
+The EPUB backend splits the document at each first-level heading, puts the content before the first heading into an introduction and builds the navigation from those headings. A document without a first-level heading stays one chapter. Chapters use the HTML block and inline conversion and a reflowable CSS subset; each chapter carries its own endnotes, so footnote numbering restarts per chapter.
+
+EPUB omits the letterhead and the running header and footer because it is reflowable and the reader controls pagination. Explicit page breaks are hidden. Body images are packaged under `images/` and referenced relatively. The package uses `mimetype` first and stored, `META-INF/container.xml`, `OEBPS/content.opf`, `OEBPS/nav.xhtml`, `OEBPS/style.css`, the chapters and the images. The frontmatter title, author, language, date, subject, keywords and identifier supply the metadata; the title falls back to the first heading or `Untitled`, and a missing language becomes `und`.
 
 ## Example
 

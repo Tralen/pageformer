@@ -12,11 +12,19 @@ pub enum Format {
     Odt,
     Docx,
     Html,
+    Epub,
 }
 
 impl Format {
     /// Every format the library can render today.
-    pub const ALL: [Self; 5] = [Self::Pdf, Self::Txt, Self::Odt, Self::Docx, Self::Html];
+    pub const ALL: [Self; 6] = [
+        Self::Pdf,
+        Self::Txt,
+        Self::Odt,
+        Self::Docx,
+        Self::Html,
+        Self::Epub,
+    ];
 
     /// The name used on the command line and in the format menu.
     pub fn name(self) -> &'static str {
@@ -26,6 +34,7 @@ impl Format {
             Self::Odt => "odt",
             Self::Docx => "docx",
             Self::Html => "html",
+            Self::Epub => "epub",
         }
     }
 
@@ -37,6 +46,7 @@ impl Format {
             Self::Odt => "odt",
             Self::Docx => "docx",
             Self::Html => "html",
+            Self::Epub => "epub",
         }
     }
 }
@@ -57,6 +67,7 @@ impl FromStr for Format {
             "odt" => Ok(Self::Odt),
             "docx" => Ok(Self::Docx),
             "html" => Ok(Self::Html),
+            "epub" => Ok(Self::Epub),
             other => Err(FormatError::Unknown(other.to_owned())),
         }
     }
@@ -74,7 +85,7 @@ impl fmt::Display for FormatError {
             Self::Unknown(name) => {
                 write!(
                     formatter,
-                    "unknown format `{name}`; use pdf, txt, odt, docx or html"
+                    "unknown format `{name}`; use pdf, txt, odt, docx, html or epub"
                 )
             }
         }
@@ -94,18 +105,22 @@ mod tests {
         assert_eq!(Format::Odt.extension(), "odt");
         assert_eq!(Format::Docx.extension(), "docx");
         assert_eq!(Format::Html.extension(), "html");
+        assert_eq!(Format::Epub.extension(), "epub");
         assert_eq!("txt".parse::<Format>(), Ok(Format::Txt));
         assert_eq!("odt".parse::<Format>(), Ok(Format::Odt));
         assert_eq!("docx".parse::<Format>(), Ok(Format::Docx));
         assert_eq!("html".parse::<Format>(), Ok(Format::Html));
+        assert_eq!("epub".parse::<Format>(), Ok(Format::Epub));
     }
 
     #[test]
     fn an_unknown_format_name_is_rejected() {
-        let error = "epub".parse::<Format>().expect_err("an unknown format");
+        let error = "mobi".parse::<Format>().expect_err("an unknown format");
 
         assert!(
-            error.to_string().contains("pdf, txt, odt, docx or html"),
+            error
+                .to_string()
+                .contains("pdf, txt, odt, docx, html or epub"),
             "{error}"
         );
     }

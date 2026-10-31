@@ -56,6 +56,7 @@ pub struct Metadata {
     date: Option<DocumentDate>,
     subject: Option<Subject>,
     keywords: Vec<Keyword>,
+    identifier: Option<Identifier>,
 }
 
 impl Metadata {
@@ -67,6 +68,7 @@ impl Metadata {
             date: None,
             subject: None,
             keywords: Vec::new(),
+            identifier: None,
         }
     }
 
@@ -86,6 +88,13 @@ impl Metadata {
 
     pub fn with_keywords(self, keywords: Vec<Keyword>) -> Self {
         Self { keywords, ..self }
+    }
+
+    pub fn with_identifier(self, identifier: Identifier) -> Self {
+        Self {
+            identifier: Some(identifier),
+            ..self
+        }
     }
 
     pub fn title(&self) -> Option<&Title> {
@@ -110,6 +119,10 @@ impl Metadata {
 
     pub fn keywords(&self) -> &[Keyword] {
         &self.keywords
+    }
+
+    pub fn identifier(&self) -> Option<&Identifier> {
+        self.identifier.as_ref()
     }
 }
 
@@ -241,6 +254,33 @@ impl fmt::Display for Keyword {
     }
 }
 
+/// A non-empty document identifier, such as an ISBN, a URN or a UUID.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Identifier(String);
+
+impl Identifier {
+    pub fn parse(text: &str) -> Result<Self, MetadataError> {
+        let trimmed = text.trim();
+        if trimmed.is_empty() {
+            return Err(MetadataError::EmptyIdentifier);
+        }
+        if trimmed.chars().any(char::is_control) {
+            return Err(MetadataError::InvalidIdentifier);
+        }
+        Ok(Self(trimmed.to_owned()))
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl fmt::Display for Identifier {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(&self.0)
+    }
+}
+
 /// A calendar date written in the frontmatter as `YYYY-MM-DD`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct DocumentDate {
@@ -355,7 +395,9 @@ pub enum MetadataError {
     EmptyLanguage,
     EmptySubject,
     EmptyKeyword,
+    EmptyIdentifier,
     InvalidLanguageTag,
+    InvalidIdentifier,
     InvalidDate,
 }
 
@@ -367,7 +409,9 @@ impl fmt::Display for MetadataError {
             Self::EmptyLanguage => "the document language is empty",
             Self::EmptySubject => "the document subject is empty",
             Self::EmptyKeyword => "a document keyword is empty",
+            Self::EmptyIdentifier => "the document identifier is empty",
             Self::InvalidLanguageTag => "the document language is not a tag such as `pt-BR`",
+            Self::InvalidIdentifier => "the document identifier contains a control character",
             Self::InvalidDate => "the document date is not a calendar date such as `2026-03-05`",
         };
         formatter.write_str(message)
@@ -1029,6 +1073,20 @@ mod tests {
         assert_eq!(
             Keyword::parse(" legal ").map(|keyword| keyword.as_str().to_owned()),
             Ok("legal".to_owned())
+        );
+    }
+
+    #[test]
+    fn an_identifier_is_trimmed_and_rejects_empty_or_control_text() {
+        assert_eq!(
+            Identifier::parse("  urn:isbn:9780000000000  ")
+                .map(|identifier| { identifier.as_str().to_owned() }),
+            Ok("urn:isbn:9780000000000".to_owned())
+        );
+        assert_eq!(Identifier::parse("  "), Err(MetadataError::EmptyIdentifier));
+        assert_eq!(
+            Identifier::parse("a\u{1}b"),
+            Err(MetadataError::InvalidIdentifier)
         );
     }
 

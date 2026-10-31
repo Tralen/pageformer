@@ -2710,7 +2710,7 @@ dependencies = [
 
 [[package]]
 name = "pageformer"
-version = "0.35.1"
+version = "0.36.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -2724,12 +2724,13 @@ dependencies = [
  "typst-kit",
  "typst-layout",
  "typst-pdf",
+ "uuid",
  "zip",
 ]
 
 [[package]]
 name = "pageformer-publisher"
-version = "0.35.1"
+version = "0.36.0"
 dependencies = [
  "eframe",
  "pageformer",
@@ -3618,6 +3619,12 @@ dependencies = [
  "serde",
  "unsafe-libyaml",
 ]
+
+[[package]]
+name = "sha1_smol"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bbfa15b3dddfee50a0fff136974b3e1bde555604ba463834a7eb7deb6417705d"
 
 [[package]]
 name = "shlex"
@@ -4717,6 +4724,11 @@ name = "uuid"
 version = "1.29.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4a0e2d11620c50695fe12bbbfde96b3477fe606e7284c22d505c12ce51214514"
+dependencies = [
+ "js-sys",
+ "sha1_smol",
+ "wasm-bindgen",
+]
 
 [[package]]
 name = "vello_common"

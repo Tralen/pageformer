@@ -11,10 +11,31 @@ use crate::html::data_uri::data_uri;
 use crate::html::escape;
 use crate::template::Template;
 
-/// The rendered body and the warnings it produced.
+/// The rendered body, its endnotes and the warnings it produced.
 pub(crate) struct Content {
-    pub main: String,
+    pub body: String,
+    pub footnotes: String,
     pub warnings: Vec<String>,
+}
+
+impl Content {
+    /// The body and the endnotes as one fragment, matching the HTML file.
+    pub(crate) fn full(&self) -> String {
+        if self.footnotes.is_empty() {
+            self.body.clone()
+        } else if self.body.is_empty() {
+            self.footnotes.clone()
+        } else {
+            format!("{}\n{}", self.body, self.footnotes)
+        }
+    }
+}
+
+/// How an image resource is named in the output.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ImageSource<'a> {
+    DataUri,
+    Relative(&'a str),
 }
 
 struct Note {
@@ -28,6 +49,7 @@ struct Note {
 struct Builder<'a> {
     template: &'a Template,
     assets: &'a Assets,
+    image_source: ImageSource<'a>,
     definitions: BTreeMap<String, FootnoteDefinition>,
     notes: Vec<Note>,
     note_index: BTreeMap<String, usize>,
@@ -35,11 +57,23 @@ struct Builder<'a> {
     warnings: Vec<String>,
 }
 
-/// Renders the document body, including the collected endnotes.
+/// Renders the document body and its collected endnotes.
 pub(crate) fn render(document: &Document, template: &Template, assets: &Assets) -> Content {
+    render_with(document, template, assets, ImageSource::DataUri)
+}
+
+/// Renders the document body and its collected endnotes with a chosen image
+/// source.
+pub(crate) fn render_with(
+    document: &Document,
+    template: &Template,
+    assets: &Assets,
+    image_source: ImageSource<'_>,
+) -> Content {
     let mut builder = Builder {
         template,
         assets,
+        image_source,
         definitions: BTreeMap::new(),
         notes: Vec::new(),
         note_index: BTreeMap::new(),
@@ -47,15 +81,12 @@ pub(crate) fn render(document: &Document, template: &Template, assets: &Assets) 
         warnings: Vec::new(),
     };
     builder.collect_definitions(document.blocks());
-    let mut main = builder.blocks_to_string(document.blocks(), 0, true);
+    let body = builder.blocks_to_string(document.blocks(), 0, true);
     builder.render_notes();
     let footnotes = builder.footnotes();
-    if !footnotes.is_empty() {
-        main.push('\n');
-        main.push_str(&footnotes);
-    }
     Content {
-        main,
+        body,
+        footnotes,
         warnings: builder.warnings,
     }
 }
@@ -384,13 +415,21 @@ impl Builder<'_> {
             ));
             return missing_image(&alternative);
         };
-        let uri = data_uri(media, bytes);
+        let source = match self.image_source {
+            ImageSource::DataUri => data_uri(media, bytes),
+            ImageSource::Relative(prefix) => {
+                format!(
+                    "{prefix}{}",
+                    asset.rsplit_once('/').map_or(asset, |(_, name)| name)
+                )
+            }
+        };
         let title = title
             .map(|title| format!(" title=\"{}\"", escape::attribute(title)))
             .unwrap_or_default();
         format!(
             "<img src=\"{}\" alt=\"{}\"{title} />",
-            escape::attribute(&uri),
+            escape::attribute(&source),
             escape::attribute(&alternative)
         )
     }
@@ -486,7 +525,7 @@ impl Builder<'_> {
     }
 }
 
-fn plain_text(inlines: &[Inline]) -> String {
+pub(crate) fn plain_text(inlines: &[Inline]) -> String {
     let mut output = String::new();
     for inline in inlines {
         match inline {
@@ -566,13 +605,17 @@ mod tests {
     fn headings_and_paragraphs_are_semantic() {
         let content = render_source("# Título\n\nTexto.\n");
 
-        assert!(content.main.contains("<h1>Título</h1>"), "{}", content.main);
+        assert!(
+            content.full().contains("<h1>Título</h1>"),
+            "{}",
+            content.full()
+        );
         assert!(
             content
-                .main
+                .full()
                 .contains("<p class=\"body-paragraph\">Texto.</p>"),
             "{}",
-            content.main
+            content.full()
         );
     }
 
@@ -581,7 +624,7 @@ mod tests {
         let document = Document::new(Metadata::default(), Vec::new());
         let content = render(&document, &embedded(), &Assets::default());
 
-        assert!(content.main.is_empty());
+        assert!(content.full().is_empty());
         assert!(content.warnings.is_empty());
     }
 
@@ -598,10 +641,10 @@ mod tests {
 
         assert!(
             content
-                .main
+                .full()
                 .contains("<span class=\"number\">3.</span> Cláusula."),
             "{}",
-            content.main
+            content.full()
         );
     }
 
@@ -613,32 +656,32 @@ mod tests {
 
         assert!(
             content
-                .main
+                .full()
                 .contains("<ul class=\"list-depth-0 task-list\">"),
             "{}",
-            content.main
+            content.full()
         );
         assert!(
             content
-                .main
+                .full()
                 .contains("<span class=\"task-done\">[x]</span>"),
             "{}",
-            content.main
+            content.full()
         );
         assert!(
             content
-                .main
+                .full()
                 .contains("<aside class=\"quote alert alert-warning\" role=\"note\">"),
             "{}",
-            content.main
+            content.full()
         );
-        assert!(content.main.contains("[!WARNING]"), "{}", content.main);
+        assert!(content.full().contains("[!WARNING]"), "{}", content.full());
         assert!(
             content
-                .main
+                .full()
                 .contains("<code class=\"language-rust\">let x = 1;"),
             "{}",
-            content.main
+            content.full()
         );
     }
 
@@ -646,18 +689,18 @@ mod tests {
     fn a_table_has_a_header_and_column_alignment() {
         let content = render_source("| A | B |\n|:--|--:|\n| 1 | 2 |\n");
 
-        assert!(content.main.contains("<thead>"), "{}", content.main);
+        assert!(content.full().contains("<thead>"), "{}", content.full());
         assert!(
             content
-                .main
+                .full()
                 .contains("<th scope=\"col\" class=\"align-left\">A</th>"),
             "{}",
-            content.main
+            content.full()
         );
         assert!(
-            content.main.contains("<td class=\"align-right\">2</td>"),
+            content.full().contains("<td class=\"align-right\">2</td>"),
             "{}",
-            content.main
+            content.full()
         );
     }
 
@@ -667,19 +710,19 @@ mod tests {
 
         assert!(
             content
-                .main
+                .full()
                 .contains("<section class=\"footnotes\" role=\"doc-endnotes\">"),
             "{}",
-            content.main
+            content.full()
         );
-        assert!(content.main.contains("id=\"fn-1\""), "{}", content.main);
-        assert!(content.main.contains("Nota B."), "{}", content.main);
+        assert!(content.full().contains("id=\"fn-1\""), "{}", content.full());
+        assert!(content.full().contains("Nota B."), "{}", content.full());
         assert!(
             content
-                .main
+                .full()
                 .contains("<a href=\"#fnref-1\" role=\"doc-backlink\">↩</a>"),
             "{}",
-            content.main
+            content.full()
         );
     }
 
@@ -687,9 +730,9 @@ mod tests {
     fn an_unsafe_link_is_text_with_a_warning() {
         let content = render_source("[clique](javascript:alert(1))\n");
 
-        assert!(content.main.contains("<p"), "{}", content.main);
-        assert!(content.main.contains("clique"), "{}", content.main);
-        assert!(!content.main.contains("href"), "{}", content.main);
+        assert!(content.full().contains("<p"), "{}", content.full());
+        assert!(content.full().contains("clique"), "{}", content.full());
+        assert!(!content.full().contains("href"), "{}", content.full());
         assert_eq!(content.warnings.len(), 1);
     }
 
@@ -705,7 +748,7 @@ mod tests {
         );
         let content = render(&document, &embedded(), &Assets::default());
 
-        assert!(content.main.contains("[Logo]"), "{}", content.main);
+        assert!(content.full().contains("[Logo]"), "{}", content.full());
         assert_eq!(content.warnings.len(), 1);
     }
 
@@ -726,11 +769,15 @@ mod tests {
         );
         let content = render(&document, &embedded(), &Assets::default());
 
-        assert!(content.main.contains("<h2>Seção</h2>"), "{}", content.main);
         assert!(
-            content.main.contains("class=\"language-c++\""),
+            content.full().contains("<h2>Seção</h2>"),
             "{}",
-            content.main
+            content.full()
+        );
+        assert!(
+            content.full().contains("class=\"language-c++\""),
+            "{}",
+            content.full()
         );
     }
 
@@ -759,12 +806,22 @@ mod tests {
         );
         let content = render(&document, &embedded(), &Assets::default());
 
-        assert!(content.main.contains("list-depth-0"), "{}", content.main);
-        assert!(content.main.contains("list-depth-1"), "{}", content.main);
         assert!(
-            content.main.contains("<p class=\"list-paragraph\">um</p>"),
+            content.full().contains("list-depth-0"),
             "{}",
-            content.main
+            content.full()
+        );
+        assert!(
+            content.full().contains("list-depth-1"),
+            "{}",
+            content.full()
+        );
+        assert!(
+            content
+                .full()
+                .contains("<p class=\"list-paragraph\">um</p>"),
+            "{}",
+            content.full()
         );
     }
 
@@ -780,9 +837,9 @@ mod tests {
         let content = render(&document, &embedded(), &Assets::default());
 
         assert!(
-            content.main.contains("class=\"align-center\""),
+            content.full().contains("class=\"align-center\""),
             "{}",
-            content.main
+            content.full()
         );
     }
 }

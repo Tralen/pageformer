@@ -6,7 +6,7 @@
 //! parser and the EPUB backend can reuse the same block conversion.
 
 pub(crate) mod content;
-mod css;
+pub(crate) mod css;
 mod data_uri;
 mod escape;
 
@@ -48,6 +48,7 @@ impl Renderer for HtmlRenderer {
 /// Renders a document with a template into a self-contained HTML file.
 pub fn render(document: &Document, template: &Template, assets: &Assets) -> Rendered {
     let content = content::render(document, template, assets);
+    let main = content.full();
     let stylesheet = css::document_stylesheet(template, document.metadata(), assets);
     let metadata = document.metadata();
     let mut html = String::new();
@@ -101,8 +102,8 @@ pub fn render(document: &Document, template: &Template, assets: &Assets) -> Rend
     html.push_str("<style>\n/*<![CDATA[*/\n");
     html.push_str(&stylesheet);
     html.push_str("/*]]>*/\n</style>\n</head>\n<body>\n<main class=\"pageformer\">\n");
-    if !content.main.is_empty() {
-        html.push_str(&content.main);
+    if !main.is_empty() {
+        html.push_str(&main);
         html.push('\n');
     }
     html.push_str("</main>\n</body>\n</html>\n");

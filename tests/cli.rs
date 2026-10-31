@@ -607,13 +607,13 @@ fn the_text_format_writes_a_txt_file_under_the_output() {
 fn an_unknown_format_fails_before_rendering() {
     let output = run(&[
         OsStr::new("--format"),
-        OsStr::new("epub"),
+        OsStr::new("mobi"),
         fixture("Contrato.md").as_os_str(),
     ]);
 
     assert!(!output.status.success());
     assert!(
-        stderr(&output).contains("pdf, txt, odt, docx or html"),
+        stderr(&output).contains("pdf, txt, odt, docx, html or epub"),
         "{}",
         stderr(&output)
     );
@@ -682,6 +682,27 @@ fn the_html_format_writes_a_self_contained_document() {
     assert!(html.starts_with("<!DOCTYPE html>"), "{html}");
     assert!(html.contains("<h1>Doc</h1>"), "{html}");
     assert!(html.contains("<![CDATA["), "{html}");
+    assert!(!output.path().join("Doc.pdf").exists());
+}
+
+#[test]
+fn the_epub_format_writes_an_epub_package() {
+    let source = TempDir::new().expect("a temporary source");
+    let output = TempDir::new().expect("a temporary output");
+    write_markdown(&source.path().join("Doc.md"), "Doc");
+
+    let result = run(&[
+        OsStr::new("--format"),
+        OsStr::new("epub"),
+        OsStr::new("--color=never"),
+        OsStr::new("--output"),
+        output.path().as_os_str(),
+        source.path().join("Doc.md").as_os_str(),
+    ]);
+    assert!(result.status.success(), "{}", stderr(&result));
+
+    let bytes = fs::read(output.path().join("Doc.epub")).expect("the package must be written");
+    assert_eq!(&bytes[..4], b"PK\x03\x04");
     assert!(!output.path().join("Doc.pdf").exists());
 }
 

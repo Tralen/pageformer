@@ -71,6 +71,42 @@ fn screen(template: &Template) -> String {
     main.push(format!("text-align: {};", alignment(paragraph.alignment())));
     output.push_str(&rule("main.pageformer", &main));
 
+    output.push_str(&content_rules(template, paragraph_after));
+    output.push_str(
+        "@media screen and (max-width: 720pt) { main.pageformer { width: 100%; padding: 24pt; } }\n",
+    );
+
+    output
+}
+
+/// The reflowable stylesheet used by EPUB chapters.
+pub(crate) fn epub_stylesheet(template: &Template) -> String {
+    let paragraph = template.formatting().paragraph();
+    let paragraph_after = metrics::paragraph_after(paragraph.spacing(), paragraph.leading());
+    let face = paragraph.face();
+    let line_height = if face.size().points() > 0.0 {
+        metrics::line_advance(face.size(), paragraph.leading()) / face.size().points()
+    } else {
+        1.0
+    };
+    let mut body = face_declarations(face);
+    body.push(format!("line-height: {line_height:.4};"));
+    body.push(format!("text-align: {};", alignment(paragraph.alignment())));
+
+    let mut output = String::from("/* Pageformer EPUB stylesheet. */\n");
+    output.push_str("html, body { margin: 0; padding: 0; }\n");
+    output.push_str(&rule("body", &body));
+    output.push_str("img { max-width: 100%; height: auto; }\n");
+    output.push_str(&content_rules(template, paragraph_after));
+    output.push_str("h1, h2, h3, h4, h5, h6 { break-before: auto; page-break-before: auto; }\n");
+    output.push_str(".page-break { display: none; break-after: auto; page-break-after: auto; }\n");
+    output
+}
+
+fn content_rules(template: &Template, paragraph_after: f64) -> String {
+    let paragraph = template.formatting().paragraph();
+    let mut output = String::new();
+
     output.push_str(&rule(
         "p",
         &[format!("margin: 0 0 {} 0;", points(paragraph_after))],
@@ -194,10 +230,6 @@ fn screen(template: &Template) -> String {
             "border: 0;".to_owned(),
         ],
     ));
-    output.push_str(
-        "@media screen and (max-width: 720pt) { main.pageformer { width: 100%; padding: 24pt; } }\n",
-    );
-
     output
 }
 
@@ -800,6 +832,23 @@ mod tests {
             css_string("a\"b\\c</style>]]&"),
             "\"a\\\"b\\\\c\\3c /style\\3e ]]\\26 \""
         );
+    }
+
+    #[test]
+    fn the_epub_style_is_reflowable() {
+        let css = epub_stylesheet(&template());
+
+        assert!(
+            css.contains("img { max-width: 100%; height: auto; }"),
+            "{css}"
+        );
+        assert!(
+            css.contains("h1, h2, h3, h4, h5, h6 { break-before: auto;"),
+            "{css}"
+        );
+        assert!(css.contains(".page-break { display: none;"), "{css}");
+        assert!(!css.contains("@page"), "{css}");
+        assert!(!css.contains("main.pageformer {\n  width:"), "{css}");
     }
 
     #[test]

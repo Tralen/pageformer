@@ -49,6 +49,7 @@ The inline model covers every construct of that subset: text, code spans, emphas
 - `src/odt/` is the ODT backend: `content.rs`, `styles.rs` and `meta.rs` generate the XML parts, and `src/zip.rs` builds the deterministic stored ZIP package.
 - `src/docx/` is the DOCX backend: `content.rs`, `styles.rs`, `numbering.rs` and `package.rs` generate the OOXML parts, reusing the same ZIP and metrics.
 - `src/html/` is the HTML backend: `content.rs` maps the model, `css.rs` derives the stylesheet, `escape.rs` escapes text and attributes and `data_uri.rs` embeds the images.
+- `src/epub/` is the EPUB backend: `chapters.rs` splits at first-level headings and `package.rs` writes the XHTML, navigation, OPF, CSS and deterministic ZIP.
 - `src/xml.rs`, `src/metrics.rs` and `src/image.rs` hold the XML escaping, the Typst spacing model and the intrinsic image sizes shared by the office backends.
 - `src/main.rs` is the CLI. It parses each input, resolves the template and either renders the chosen format or reports the pipeline result.
 
@@ -114,7 +115,8 @@ Plain text is a view of the model, used by the copy-as-plain-text action. The ou
 - ODT is the paged format for office review and is implemented with the internal writer below.
 - DOCX is the review and exchange format and is implemented with the internal OOXML writer below.
 - Plain text is implemented and carries the copy-as-plain-text view.
-- HTML is implemented as one self-contained semantic file with embedded CSS and data-URI images. It is the basis for EPUB, which splits chapters at first-level headings and uses deterministic metadata.
+- HTML is implemented as one self-contained semantic file with embedded CSS and data-URI images.
+- EPUB is implemented as an EPUB 3 package that reuses the HTML block and inline conversion, splits chapters at first-level headings and uses deterministic metadata.
 
 ## ODT writer
 
@@ -145,6 +147,16 @@ The letterhead is print-only, as a page background, because the fixture is a ful
 Links allow relative destinations and the `http`, `https` and `mailto` schemes. Any other scheme, including `javascript:`, `data:`, `file:` and `vbscript:`, is rendered as plain text with a warning and never reaches `href`. Images are local assets loaded by the pipeline and embedded as data URIs; a missing asset falls back to the alternative text and a warning. The output has no script and no external resource.
 
 The output is deterministic: attributes and CSS rules have a fixed order, notes follow reference order and assets follow a `BTreeMap`. It carries no generator or version, so a patch release does not change the HTML examples. `html::stylesheet` exposes the generated screen and structural print CSS for the Pageweaver preview, which consumes the same class names instead of reparsing the template.
+
+## EPUB writer
+
+EPUB 3 packages the HTML content without a second converter. `src/epub/chapters.rs` splits the top-level blocks at each first-level heading; content before the first heading becomes an introduction, a document without a first-level heading stays one chapter, and a chapter whose rendered body is empty is dropped. Each chapter receives all footnote definitions from the document, so a reference resolves even when its definition is in another chapter. Footnotes stay per chapter: numbering restarts and the links stay local.
+
+The body uses `src/html/content.rs` with a relative image source instead of a data URI. Body images are loaded separately from the letterhead by `assets::load_images`, packaged under `OEBPS/images/` and referenced from the chapters. The letterhead, the running header and footer, the page size and the margins are omitted because EPUB is reflowable; explicit page breaks are hidden by the EPUB CSS. `src/html/css.rs` exposes a reflowable subset with the body face, line height, alignment, headings, lists, tables, quotes, code and notes, while the HTML backend keeps its screen and print stylesheets byte-identical.
+
+The package order is `mimetype` first and stored, then `META-INF/container.xml`, `OEBPS/content.opf`, `OEBPS/nav.xhtml`, `OEBPS/style.css`, the chapters and the images. The OPF carries `dc:identifier`, `dc:title`, `dc:language`, the optional creator, date and subjects, and a deterministic `dcterms:modified`. The navigation is an EPUB 3 `nav` with `epub:type="toc"`; there is no NCX. `src/zip.rs` supplies the fixed timestamp and stored entries, so two renders are byte-identical.
+
+The frontmatter `identifier` becomes `dc:identifier`. Without it, the identifier is a UUID v5 over the metadata and the rendered chapter bodies, with the standard URL namespace; CSS, the source path and the clock stay out of the hash. The title falls back to the first first-level heading and then to `Untitled`, and a missing language becomes `und`. The EPUB is not page-perfect: the reader chooses the pagination and the fonts.
 
 ## PDF engine
 
@@ -189,7 +201,7 @@ The backend declares PDF/A-2b. PDF/A-2u was evaluated and is not emitted: when t
 
 ## Testing
 
-Pure tests cover the document model, the Markdown parser, template validation, template resolution and the Typst source generation. The fixtures in `assets/examples/` drive the parser and PDF tests. The office examples live in `escritorio/`, their fictional values in `confidencial/`, and the generated PDFs in `publicacao/`. HTML and plain text will be compared as text once those backends exist. ZIP-based formats will be checked structurally. PDF output is checked for the PDF header and the PDF/A markers, and the same input must produce identical bytes in two runs. A corpus of real documents is kept as fixtures, because typography regressions do not appear in synthetic samples.
+Pure tests cover the document model, the Markdown parser, template validation, template resolution and the Typst source generation. The fixtures in `assets/examples/` drive the parser and PDF tests. The office examples live in `escritorio/`, their fictional values in `confidencial/`, and the generated formats in `publicacao/`. HTML is compared structurally and by normalized text; plain text has byte goldens. The ZIP-based formats are checked structurally, and the EPUB package also checks the manifest, navigation, chapter split and deterministic identifier. PDF output is checked for the PDF header and the PDF/A markers, and the same input must produce identical bytes in two runs. A corpus of real documents is kept as fixtures, because typography regressions do not appear in synthetic samples.
 
 The parser also has property tests that assert arbitrary text is either accepted or rejected without panicking. The template parser has the same property.
 

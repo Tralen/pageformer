@@ -15,6 +15,7 @@ use std::path::{Path, PathBuf};
 use crate::confidential::{self, ConfidentialStore, ResolveError};
 use crate::document::Document;
 use crate::docx::{DocxError, DocxRenderer};
+use crate::epub::{EpubError, EpubRenderer};
 use crate::format::Format;
 use crate::html::{HtmlError, HtmlRenderer};
 use crate::markdown::{self, MarkdownError};
@@ -187,6 +188,7 @@ pub enum ExportError {
     Odt(OdtError),
     Docx(DocxError),
     Html(HtmlError),
+    Epub(EpubError),
     ConfidentialOutput { root: PathBuf },
     OutputPath { path: PathBuf },
     CreateDirectory { path: PathBuf, source: io::Error },
@@ -209,6 +211,7 @@ impl fmt::Display for ExportError {
             Self::Odt(error) => write!(formatter, "cannot render the ODT: {error}"),
             Self::Docx(error) => write!(formatter, "cannot render the DOCX: {error}"),
             Self::Html(error) => write!(formatter, "cannot render the HTML: {error}"),
+            Self::Epub(error) => write!(formatter, "cannot render the EPUB: {error}"),
             Self::ConfidentialOutput { root } => write!(
                 formatter,
                 "a document with confidential fields must be written outside its source tree, which is {}",
@@ -248,6 +251,7 @@ impl std::error::Error for ExportError {
             Self::Odt(error) => Some(error),
             Self::Docx(error) => Some(error),
             Self::Html(error) => Some(error),
+            Self::Epub(error) => Some(error),
             Self::ConfidentialOutput { .. } | Self::OutputPath { .. } => None,
         }
     }
@@ -292,6 +296,12 @@ impl From<DocxError> for ExportError {
 impl From<HtmlError> for ExportError {
     fn from(error: HtmlError) -> Self {
         Self::Html(error)
+    }
+}
+
+impl From<EpubError> for ExportError {
+    fn from(error: EpubError) -> Self {
+        Self::Epub(error)
     }
 }
 
@@ -396,6 +406,9 @@ fn render_document(
             resolved.base_directory(),
         )?
         .render(document, template)?,
+        Format::Epub => {
+            EpubRenderer::load(document, source_directory)?.render(document, template)?
+        }
     };
     Ok(rendered)
 }

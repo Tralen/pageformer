@@ -13,9 +13,9 @@ use serde::Deserialize;
 
 use crate::document::{
     Alert, Author, Block, CodeBlock, CodeLanguage, ColumnAlignment, Destination, Document,
-    DocumentDate, FootnoteDefinition, FootnoteId, Heading, HeadingLevel, Inline, Keyword, Language,
-    List, ListItem, ListStart, Metadata, MetadataError, NumberedParagraph, Quote, QuoteKind,
-    Subject, Table, TableCell, TableError, TaskState, Title,
+    DocumentDate, FootnoteDefinition, FootnoteId, Heading, HeadingLevel, Identifier, Inline,
+    Keyword, Language, List, ListItem, ListStart, Metadata, MetadataError, NumberedParagraph,
+    Quote, QuoteKind, Subject, Table, TableCell, TableError, TaskState, Title,
 };
 
 /// The deepest tag nesting accepted. A deeper document is rejected instead of
@@ -665,6 +665,7 @@ struct Frontmatter {
     date: Option<String>,
     subject: Option<String>,
     keywords: Option<Vec<String>>,
+    identifier: Option<String>,
 }
 
 fn frontmatter_metadata(yaml: &str) -> Result<Metadata, MarkdownError> {
@@ -681,13 +682,16 @@ fn frontmatter_metadata(yaml: &str) -> Result<Metadata, MarkdownError> {
         (&raw.language, "language"),
         (&raw.date, "date"),
         (&raw.subject, "subject"),
+        (&raw.identifier, "identifier"),
     ] {
         if let Some(text) = value {
             reject_confidential(text, field)?;
         }
     }
-    for keyword in raw.keywords.iter().flatten() {
-        reject_confidential(keyword, "keywords")?;
+    if let Some(keywords) = &raw.keywords {
+        for keyword in keywords {
+            reject_confidential(keyword, "keywords")?;
+        }
     }
     let title = raw
         .title
@@ -721,6 +725,11 @@ fn frontmatter_metadata(yaml: &str) -> Result<Metadata, MarkdownError> {
         .map(|text| Keyword::parse(text))
         .collect::<Result<Vec<_>, _>>()
         .map_err(MarkdownError::Metadata)?;
+    let identifier = raw
+        .identifier
+        .map(|text| Identifier::parse(&text))
+        .transpose()
+        .map_err(MarkdownError::Metadata)?;
     let metadata = Metadata::new(title, author, language);
     let metadata = match date {
         Some(date) => metadata.with_date(date),
@@ -728,6 +737,10 @@ fn frontmatter_metadata(yaml: &str) -> Result<Metadata, MarkdownError> {
     };
     let metadata = match subject {
         Some(subject) => metadata.with_subject(subject),
+        None => metadata,
+    };
+    let metadata = match identifier {
+        Some(identifier) => metadata.with_identifier(identifier),
         None => metadata,
     };
     Ok(metadata.with_keywords(keywords))
@@ -797,7 +810,7 @@ mod tests {
     #[test]
     fn frontmatter_fills_the_remaining_metadata() {
         let document = parse(
-            "---\ndate: 2026-03-05\nsubject: Contrato\nkeywords:\n  - legal\n  - contrato\n---\n\nTexto.\n",
+            "---\ndate: 2026-03-05\nsubject: Contrato\nkeywords:\n  - legal\n  - contrato\nidentifier: urn:isbn:9780000000000\n---\n\nTexto.\n",
         )
         .expect("valid frontmatter");
         let metadata = document.metadata();
@@ -813,6 +826,10 @@ mod tests {
                 .map(Keyword::as_str)
                 .collect::<Vec<_>>(),
             vec!["legal", "contrato"]
+        );
+        assert_eq!(
+            metadata.identifier().map(Identifier::as_str),
+            Some("urn:isbn:9780000000000")
         );
     }
 

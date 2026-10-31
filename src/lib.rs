@@ -13,6 +13,7 @@ pub mod assets;
 pub mod confidential;
 pub mod document;
 pub mod docx;
+pub mod epub;
 pub mod format;
 pub mod html;
 pub mod markdown;

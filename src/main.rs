@@ -272,7 +272,7 @@ fn command() -> Command {
             Arg::new("format")
                 .long("format")
                 .value_name("FORMAT")
-                .help("Output format: pdf, txt, odt, docx or html")
+                .help("Output format: pdf, txt, odt, docx, html or epub")
                 .value_parser(clap::builder::ValueParser::new(Format::from_str))
                 .default_value("pdf"),
         )
@@ -485,7 +485,7 @@ mod tests {
     #[test]
     fn the_format_option_rejects_an_unknown_value() {
         let error = command()
-            .try_get_matches_from(["pageformer", "--format", "epub", "a.md"])
+            .try_get_matches_from(["pageformer", "--format", "mobi", "a.md"])
             .expect_err("the value is not accepted");
         assert_eq!(error.kind(), clap::error::ErrorKind::ValueValidation);
     }

@@ -3,7 +3,8 @@
 //! The pure pieces live in `markdown`, `document`, `template`, `assets` and the
 //! renderers. This module is the smallest effectful edge: it reads the source,
 //! resolves the template and the confidential fields, calls one backend and
-//! writes the output. The CLI, the minimal GUI and Pageweaver share it.
+//! either returns the bytes (`render`) or writes the output (`export`). The CLI,
+//! the minimal GUI and Pageweaver share it.
 
 use std::borrow::Cow;
 use std::fmt;
@@ -12,6 +13,7 @@ use std::io;
 use std::path::{Path, PathBuf};
 
 use crate::confidential::{self, ConfidentialStore, ResolveError};
+use crate::document::Document;
 use crate::docx::{DocxError, DocxRenderer};
 use crate::format::Format;
 use crate::markdown::{self, MarkdownError};
@@ -139,6 +141,26 @@ impl CheckOutcome {
 pub struct ExportOutcome {
     output: PathBuf,
     warnings: Vec<String>,
+}
+
+/// The rendered bytes of a document and the warnings the backend reported,
+/// before an output path is chosen.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RenderOutcome {
+    bytes: Vec<u8>,
+    warnings: Vec<String>,
+}
+
+impl RenderOutcome {
+    /// The rendered bytes.
+    pub fn bytes(&self) -> &[u8] {
+        &self.bytes
+    }
+
+    /// The warnings the backend reported.
+    pub fn warnings(&self) -> &[String] {
+        &self.warnings
+    }
 }
 
 impl ExportOutcome {
@@ -281,6 +303,23 @@ pub fn check(job: &DocumentJob, store: &ConfidentialStore) -> Result<CheckOutcom
     })
 }
 
+/// Reads, parses, resolves and renders a document, without writing.
+pub fn render(
+    job: &DocumentJob,
+    format: Format,
+    store: &ConfidentialStore,
+) -> Result<RenderOutcome, ExportError> {
+    let text = job.source.text()?;
+    let document = markdown::parse(&text)?;
+    let resolution = confidential::resolve(&document, store)?;
+    let resolved = resolve_template(job)?;
+    let rendered = render_document(job, format, resolution.document(), &resolved)?;
+    Ok(RenderOutcome {
+        bytes: rendered.bytes().to_vec(),
+        warnings: rendered.warnings().to_vec(),
+    })
+}
+
 /// Reads, parses, resolves and renders a document, then writes the output.
 pub fn export(
     job: &DocumentJob,
@@ -295,7 +334,21 @@ pub fn export(
     if !resolution.names().is_empty() {
         require_confidential_output(job, output)?;
     }
-    let document = resolution.document();
+    let rendered = render_document(job, format, resolution.document(), &resolved)?;
+    write_atomic(output, rendered.bytes())?;
+    Ok(ExportOutcome {
+        output: output.to_path_buf(),
+        warnings: rendered.warnings().to_vec(),
+    })
+}
+
+fn render_document(
+    job: &DocumentJob,
+    format: Format,
+    document: &Document,
+    resolved: &ResolvedTemplate,
+) -> Result<Rendered, ExportError> {
+    let template = resolved.template();
     let source_directory = job
         .source_path()
         .parent()
@@ -305,33 +358,29 @@ pub fn export(
         Format::Pdf => {
             let assets = pdf::load_assets(
                 document,
-                resolved.template(),
+                template,
                 source_directory,
                 resolved.base_directory(),
             )?;
-            PdfRenderer::new(assets).render(document, resolved.template())?
+            PdfRenderer::new(assets).render(document, template)?
         }
-        Format::Txt => render_infallible(TxtRenderer.render(document, resolved.template())),
+        Format::Txt => render_infallible(TxtRenderer.render(document, template)),
         Format::Odt => OdtRenderer::load(
             document,
-            resolved.template(),
+            template,
             source_directory,
             resolved.base_directory(),
         )?
-        .render(document, resolved.template())?,
+        .render(document, template)?,
         Format::Docx => DocxRenderer::load(
             document,
-            resolved.template(),
+            template,
             source_directory,
             resolved.base_directory(),
         )?
-        .render(document, resolved.template())?,
+        .render(document, template)?,
     };
-    write_atomic(output, rendered.bytes())?;
-    Ok(ExportOutcome {
-        output: output.to_path_buf(),
-        warnings: rendered.warnings().to_vec(),
-    })
+    Ok(rendered)
 }
 
 /// Unwraps a renderer whose error type cannot be constructed.
@@ -471,6 +520,26 @@ mod tests {
         let text = fs::read_to_string(&output).expect("the output must exist");
         assert!(text.contains("Título"), "{text}");
         assert!(text.contains("Texto."), "{text}");
+    }
+
+    #[test]
+    fn a_buffer_is_rendered_without_writing() {
+        let project = TempDir::new().expect("a temporary project");
+        let job = DocumentJob::new(
+            Source::Buffer {
+                text: "# Título\n\nTexto.\n".to_owned(),
+                path: project.path().join("A.md"),
+            },
+            project.path().to_path_buf(),
+        );
+
+        let outcome = render(&job, Format::Txt, &ConfidentialStore::default())
+            .expect("the document must render");
+
+        let text = std::str::from_utf8(outcome.bytes()).expect("the text must be UTF-8");
+        assert!(text.contains("Título"), "{text}");
+        assert!(text.contains("Texto."), "{text}");
+        assert!(outcome.warnings().is_empty());
     }
 
     #[test]

@@ -21,8 +21,12 @@ enum State {
     Working {
         format: Format,
     },
+    Copying,
     Succeeded {
         output: PathBuf,
+        warnings: Vec<String>,
+    },
+    Copied {
         warnings: Vec<String>,
     },
     Failed {
@@ -41,12 +45,93 @@ struct ExportRequest {
     template: Option<PathBuf>,
 }
 
+/// One plain-text copy handed to the worker thread.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct CopyRequest {
+    input: PathBuf,
+    source_root: PathBuf,
+    confidential_file: Option<PathBuf>,
+    template: Option<PathBuf>,
+}
+
 /// One finished export, with the warnings already redacted.
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct Completed {
     output: PathBuf,
     warnings: Vec<String>,
 }
+
+/// What the worker thread produced.
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum WorkerOutcome {
+    Exported(Completed),
+    Copied { text: String, warnings: Vec<String> },
+}
+
+/// One colored export button in the right column.
+struct ExportButton {
+    label: &'static str,
+    fill: egui::Color32,
+    text: egui::Color32,
+    format: Option<Format>,
+    copy: bool,
+}
+
+/// The export buttons, in display order. HTML and EPUB are placeholders until
+/// their backends exist, so they carry no `Format` and render disabled.
+const EXPORT_BUTTONS: [ExportButton; 6] = [
+    ExportButton {
+        label: "PDF",
+        fill: egui::Color32::from_rgb(0xc6, 0x28, 0x28),
+        text: egui::Color32::WHITE,
+        format: Some(Format::Pdf),
+        copy: false,
+    },
+    ExportButton {
+        label: "ODT",
+        fill: egui::Color32::from_rgb(0x2e, 0x7d, 0x32),
+        text: egui::Color32::WHITE,
+        format: Some(Format::Odt),
+        copy: false,
+    },
+    ExportButton {
+        label: "DOCX",
+        fill: egui::Color32::from_rgb(0x15, 0x65, 0xc0),
+        text: egui::Color32::WHITE,
+        format: Some(Format::Docx),
+        copy: false,
+    },
+    ExportButton {
+        label: "HTML",
+        fill: egui::Color32::from_rgb(0xef, 0x6c, 0x00),
+        text: egui::Color32::WHITE,
+        format: None,
+        copy: false,
+    },
+    ExportButton {
+        label: "EPUB",
+        fill: egui::Color32::from_rgb(0xf9, 0xa8, 0x25),
+        text: egui::Color32::BLACK,
+        format: None,
+        copy: false,
+    },
+    ExportButton {
+        label: "TXT",
+        fill: egui::Color32::from_rgb(0x61, 0x61, 0x61),
+        text: egui::Color32::WHITE,
+        format: Some(Format::Txt),
+        copy: true,
+    },
+];
+
+/// The width of one format button.
+const BUTTON_WIDTH: f32 = 120.0;
+/// The height of one format button.
+const BUTTON_HEIGHT: f32 = 36.0;
+/// The width of the copy half of the split TXT button.
+const COPY_BUTTON_WIDTH: f32 = 48.0;
+/// The fill of the copy half of the split TXT button.
+const COPY_FILL: egui::Color32 = egui::Color32::from_rgb(0x45, 0x45, 0x45);
 
 /// The pure converter state: the input, the paths and the visible state.
 struct Session {
@@ -69,7 +154,7 @@ impl Session {
     }
 
     fn can_export(&self) -> bool {
-        self.input.is_some() && !matches!(self.state, State::Working { .. })
+        self.input.is_some() && !matches!(self.state, State::Working { .. } | State::Copying)
     }
 
     /// Accepts a Markdown file or a confidential INI file.
@@ -134,6 +219,27 @@ impl Session {
             Err(message) => State::Failed { message },
         };
     }
+
+    fn begin_copy(&mut self) -> Option<CopyRequest> {
+        if !self.can_export() {
+            return None;
+        }
+        let input = self.input.clone()?;
+        let source_root = self.source_root()?;
+        let confidential_file = explicit_path(&self.confidential_file);
+        let template = explicit_path(&self.template_file);
+        self.state = State::Copying;
+        Some(CopyRequest {
+            input,
+            source_root,
+            confidential_file,
+            template,
+        })
+    }
+
+    fn finish_copy(&mut self, warnings: Vec<String>) {
+        self.state = State::Copied { warnings };
+    }
 }
 
 /// The eframe application.
@@ -142,7 +248,7 @@ pub struct Publisher {
     template_label: String,
     template_path: Option<PathBuf>,
     message: Option<String>,
-    receiver: Option<Receiver<Result<Completed, String>>>,
+    receiver: Option<Receiver<Result<WorkerOutcome, String>>>,
 }
 
 impl Publisher {
@@ -208,12 +314,28 @@ impl Publisher {
         });
     }
 
-    fn poll_receiver(&mut self) {
+    fn start_copy(&mut self) {
+        let Some(request) = self.session.begin_copy() else {
+            return;
+        };
+        let (sender, receiver) = mpsc::channel();
+        self.receiver = Some(receiver);
+        thread::spawn(move || {
+            let _ = sender.send(run_copy(request));
+        });
+    }
+
+    fn poll_receiver(&mut self, context: &egui::Context) {
         let Some(receiver) = self.receiver.take() else {
             return;
         };
         match receiver.try_recv() {
-            Ok(result) => self.session.finish(result),
+            Ok(Ok(WorkerOutcome::Exported(completed))) => self.session.finish(Ok(completed)),
+            Ok(Ok(WorkerOutcome::Copied { text, warnings })) => {
+                self.session.finish_copy(warnings);
+                context.copy_text(text);
+            }
+            Ok(Err(message)) => self.session.finish(Err(message)),
             Err(TryRecvError::Empty) => self.receiver = Some(receiver),
             Err(TryRecvError::Disconnected) => {
                 self.session
@@ -311,12 +433,15 @@ impl Publisher {
 
         ui.add_space(8.0);
 
-        let button_width = 120.0;
+        let button_width = BUTTON_WIDTH;
         let gap = 12.0;
         let spacing = ui.spacing().item_spacing.x;
-        let drop_height = 184.0;
+        let button_spacing = ui.spacing().item_spacing.y;
+        let column_height = EXPORT_BUTTONS.len() as f32 * BUTTON_HEIGHT
+            + (EXPORT_BUTTONS.len() as f32 - 1.0) * button_spacing;
+        let drop_height = column_height.max(184.0);
         let drop_width = (ui.available_width() - button_width - gap - spacing).max(140.0);
-        let working = matches!(self.session.state, State::Working { .. });
+        let working = matches!(self.session.state, State::Working { .. } | State::Copying);
         ui.horizontal_top(|ui| {
             let (rect, response) =
                 ui.allocate_exact_size(egui::vec2(drop_width, drop_height), egui::Sense::click());
@@ -366,15 +491,85 @@ impl Publisher {
             ui.vertical(|ui| {
                 ui.set_width(button_width);
                 let enabled = self.session.can_export();
-                for format in Format::ALL {
-                    let button = egui::Button::new(format.name().to_uppercase())
-                        .min_size(egui::vec2(button_width, 36.0));
-                    let response = with_tooltip(
-                        ui.add_enabled(enabled, button),
-                        &format!("Export the selected document as {}.", format.name().to_uppercase()),
-                    );
-                    if response.clicked() {
-                        self.start(format);
+                for entry in &EXPORT_BUTTONS {
+                    match entry.format {
+                        Some(format) if entry.copy => {
+                            ui.horizontal(|ui| {
+                                ui.spacing_mut().item_spacing.x = 0.0;
+                                let main_width = BUTTON_WIDTH - COPY_BUTTON_WIDTH;
+                                let export = with_tooltip(
+                                    ui.add_enabled(
+                                        enabled,
+                                        egui::Button::new(
+                                            egui::RichText::new(entry.label).color(entry.text),
+                                        )
+                                        .fill(entry.fill)
+                                        .corner_radius(egui::CornerRadius {
+                                            nw: 4,
+                                            sw: 4,
+                                            ne: 0,
+                                            se: 0,
+                                        })
+                                        .min_size(egui::vec2(main_width, BUTTON_HEIGHT)),
+                                    ),
+                                    "Export the selected document as TXT.",
+                                );
+                                if export.clicked() {
+                                    self.start(format);
+                                }
+                                let copy = with_tooltip(
+                                    ui.add_enabled(
+                                        enabled,
+                                        egui::Button::new(
+                                            egui::RichText::new("Copy").color(entry.text),
+                                        )
+                                        .fill(COPY_FILL)
+                                        .corner_radius(egui::CornerRadius {
+                                            nw: 0,
+                                            sw: 0,
+                                            ne: 4,
+                                            se: 4,
+                                        })
+                                        .min_size(egui::vec2(
+                                            COPY_BUTTON_WIDTH,
+                                            BUTTON_HEIGHT,
+                                        )),
+                                    ),
+                                    "Copy the selected document as plain text to the clipboard.",
+                                );
+                                if copy.clicked() {
+                                    self.start_copy();
+                                }
+                            });
+                        }
+                        Some(format) => {
+                            let button = egui::Button::new(
+                                egui::RichText::new(entry.label).color(entry.text),
+                            )
+                            .fill(entry.fill)
+                            .min_size(egui::vec2(BUTTON_WIDTH, BUTTON_HEIGHT));
+                            let response = with_tooltip(
+                                ui.add_enabled(enabled, button),
+                                &format!(
+                                    "Export the selected document as {}.",
+                                    entry.label
+                                ),
+                            );
+                            if response.clicked() {
+                                self.start(format);
+                            }
+                        }
+                        None => {
+                            let button = egui::Button::new(
+                                egui::RichText::new(entry.label).color(entry.text),
+                            )
+                            .fill(entry.fill)
+                            .min_size(egui::vec2(BUTTON_WIDTH, BUTTON_HEIGHT));
+                            with_tooltip(
+                                ui.add_enabled(false, button),
+                                &format!("{} export is not available yet.", entry.label),
+                            );
+                        }
                     }
                 }
             });
@@ -455,6 +650,19 @@ impl Publisher {
                     );
                 });
             }
+            State::Copying => {
+                ui.horizontal(|ui| {
+                    let spinner = ui.spinner();
+                    with_tooltip(
+                        spinner,
+                        "The plain-text copy runs on a worker thread; the window stays responsive.",
+                    );
+                    with_tooltip(
+                        ui.label("Copying plain text..."),
+                        "The plain-text copy runs on a worker thread; the window stays responsive.",
+                    );
+                });
+            }
             State::Succeeded { output, warnings } => {
                 with_tooltip(
                     ui.colored_label(
@@ -486,6 +694,18 @@ impl Publisher {
                     with_tooltip(ui.label(warning), "A warning from the renderer.");
                 }
             }
+            State::Copied { warnings } => {
+                with_tooltip(
+                    ui.colored_label(
+                        egui::Color32::from_rgb(0x2e, 0x7d, 0x32),
+                        "Copied plain text to the clipboard",
+                    ),
+                    "The document text is on the clipboard; it is never displayed here.",
+                );
+                for warning in warnings {
+                    with_tooltip(ui.label(warning), "A warning from the renderer.");
+                }
+            }
             State::Failed { message } => {
                 with_tooltip(
                     ui.colored_label(egui::Color32::from_rgb(0xb0, 0x2a, 0x2a), message),
@@ -507,8 +727,8 @@ impl Publisher {
 impl eframe::App for Publisher {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         self.poll_drops(ui.ctx());
-        self.poll_receiver();
-        if matches!(self.session.state, State::Working { .. }) {
+        self.poll_receiver(ui.ctx());
+        if matches!(self.session.state, State::Working { .. } | State::Copying) {
             ui.ctx().request_repaint_after(Duration::from_millis(100));
         }
         let mut content_height = 0.0;
@@ -661,7 +881,20 @@ fn is_confidential_file(path: &Path) -> bool {
         .is_some_and(|extension| extension.eq_ignore_ascii_case("ini"))
 }
 
-fn run_export(request: ExportRequest) -> Result<Completed, String> {
+fn load_store(
+    confidential_file: Option<PathBuf>,
+    source_root: &Path,
+) -> Result<ConfidentialStore, String> {
+    match confidential_file {
+        Some(path) => {
+            let roots = [source_root];
+            confidential::loader::load(Some(&path), &roots).map_err(|error| error.to_string())
+        }
+        None => Ok(ConfidentialStore::default()),
+    }
+}
+
+fn run_export(request: ExportRequest) -> Result<WorkerOutcome, String> {
     let ExportRequest {
         input,
         source_root,
@@ -670,26 +903,45 @@ fn run_export(request: ExportRequest) -> Result<Completed, String> {
         confidential_file,
         template,
     } = request;
-    let store = match confidential_file {
-        Some(path) => {
-            let roots = [source_root.as_path()];
-            confidential::loader::load(Some(&path), &roots).map_err(|error| error.to_string())?
-        }
-        None => ConfidentialStore::default(),
-    };
+    let store = load_store(confidential_file, &source_root)?;
     let job = DocumentJob::new(Source::File(input), source_root)
         .with_template(template)
         .with_global_template(loader::global_template_path());
     pipeline::export(&job, format, &output, &store)
-        .map(|outcome| Completed {
-            output: outcome.output().to_path_buf(),
-            warnings: outcome
-                .warnings()
-                .iter()
-                .map(|warning| store.redact(warning))
-                .collect(),
+        .map(|outcome| {
+            WorkerOutcome::Exported(Completed {
+                output: outcome.output().to_path_buf(),
+                warnings: outcome
+                    .warnings()
+                    .iter()
+                    .map(|warning| store.redact(warning))
+                    .collect(),
+            })
         })
         .map_err(|error| store.redact(&error.to_string()))
+}
+
+fn run_copy(request: CopyRequest) -> Result<WorkerOutcome, String> {
+    let CopyRequest {
+        input,
+        source_root,
+        confidential_file,
+        template,
+    } = request;
+    let store = load_store(confidential_file, &source_root)?;
+    let job = DocumentJob::new(Source::File(input), source_root)
+        .with_template(template)
+        .with_global_template(loader::global_template_path());
+    let rendered = pipeline::render(&job, Format::Txt, &store)
+        .map_err(|error| store.redact(&error.to_string()))?;
+    let text = String::from_utf8(rendered.bytes().to_vec())
+        .map_err(|error| store.redact(&error.to_string()))?;
+    let warnings = rendered
+        .warnings()
+        .iter()
+        .map(|warning| store.redact(warning))
+        .collect();
+    Ok(WorkerOutcome::Copied { text, warnings })
 }
 
 #[cfg(test)]
@@ -752,6 +1004,42 @@ mod tests {
         assert!(session.begin(Format::Pdf).is_some());
         assert!(matches!(session.state, State::Working { .. }));
         assert!(session.begin(Format::Txt).is_none());
+    }
+
+    #[test]
+    fn the_copy_request_keeps_the_source_root_and_template() {
+        let mut session = session_with_input("docs/A.md");
+        session.template_file = "t.yaml".to_owned();
+
+        let request = session.begin_copy().expect("a copy request");
+
+        assert_eq!(request.input, PathBuf::from("docs/A.md"));
+        assert_eq!(request.source_root, PathBuf::from("docs"));
+        assert_eq!(request.template, Some(PathBuf::from("t.yaml")));
+    }
+
+    #[test]
+    fn a_copied_document_stays_exportable() {
+        let mut session = session_with_input("docs/A.md");
+
+        assert!(session.begin_copy().is_some());
+        assert!(matches!(session.state, State::Copying));
+        assert!(session.begin(Format::Pdf).is_none());
+
+        session.finish_copy(Vec::new());
+
+        assert!(matches!(session.state, State::Copied { .. }));
+        assert!(session.can_export());
+    }
+
+    #[test]
+    fn the_export_buttons_follow_the_requested_order() {
+        let labels: Vec<&str> = EXPORT_BUTTONS.iter().map(|button| button.label).collect();
+
+        assert_eq!(labels, ["PDF", "ODT", "DOCX", "HTML", "EPUB", "TXT"]);
+        assert_eq!(EXPORT_BUTTONS[3].format, None);
+        assert_eq!(EXPORT_BUTTONS[4].format, None);
+        assert!(EXPORT_BUTTONS[5].copy);
     }
 
     #[test]

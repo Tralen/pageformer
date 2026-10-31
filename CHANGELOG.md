@@ -4,6 +4,14 @@
 
 *Major updates and feature releases.*
 
+### 0.33.0
+
+- The `pageformer-publisher` format column now lists PDF, ODT, DOCX, HTML, EPUB and TXT in that order, colored red, green, blue, orange, yellow and gray. HTML and EPUB are disabled placeholders until their backends exist.
+- The TXT button is split: the left half exports TXT and the `Copy` half puts the plain text on the clipboard. The copy never writes a file and never displays the text in the window.
+- Added `pipeline::render` and `RenderOutcome`, so a backend can return bytes plus warnings without choosing an output path; `pipeline::export` now shares the same render path. The GUI uses `render` for the copy action.
+- The drop box grows to match the six-button column, so the column is never taller than the drop area.
+- Regenerates the ODT examples for the version in `meta:generator`.
+
 ### 0.32.4
 
 - Softened the `pageformer-publisher` tooltip: the text is now dark gray (48) and the frame a less light gray (224), with a lighter border, so the hint no longer jumps against the dark window.

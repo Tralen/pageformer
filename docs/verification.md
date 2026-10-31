@@ -78,10 +78,10 @@ The packaging script is shell and is checked with `shellcheck`, then exercised e
 ```sh
 shellcheck packaging/build-deb.sh
 packaging/build-deb.sh
-lintian dist/pageformer_1.0.0_amd64.deb
-dpkg-deb --info dist/pageformer_1.0.0_amd64.deb
-dpkg-deb --contents dist/pageformer_1.0.0_amd64.deb
-dpkg-deb -x dist/pageformer_1.0.0_amd64.deb /tmp/pageformer-deb
+lintian dist/pageformer_<version>_amd64.deb
+dpkg-deb --info dist/pageformer_<version>_amd64.deb
+dpkg-deb --contents dist/pageformer_<version>_amd64.deb
+dpkg-deb -x dist/pageformer_<version>_amd64.deb /tmp/pageformer-deb
 /tmp/pageformer-deb/usr/bin/pageformer --version
 ```
 

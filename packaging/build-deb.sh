@@ -70,9 +70,12 @@ trap 'rm -rf "$staging"' EXIT INT TERM
 
 install -D -m 755 target/release/pageformer "$staging/usr/bin/pageformer"
 install -D -m 755 target/release/pageformer-publisher "$staging/usr/bin/pageformer-publisher"
+# The SVG is the scalable icon; the 256 PNG is its fallback export.
 install -D -m 644 packaging/pageformer-publisher.desktop \
     "$staging/usr/share/applications/pageformer-publisher.desktop"
-install -D -m 644 packaging/pageformer.png \
+install -D -m 644 packaging/pageformer.svg \
+    "$staging/usr/share/icons/hicolor/scalable/apps/pageformer.svg"
+install -D -m 644 packaging/pageformer-256.png \
     "$staging/usr/share/icons/hicolor/256x256/apps/pageformer.png"
 install -D -m 644 README.md "$staging/usr/share/doc/$package/README.md"
 install -D -m 644 CHANGELOG.md "$staging/usr/share/doc/$package/CHANGELOG.md"

@@ -85,17 +85,17 @@ Build the candidate from the tag. `git archive` includes only tracked files, so 
 ```sh
 mkdir -p dist
 git archive --format=tar.gz --prefix=pageformer-<version>/ v<version> > dist/pageformer-<version>.tar.gz
-cd dist
-sha256sum pageformer-<version>.tar.gz > SHA256SUMS
 ```
 
 Inspect the archive before publishing, from inside `dist`:
 
 ```sh
+cd dist
 tar -tzf pageformer-<version>.tar.gz | head -40
-sha256sum -c SHA256SUMS
 cd ..
 ```
+
+The checksum file is created after the Debian package is built, so it covers every attachment.
 
 ## Debian package
 
@@ -110,7 +110,7 @@ packaging/build-deb.sh
 
 Build the package from the same signed tag as the source archive, so the package and the archive describe the same code. A packaging change that lands after a tag rides with the next release instead of rebuilding an old one.
 
-The optional argument selects the architecture, which defaults to `dpkg --print-architecture`. The script needs `cargo` and `dpkg-deb`, runs the release build for both workspace binaries and writes `dist/pageformer_<version>_<architecture>.deb`. It installs `pageformer`, `pageformer-publisher`, the desktop entry, the icon, the two manual pages, the README, the change log and the license.
+The optional argument selects the architecture, which defaults to `dpkg --print-architecture`. The script needs `cargo` and `dpkg-deb`, runs the release build for both workspace binaries and writes `dist/pageformer_<version>_<architecture>.deb`. It installs `pageformer`, `pageformer-publisher`, the desktop entry, the SVG icon and its 256 PNG fallback, the two manual pages, the README, the change log and the license.
 
 The script remaps the Rust build paths, so the binary never carries the builder's home directory, and it derives `SOURCE_DATE_EPOCH` from the last commit. Two runs from the same checkout produce a byte-identical package.
 
@@ -129,6 +129,15 @@ dpkg-deb -x dist/pageformer_<version>_<architecture>.deb /tmp/pageformer-deb
 
 `lintian` must report no errors. The four `embedded-library` errors are overridden with a comment in `/usr/share/lintian/overrides/pageformer`, because `unsafe-libyaml` is a pure Rust port compiled into the binary and the FreeType strings come from the font stack; neither is a system dependency.
 
+Create the checksum file with the source archive and the package together, and verify it before publishing:
+
+```sh
+cd dist
+sha256sum pageformer-<version>.tar.gz pageformer_<version>_<architecture>.deb > SHA256SUMS
+sha256sum -c SHA256SUMS
+cd ..
+```
+
 Attach the package in the authorized publish step, after the tag and the source archive exist:
 
 ```sh
@@ -145,10 +154,10 @@ Publishing needs explicit authorization even after the candidate exists. Push th
 git push origin main
 git push origin v<version>
 gh release create v<version> --verify-tag --generate-notes \
-  dist/pageformer-<version>.tar.gz dist/SHA256SUMS
+  dist/pageformer-<version>.tar.gz dist/pageformer_<version>_<architecture>.deb dist/SHA256SUMS
 ```
 
-The project ships no binaries, so there are no provenance attestations to attach. The source archive and its checksum are the artifacts.
+The release carries the source archive, the Debian binary package and a checksum file. There are no provenance attestations to attach.
 
 Finally, download the assets from the release into a temporary directory and verify the checksum again:
 

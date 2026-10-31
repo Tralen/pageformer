@@ -4,12 +4,15 @@
 
 *Major updates and feature releases.*
 
-### Unreleased
+### 1.0.1
 
+- Ships a Debian binary package built by `packaging/build-deb.sh`, with both binaries, the desktop entry, the manual pages, the documentation and a reproducible archive.
+- Adds the application icon as a scalable SVG with a PNG fallback, installed through the freedesktop icon theme and used by the desktop entry.
 - Translates the technical example to English as `assets/examples/technical/Report.md`, renames its files and diagram, and regenerates its six outputs.
 - Adds `assets/examples/brief/`, a self-contained English example with its own template, letterhead, diagram and six outputs; `tests/brief.rs` guards the goldens and every format.
 - Adds `packaging/build-deb.sh` with a desktop entry, icon, manual pages and lintian overrides, producing a reproducible `.deb` that installs both binaries and never embeds the builder's home path.
 - Documents the Debian package process and the Pageweaver readiness review.
+- Regenerates the ODT examples for `meta:generator` 1.0.1.
 
 ### 1.0.0
 

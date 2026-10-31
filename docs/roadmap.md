@@ -1,6 +1,6 @@
 # Roadmap
 
-Pageformer is at 1.0.0. The engine, the command line, the six output formats and the minimal converter window are implemented, tested on Linux, macOS and Windows, and released. This page records what each phase delivered, why the work happened in that order, and the compatibility promise that starts with the release.
+Pageformer is at 1.0.1. The engine, the command line, the six output formats and the minimal converter window are implemented, tested on Linux, macOS and Windows, and released. This page records what each phase delivered, why the work happened in that order, and the compatibility promise that starts with the release.
 
 ## Status at a glance
 
@@ -16,6 +16,7 @@ Pageformer is at 1.0.0. The engine, the command line, the six output formats and
 | 8. HTML | The self-contained semantic view | 0.35.0 |
 | 9. EPUB | The EPUB 3 package built on the HTML conversion | 0.36.0 |
 | 10. Release 1.0.0 | Stability review, full verification and a signed tag | Done in 1.0.0 |
+| 11. Packaging | Debian binary package, English examples and the application icon | Done in 1.0.1 |
 
 ```mermaid
 flowchart TD
@@ -28,6 +29,7 @@ flowchart TD
     Publisher --> HTML[8. HTML]
     HTML --> EPUB[9. EPUB]
     EPUB --> Release[10. Release 1.0.0]
+    Release --> Packaging[11. Packaging]
 ```
 
 ## Why this order
@@ -54,9 +56,13 @@ The release is a GitHub source release with a signed `v1.0.0` tag and a source a
 
 The compatibility promise after 1.0.0 is intentionally simple: an additive optional template key is a minor application release and keeps the current schema version; removing a key or changing its meaning is a major release and bumps the schema version; a deprecated key keeps working for one minor cycle.
 
+## The 1.0.1 release
+
+1.0.1 ships the Debian binary package, the English examples and the application icon. It changes no template key and no output format; the ODT examples were regenerated only because `meta:generator` carries the version. The source archive, the `.deb` and `SHA256SUMS` are attached to the signed `v1.0.1` tag.
+
 ## Binary packages
 
-The source archive remains the primary artifact. Debian and Ubuntu users can install a `.deb` built from the tag with `packaging/build-deb.sh`; the release attaches it when the maintainer authorizes the publish step. The package is a release asset, not a Debian repository, and CI stays test-only. `docs/releasing.md` owns the build and the checks.
+The source archive remains the primary artifact. Debian and Ubuntu users install the `.deb` attached to the release; it is built from the tag with `packaging/build-deb.sh`. The package is a release asset, not a Debian repository, and CI stays test-only. `docs/releasing.md` owns the build and the checks.
 
 ## Contract for a release
 

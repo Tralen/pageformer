@@ -141,4 +141,4 @@ All four PDFs pass veraPDF as PDF/A-2b. The ODT and DOCX packages open in LibreO
 - [`docs/verification.md`](docs/verification.md): the test commands, the external validators and the example regeneration.
 - [`docs/releasing.md`](docs/releasing.md): the manual GitHub release process, the tag convention and the candidate archive.
 - [`docs/pageweaver.md`](docs/pageweaver.md): the boundary with the separate WYSIWYG editor.
-- [`docs/roadmap.md`](docs/roadmap.md): what is done and what remains before 1.0.0.
+- [`docs/roadmap.md`](docs/roadmap.md): what each phase delivered and what remains.

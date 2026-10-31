@@ -1,0 +1,109 @@
+---
+title: Technical Report
+author: Pageformer
+language: en-US
+date: 2026-03-10
+subject: A demonstration of the template features
+keywords:
+  - report
+  - demonstration
+---
+
+# Technical Report
+
+This report demonstrates, in a short document, the running header and footer, the explicit page break, the table style, the inline formatting and the quote and code blocks.
+
+## Scope
+
+The example uses its own template in this folder, which replaces the shared template of the parent folder. Without a letterhead, both margins are free for the running content, and level one opens each section on a new page.
+
+### Inline formatting
+
+The text accepts *emphasis*, **bold**, ~~strikethrough~~ and `inline code`, as well as [links](https://example.com) and footnotes.[^note]
+
+[^note]: The footnote is collected at the end of the document.
+
+## Lists
+
+- A simple item;
+- An item with **bold** and `code`;
+  - A subitem with a second-level marker;
+    - A sub-subitem with a third-level marker;
+- An item with an [example site](https://example.com).
+
+1. First step;
+   1. An inner step with alphabetic numbering;
+   2. Another inner step;
+2. Second step;
+3. Third step.
+
+- [x] Completed task;
+- [ ] Pending task.
+
+The table below uses the border, the header fill and the color defined in the template.
+
+| Stage | Deadline | Owner |
+|---|---|---|
+| Survey | 5 days | Analysis |
+| Execution | 10 days | Production |
+| Review | 3 days | Quality |
+
+The header shows the author, the title and the page numbers; the footer repeats the notice and the program name.
+
+## Quote and alert
+
+> A block quote, with `code` and *emphasis*, to show the vertical bar and the background declared in the template.
+
+An alert uses the same quote syntax, with a type in brackets:
+
+> [!NOTE]
+> An alert is a quote with a type, and keeps the label in brackets.
+
+## Code
+
+The block below uses the monospaced face, the background and the rules declared in the template.
+
+```rust
+fn main() {
+    println!("hello");
+}
+```
+
+A rule closes this section.
+
+-horizontal-
+
+## Image
+
+The image below uses the width, the alignment, the border and the background defined in the template.
+
+![Example diagram](Diagram.png)
+-width:70%-
+-align:center-
+
+## Results
+
+The engine computes pagination and numbering from the whole document, so the total in the header matches the final number.
+
+The same model drives the six formats: Typst for PDF, internal writers for ODT and DOCX, a semantic view for HTML and EPUB, and a plain-text view for TXT. A single template keeps the face, the colors, the spacing and the blocks consistent.
+
+The table below summarizes what each format preserves from the template.
+
+| Format | Layout | Colors | Blocks |
+|---|---|---|---|
+| PDF | own pagination | yes | yes |
+| ODT/DOCX | Writer and Word pagination | yes | yes |
+| HTML/EPUB | semantic and reflowable | yes | yes |
+| TXT | no layout | no | text |
+
+This paragraph forces an explicit page break before the annex.
+
+-pagebreak-
+
+# Annex
+
+The annex starts on a new page because of the paragraph that contains only the page-break marker, written as `-pagebreak-` or with the `-!-` shortcut. Any other occurrence, such as -!- in this sentence, remains ordinary text.
+
+# Appendix
+
+This appendix starts on a new page because of `page_break_before` on level one of the template, without any marker in the text. The break is weak, so it does not create an empty page when the heading is already at the top.

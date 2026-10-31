@@ -44,7 +44,7 @@ cargo doc --no-deps
 markdownlint-cli2
 ```
 
-3. Run the external validators in [`verification.md`](verification.md): veraPDF on the three PDFs, the LibreOffice conversion for ODT and DOCX, the HTML and EPUB structural checks, and `epubcheck` when it is installed.
+3. Run the external validators in [`verification.md`](verification.md): veraPDF on the four PDFs, the LibreOffice conversion for ODT and DOCX, the HTML and EPUB structural checks, and `epubcheck` when it is installed.
 
 4. Scan for secrets and private data:
 
@@ -96,6 +96,46 @@ tar -tzf pageformer-<version>.tar.gz | head -40
 sha256sum -c SHA256SUMS
 cd ..
 ```
+
+## Debian package
+
+The source archive is the primary release, but Debian and Ubuntu users can install a binary package. `packaging/build-deb.sh` builds it from the checkout:
+
+```sh
+git fetch --prune operador
+git status --short
+git checkout v<version>
+packaging/build-deb.sh
+```
+
+Build the package from the same signed tag as the source archive, so the package and the archive describe the same code. A packaging change that lands after a tag rides with the next release instead of rebuilding an old one.
+
+The optional argument selects the architecture, which defaults to `dpkg --print-architecture`. The script needs `cargo` and `dpkg-deb`, runs the release build for both workspace binaries and writes `dist/pageformer_<version>_<architecture>.deb`. It installs `pageformer`, `pageformer-publisher`, the desktop entry, the icon, the two manual pages, the README, the change log and the license.
+
+The script remaps the Rust build paths, so the binary never carries the builder's home directory, and it derives `SOURCE_DATE_EPOCH` from the last commit. Two runs from the same checkout produce a byte-identical package.
+
+The package declares `libc6 (>= 2.35)` and `libgcc-s1`; it is built against the oldest glibc available in the target matrix, so build it on the oldest supported distribution instead of a newer one. There is no Debian repository: the artifact is a release asset, and the user installs it with `sudo apt install ./pageformer_<version>_<architecture>.deb`. Build each architecture on a machine of that architecture; there is no cross-compilation step.
+
+Verify the package before attaching it:
+
+```sh
+shellcheck packaging/build-deb.sh
+lintian dist/pageformer_<version>_<architecture>.deb
+dpkg-deb --info dist/pageformer_<version>_<architecture>.deb
+dpkg-deb --contents dist/pageformer_<version>_<architecture>.deb
+dpkg-deb -x dist/pageformer_<version>_<architecture>.deb /tmp/pageformer-deb
+/tmp/pageformer-deb/usr/bin/pageformer --version
+```
+
+`lintian` must report no errors. The four `embedded-library` errors are overridden with a comment in `/usr/share/lintian/overrides/pageformer`, because `unsafe-libyaml` is a pure Rust port compiled into the binary and the FreeType strings come from the font stack; neither is a system dependency.
+
+Attach the package in the authorized publish step, after the tag and the source archive exist:
+
+```sh
+gh release upload v<version> dist/pageformer_<version>_<architecture>.deb
+```
+
+CI stays test-only. It may build the package to prove the script works, but it must not upload it without a separate decision.
 
 ## Publish
 

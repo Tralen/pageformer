@@ -1,0 +1,133 @@
+# Template for the orbital weather brief example.
+#
+# It is self-contained: its own letterhead, page palette and type scale. The
+# letterhead covers the top and bottom bands, so the margins leave room for it.
+
+version: "0.7"
+
+page:
+  size: a4
+  orientation: portrait
+  margins:
+    top: 40mm
+    bottom: 36mm
+    left: 26mm
+    right: 24mm
+  # A cool paper tone, visible behind the letterhead.
+  background: "#fbfcfa"
+  # The letterhead resolves relative to this file.
+  letterhead: Letterhead.png
+  # The page counter sits below the letterhead rule.
+  header:
+    right: "{page} / {pages}"
+
+formatting:
+  paragraph:
+    font_families:
+      - Liberation Sans
+      - DejaVu Sans
+    size: 10.5
+    leading: 7
+    spacing: 11
+    alignment: left
+    emphasis:
+      style: italic
+    strong:
+      weight: bold
+    # Monospace has a larger x-height, so it uses 0.875 of the body size.
+    code:
+      font_families:
+        - Liberation Mono
+        - DejaVu Sans Mono
+      size: 9
+      foreground: "#0f4c5c"
+      background: "#eef4f5"
+    strikethrough:
+      foreground: "#8a3b2e"
+    link:
+      foreground: "#0f6f7a"
+      underline: true
+  quote:
+    foreground: "#23454c"
+    background: "#f2f7f8"
+    border:
+      left: 3pt
+      color: "#0f4c5c"
+      padding: 8
+  code_block:
+    font_families:
+      - Liberation Mono
+      - DejaVu Sans Mono
+    size: 9
+    background: "#f4f4f4"
+    border:
+      top: 0.5pt
+      bottom: 0.5pt
+      color: "#9bb3b8"
+      padding: 6
+  image:
+    alignment: center
+    max_width: 100%
+    background: "#ffffff"
+    border:
+      top: 1pt
+      right: 1pt
+      bottom: 1pt
+      left: 1pt
+      color: "#0f4c5c"
+      padding: 6
+  list:
+    indent: 0.7cm
+    marker_gap: 0.45cm
+    alignment: left
+    foreground: "#23454c"
+    bullet:
+      - "▪"
+      - "–"
+    numbering:
+      format:
+        - decimal
+        - lower-alpha
+      suffix: "."
+    task:
+      gap: 1
+      bullet: false
+      done:
+        marker: "[x]"
+        foreground: "#1f6b45"
+        weight: bold
+      todo:
+        marker: "[ ]"
+        foreground: "#7a6a52"
+  heading:
+    font_families:
+      - Liberation Serif
+      - DejaVu Serif
+    weight: bold
+    style: normal
+    foreground: "#0f4c5c"
+    spacing_before: 16
+    spacing_after: 6
+    rule:
+      thickness: 0.75pt
+      color: "#c27c2c"
+      spacing_before: 3
+    h1:
+      size: 20
+      spacing_before: 0
+      spacing_after: 10
+      page_break_before: true
+    h2:
+      size: 14
+      spacing_before: 14
+      spacing_after: 5
+    h3:
+      size: 11.5
+      spacing_before: 11
+      spacing_after: 4
+
+  table:
+    border: 0.75pt
+    border_color: "#0f4c5c"
+    header_fill: "#e6eef0"
+    cell_padding: 7pt

@@ -16,6 +16,8 @@ The development profile keeps line tables for this crate and no debug informatio
 
 The workspace also builds `pageformer-publisher`, the minimal egui converter. Its eframe dependencies follow the same profile. To build only the engine and the command line, use `cargo build -p pageformer`.
 
+To build a Debian or Ubuntu package from a checkout, run `packaging/build-deb.sh`; it installs both binaries, the desktop entry, the icon and the manual pages. The packaging checks and the release attachment are in [`docs/releasing.md`](docs/releasing.md).
+
 ## Versioning
 
 Pageformer follows SemVer. The version lives in `Cargo.toml`, under `[package].version`.
@@ -43,19 +45,19 @@ The examples below use `cargo run --` because the crate is not published. In a b
 Render a single file next to its source, as PDF/A by default:
 
 ```sh
-cargo run -- assets/examples/tecnico/Relatorio.md
+cargo run -- assets/examples/technical/Report.md
 ```
 
 Choose another format and write the results to another directory:
 
 ```sh
-cargo run -- --format odt --output /tmp/pageformer assets/examples/tecnico/Relatorio.md
+cargo run -- --format odt --output /tmp/pageformer assets/examples/technical/Report.md
 ```
 
 Validate the Markdown and the template without writing anything:
 
 ```sh
-cargo run -- --check assets/examples/tecnico/Relatorio.md
+cargo run -- --check assets/examples/technical/Report.md
 ```
 
 A confidential document needs its values file and an output directory outside the source tree:
@@ -126,9 +128,10 @@ The fixtures in [`assets/examples/`](assets/examples/) exercise the parser and e
 - `escritorio/` holds `Contrato.md` and `Embargos.md` with the shared `.pageformer.yaml`, its fictional `Timbre.png` letterhead, a warm page background and a page-number header.
 - `confidencial/embargos.ini` holds the fictional values for the fields in `Embargos.md`.
 - `publicacao/` holds the generated `Contrato` and `Embargos` in PDF, ODT, DOCX, HTML, EPUB and TXT. The signature block of the contract is on its own page.
-- `tecnico/Relatorio.md` has its own template and its six outputs beside it. It demonstrates a light blue page background, the running header and footer, the table style, the image frame, list markers and numbering with a nested list, an explicit page break and first-level headings that start a new page, without a letterhead. `Diagrama.png` is the block image used by the report.
+- `technical/Report.md` has its own template and its six outputs beside it, in English. It demonstrates a light blue page background, the running header and footer, the table style, the image frame, list markers and numbering with a nested list, an explicit page break and first-level headings that start a new page, without a letterhead. `Diagram.png` is the block image used by the report.
+- `brief/` is the second English example and is independent of the others: `Brief.md`, its own template, an English `Letterhead.png` and a `Pipeline.png` diagram, with the six outputs beside the source. It shows a letterhead with a running page counter, a table, an alert, task lists, a numbered method, a code block, a block image and an appendix.
 
-All three PDFs pass veraPDF as PDF/A-2b. The ODT and DOCX packages open in LibreOffice without repair, the HTML files open offline without a network request, the EPUB packages split and navigate by their first-level headings, and the text goldens are compared byte for byte.
+All four PDFs pass veraPDF as PDF/A-2b. The ODT and DOCX packages open in LibreOffice without repair, the HTML files open offline without a network request, the EPUB packages split and navigate by their first-level headings, and the text goldens are compared byte for byte.
 
 ## Documentation
 

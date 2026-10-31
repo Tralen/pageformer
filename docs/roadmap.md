@@ -54,6 +54,10 @@ The release is a GitHub source release with a signed `v1.0.0` tag and a source a
 
 The compatibility promise after 1.0.0 is intentionally simple: an additive optional template key is a minor application release and keeps the current schema version; removing a key or changing its meaning is a major release and bumps the schema version; a deprecated key keeps working for one minor cycle.
 
+## Binary packages
+
+The source archive remains the primary artifact. Debian and Ubuntu users can install a `.deb` built from the tag with `packaging/build-deb.sh`; the release attaches it when the maintainer authorizes the publish step. The package is a release asset, not a Debian repository, and CI stays test-only. `docs/releasing.md` owns the build and the checks.
+
 ## Contract for a release
 
 A release is ready when all of the following are true:

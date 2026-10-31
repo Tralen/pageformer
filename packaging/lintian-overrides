@@ -1,0 +1,8 @@
+# unsafe-libyaml is a pure Rust port of libyaml and is compiled into the binary;
+# it is not a system library. The FreeType strings come from the font stack in
+# the same way. Neither library is a shared object dependency of the package.
+
+pageformer: embedded-library freetype usr/bin/pageformer
+pageformer: embedded-library freetype usr/bin/pageformer-publisher
+pageformer: embedded-library libyaml usr/bin/pageformer
+pageformer: embedded-library libyaml usr/bin/pageformer-publisher

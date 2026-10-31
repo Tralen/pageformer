@@ -19,9 +19,9 @@ page:
   header:
     left: "{author}"
     center: "{title}"
-    right: "Página {page} de {pages}"
+    right: "Page {page} of {pages}"
   footer:
-    left: "Documento de demonstração"
+    left: "Demonstration document"
     right: "Pageformer"
 
 formatting:

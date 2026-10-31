@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Pageformer Publisher
+GenericName=Document Converter
+Comment=Convert Markdown and a YAML template into PDF, ODT, DOCX, HTML, EPUB and text
+Exec=pageformer-publisher
+Icon=pageformer
+Terminal=false
+Categories=Office;Publishing;
+Keywords=markdown;pdf;odt;docx;html;epub;text;
+StartupNotify=true

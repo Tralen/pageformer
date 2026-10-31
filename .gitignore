@@ -8,6 +8,7 @@ COMPLIANCE.md
 .prompt/
 .handoff/
 target/
+dist/
 SKETCH.md
 .ruff_cache
 

@@ -17,11 +17,11 @@ use zip::ZipArchive;
 
 const CONTRACT: &str = include_str!("../assets/examples/escritorio/Contrato.md");
 const EMBARGOS: &str = include_str!("../assets/examples/escritorio/Embargos.md");
-const REPORT: &str = include_str!("../assets/examples/tecnico/Relatorio.md");
+const REPORT: &str = include_str!("../assets/examples/technical/Report.md");
 const EMBARGOS_VALUES: &str = include_str!("../assets/examples/confidencial/embargos.ini");
 const CONTRACT_EPUB: &[u8] = include_bytes!("../assets/examples/publicacao/Contrato.epub");
 const EMBARGOS_EPUB: &[u8] = include_bytes!("../assets/examples/publicacao/Embargos.epub");
-const REPORT_EPUB: &[u8] = include_bytes!("../assets/examples/tecnico/Relatorio.epub");
+const REPORT_EPUB: &[u8] = include_bytes!("../assets/examples/technical/Report.epub");
 
 fn example_directory(name: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -137,7 +137,7 @@ fn the_package_starts_with_a_stored_mimetype() {
 
 #[test]
 fn every_xml_part_parses() {
-    let (bytes, _) = render_example("tecnico", REPORT);
+    let (bytes, _) = render_example("technical", REPORT);
     let mut archive = archive(bytes);
     let names = archive
         .file_names()
@@ -166,7 +166,7 @@ fn every_xml_part_parses() {
 
 #[test]
 fn the_report_splits_at_first_level_headings() {
-    let (bytes, warnings) = render_example("tecnico", REPORT);
+    let (bytes, warnings) = render_example("technical", REPORT);
     assert!(warnings.is_empty(), "{warnings:?}");
     let mut archive = archive(bytes);
     let package = entry(&mut archive, "OEBPS/content.opf");
@@ -179,17 +179,17 @@ fn the_report_splits_at_first_level_headings() {
             "{package}"
         );
     }
-    assert!(nav.contains(">Relatório Técnico</a>"), "{nav}");
-    assert!(nav.contains(">Anexo</a>"), "{nav}");
-    assert!(nav.contains(">Apêndice</a>"), "{nav}");
-    assert!(first.contains("<h1>Relatório Técnico</h1>"), "{first}");
+    assert!(nav.contains(">Technical Report</a>"), "{nav}");
+    assert!(nav.contains(">Annex</a>"), "{nav}");
+    assert!(nav.contains(">Appendix</a>"), "{nav}");
+    assert!(first.contains("<h1>Technical Report</h1>"), "{first}");
     assert!(first.contains("role=\"doc-endnotes\""), "{first}");
 }
 
 #[test]
 fn the_two_renders_are_byte_identical() {
-    let (first, _) = render_example("tecnico", REPORT);
-    let (second, _) = render_example("tecnico", REPORT);
+    let (first, _) = render_example("technical", REPORT);
+    let (second, _) = render_example("technical", REPORT);
 
     assert_eq!(first, second);
 }
@@ -211,7 +211,7 @@ fn the_embargos_values_reach_the_content_but_not_the_package_metadata() {
 #[test]
 fn a_frontmatter_identifier_is_used_verbatim() {
     let (bytes, _) = render_example(
-        "tecnico",
+        "technical",
         "---\ntitle: Livro\nlanguage: pt-BR\nidentifier: urn:isbn:9780000000000\n---\n\n# Um\n\nTexto.\n",
     );
     let mut archive = archive(bytes);
@@ -225,7 +225,7 @@ fn a_frontmatter_identifier_is_used_verbatim() {
 
 #[test]
 fn missing_title_and_language_fall_back() {
-    let (bytes, _) = render_example("tecnico", "# Um\n\nTexto.\n");
+    let (bytes, _) = render_example("technical", "# Um\n\nTexto.\n");
     let mut archive = archive(bytes);
     let package = entry(&mut archive, "OEBPS/content.opf");
 
@@ -239,7 +239,7 @@ fn missing_title_and_language_fall_back() {
 #[test]
 fn the_committed_examples_match_a_fresh_render() {
     let (contract, _) = render_example("escritorio", CONTRACT);
-    let (report, _) = render_example("tecnico", REPORT);
+    let (report, _) = render_example("technical", REPORT);
     let (embargos, _) = render_embargos();
 
     assert_eq!(contract, CONTRACT_EPUB);
@@ -249,8 +249,8 @@ fn the_committed_examples_match_a_fresh_render() {
 
 #[test]
 fn a_block_image_keeps_its_frame_and_relative_source() {
-    let directory = example_directory("tecnico");
-    let document = markdown::parse("![Diagrama](Diagrama.png)\n-width:70%-\n-align:center-\n")
+    let directory = example_directory("technical");
+    let document = markdown::parse("![Diagram](Diagram.png)\n-width:70%-\n-align:center-\n")
         .expect("the image must parse");
     let assets = load_images(&document, &directory).expect("the image must load");
     let template = pageformer::template::Template::from_yaml(

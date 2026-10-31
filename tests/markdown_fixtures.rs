@@ -7,7 +7,7 @@ use pageformer::markdown;
 
 const CONTRACT: &str = include_str!("../assets/examples/escritorio/Contrato.md");
 const EMBARGOS: &str = include_str!("../assets/examples/escritorio/Embargos.md");
-const REPORT: &str = include_str!("../assets/examples/tecnico/Relatorio.md");
+const REPORT: &str = include_str!("../assets/examples/technical/Report.md");
 
 fn plain_text(inlines: &[Inline]) -> String {
     inlines
@@ -87,7 +87,7 @@ fn the_report_uses_the_new_template_features() {
     );
     assert_eq!(
         metadata.subject().map(|subject| subject.as_str()),
-        Some("Demonstração das funcionalidades do template")
+        Some("A demonstration of the template features")
     );
     assert_eq!(metadata.keywords().len(), 2);
     assert!(

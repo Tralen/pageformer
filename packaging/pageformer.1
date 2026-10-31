@@ -1,0 +1,74 @@
+.TH PAGEFORMER 1 "2026-10-31" "Pageformer 1.0.0" "User Commands"
+.SH NAME
+pageformer \- generate documents from Markdown and a YAML template
+.SH SYNOPSIS
+.B pageformer
+.RI [ options ]
+.IR input ...
+.SH DESCRIPTION
+.B pageformer
+reads each Markdown file or directory and writes one output per input in the
+selected format. A directory is walked recursively in path order, and only
+.B .md
+files are read. Hidden directories and
+.B target/
+are skipped.
+.PP
+One template applies to each document: the nearest
+.B .pageformer.yaml
+above the source, the user template, or the embedded default. The template is
+validated for every format, so a broken template fails the same way even when
+the format has no equivalent for a style.
+.PP
+Confidential
+.B {NAME}
+fields are resolved once, after parsing and before rendering. Their values
+come from an INI file or from the user-level folder mapping, and a document
+with fields must be written outside its source tree.
+.SH OPTIONS
+.TP
+.BR \-t ", " \-\-template " " FILE
+Use this template instead of resolving one.
+.TP
+.BR \-o ", " \-\-output " " DIR
+Write the generated files under this directory. A directory input mirrors its
+relative tree; a direct file is written flat.
+.TP
+.B \-\-check
+Parse the Markdown and validate the template without writing.
+.TP
+.BR \-\-format " " FORMAT
+Select
+.BR pdf ", " txt ", " odt ", " docx ", " html " or " epub .
+The default is
+.BR pdf .
+.TP
+.BR \-\-color " " WHEN
+Color the terminal output:
+.BR auto ", " always " or " never .
+.TP
+.BR \-\-confidential-file " " FILE
+Read confidential fields from an INI-style
+.B "NAME = value"
+file outside the source tree.
+.TP
+.BR \-h ", " \-\-help
+Print help.
+.TP
+.BR \-V ", " \-\-version
+Print the version.
+.SH FILES
+.TP
+.I .pageformer.yaml
+The local template, resolved from the source directory upward.
+.TP
+.I ~/.config/pageformer/pageformer.yaml
+The user template, used when no local template exists. The platform
+configuration root replaces
+.I ~/.config
+where the system defines one.
+.SH EXIT STATUS
+Zero when every input succeeds, and one when any input fails. A failure in one
+input does not stop the rest of the batch.
+.SH SEE ALSO
+.BR pageformer-publisher (1)

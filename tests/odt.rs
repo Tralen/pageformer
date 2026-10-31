@@ -19,7 +19,7 @@ use zip::ZipArchive;
 
 const CONTRACT: &str = include_str!("../assets/examples/escritorio/Contrato.md");
 const EMBARGOS: &str = include_str!("../assets/examples/escritorio/Embargos.md");
-const REPORT: &str = include_str!("../assets/examples/tecnico/Relatorio.md");
+const REPORT: &str = include_str!("../assets/examples/technical/Report.md");
 const EMBARGOS_VALUES: &str = include_str!("../assets/examples/confidencial/embargos.ini");
 
 fn embedded() -> Template {
@@ -712,8 +712,8 @@ fn a_block_image_takes_its_size_alignment_and_frame() {
     let directory = Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("assets")
         .join("examples")
-        .join("tecnico");
-    let document = markdown::parse("![Diagrama](Diagrama.png)\n-height:4cm-\n-align:right-\n")
+        .join("technical");
+    let document = markdown::parse("![Diagram](Diagram.png)\n-height:4cm-\n-align:right-\n")
         .expect("the image must parse");
     let assets = load_images(&document, &directory).expect("the image must load");
     let template = Template::from_yaml(

@@ -16,11 +16,11 @@ use tempfile::TempDir;
 
 const CONTRACT: &str = include_str!("../assets/examples/escritorio/Contrato.md");
 const EMBARGOS: &str = include_str!("../assets/examples/escritorio/Embargos.md");
-const REPORT: &str = include_str!("../assets/examples/tecnico/Relatorio.md");
+const REPORT: &str = include_str!("../assets/examples/technical/Report.md");
 const EMBARGOS_VALUES: &str = include_str!("../assets/examples/confidencial/embargos.ini");
 const CONTRACT_HTML: &str = include_str!("../assets/examples/publicacao/Contrato.html");
 const EMBARGOS_HTML: &str = include_str!("../assets/examples/publicacao/Embargos.html");
-const REPORT_HTML: &str = include_str!("../assets/examples/tecnico/Relatorio.html");
+const REPORT_HTML: &str = include_str!("../assets/examples/technical/Report.html");
 
 fn example_directory(name: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -159,8 +159,8 @@ fn the_contract_is_a_self_contained_semantic_document() {
 
 #[test]
 fn a_block_image_takes_its_width_alignment_and_frame() {
-    let directory = example_directory("tecnico");
-    let document = markdown::parse("![Diagrama](Diagrama.png)\n-width:70%-\n-align:right-\n")
+    let directory = example_directory("technical");
+    let document = markdown::parse("![Diagram](Diagram.png)\n-width:70%-\n-align:right-\n")
         .expect("the image must parse");
     let assets = load_images(&document, &directory).expect("the image must load");
     let template = Template::from_yaml(
@@ -176,7 +176,7 @@ fn a_block_image_takes_its_width_alignment_and_frame() {
     );
     assert!(html.contains("style=\"width: 70.00%;\""), "{html}");
     assert!(html.contains("class=\"image-frame\""), "{html}");
-    assert!(html.contains("alt=\"Diagrama\""), "{html}");
+    assert!(html.contains("alt=\"Diagram\""), "{html}");
     assert!(html.contains("text-align: right;"), "{html}");
     assert!(
         html.contains("border-width: 1.00pt 1.00pt 1.00pt 1.00pt;"),
@@ -210,15 +210,15 @@ fn a_page_background_reaches_the_screen_page_and_the_print_paper() {
 
 #[test]
 fn the_two_renders_are_byte_identical() {
-    let (first, _) = render_example("tecnico", REPORT);
-    let (second, _) = render_example("tecnico", REPORT);
+    let (first, _) = render_example("technical", REPORT);
+    let (second, _) = render_example("technical", REPORT);
 
     assert_eq!(first, second);
 }
 
 #[test]
 fn the_report_keeps_its_table_alert_code_and_endnotes() {
-    let (html, warnings) = render_example("tecnico", REPORT);
+    let (html, warnings) = render_example("technical", REPORT);
     assert!(warnings.is_empty(), "{warnings:?}");
 
     let document = parser(&html);
@@ -245,8 +245,8 @@ fn the_report_keeps_its_table_alert_code_and_endnotes() {
         }),
         "the backlink must exist"
     );
-    assert!(normalized_text(&document).contains("Relatório Técnico"));
-    assert!(normalized_text(&document).contains("A nota de rodapé"));
+    assert!(normalized_text(&document).contains("Technical Report"));
+    assert!(normalized_text(&document).contains("The footnote is collected"));
 }
 
 #[test]
@@ -272,7 +272,7 @@ fn the_embargos_values_reach_the_body_but_not_the_head() {
 #[test]
 fn the_committed_examples_match_a_fresh_render() {
     let (contract, _) = render_example("escritorio", CONTRACT);
-    let (report, _) = render_example("tecnico", REPORT);
+    let (report, _) = render_example("technical", REPORT);
     let (embargos, _) = render_embargos();
 
     assert_eq!(contract, CONTRACT_HTML);

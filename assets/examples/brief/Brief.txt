@@ -1,0 +1,74 @@
+Orbital Weather Brief
+
+This brief summarizes the spring observing window for the Northwind Observatory. It collects the instrument readiness review, the method used to combine the atmospheric models and the schedule for the next campaign.
+
+The document is a Pageformer example. It is independent of the legal fixtures: it has its own template, letterhead and diagram, and it demonstrates the running header, a table, an alert, task lists, a numbered method, a code block, a block image and a page break.
+
+Summary
+
+The station finished the winter maintenance with three of the four instruments ready. The lidar remains in calibration and joins the campaign after the first week.
+
+Instrument	State	Next window
+---	---	---
+Spectrometer	Ready	12 April
+Cloud camera	Ready	12 April
+Radiosonde array	Ready	14 April
+Lidar	Calibration	19 April
+
+> The lidar calibration must finish before the 19 April window. A delay moves the comparison to the May campaign.
+
+Instrument readiness
+
+- [x] Replace the spectrometer lamp;
+- [x] Clean the cloud camera dome;
+- [x] Test the radiosonde launch rail;
+- [ ] Finish the lidar calibration.
+
+The station reviews the list at the start of every campaign and records the outcome in the operations log.
+
+Method
+
+The outlook combines the station readings with the regional model. The steps are the same for every campaign:
+
+1. Collect the hourly station records;
+   1. Read the pressure and humidity channels;
+   2. Reject the samples flagged by the quality check;
+2. Merge the regional model;
+3. Publish the outlook.
+
+The merge is a small, deterministic function:
+
+def merge(station, model, weight=0.6):
+    return [weight * s + (1 - weight) * m for s, m in zip(station, model)]
+
+The weight favors the station because its sensors sit closer to the ground. The model fills the gaps between launches.
+
+> A short quote marks the decision: the outlook is published only after the station lead reviews the merged series.
+
+Field diagram
+
+The diagram shows the two stages of the pipeline: the station series enters the merge, and the merged series leaves toward the outlook.
+
+[Pipeline]
+
+Schedule
+
+The campaign opens on 12 April. The comparison run follows the lidar calibration, and the report is due two weeks later.
+
+
+
+Appendix
+
+Data dictionary
+
+Field	Unit	Source
+---	---	---
+pressure	hPa	station
+humidity	%	station
+temperature	K	station and model
+cloud cover	okta	cloud camera
+
+Change log
+
+- April 2026: first edition for the spring campaign.
+- March 2026: letterhead and palette updated for the new programme.

@@ -248,7 +248,7 @@ fn the_technical_report_uses_its_own_template() {
     let examples = Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("assets")
         .join("examples")
-        .join("tecnico");
+        .join("technical");
     let resolved = loader::resolve(&examples, None).expect("the report template must resolve");
     let template = resolved.template();
     assert_eq!(template.page().letterhead(), None);
@@ -261,7 +261,7 @@ fn the_technical_report_uses_its_own_template() {
         "the report has a footer"
     );
 
-    let document = markdown::parse(include_str!("../assets/examples/tecnico/Relatorio.md"))
+    let document = markdown::parse(include_str!("../assets/examples/technical/Report.md"))
         .expect("the report fixture must parse");
     let assets = pdf::load_assets(&document, template, &examples, resolved.base_directory())
         .expect("the report assets must load");

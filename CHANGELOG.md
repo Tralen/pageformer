@@ -4,6 +4,13 @@
 
 *Major updates and feature releases.*
 
+### Unreleased
+
+- Translates the technical example to English as `assets/examples/technical/Report.md`, renames its files and diagram, and regenerates its six outputs.
+- Adds `assets/examples/brief/`, a self-contained English example with its own template, letterhead, diagram and six outputs; `tests/brief.rs` guards the goldens and every format.
+- Adds `packaging/build-deb.sh` with a desktop entry, icon, manual pages and lintian overrides, producing a reproducible `.deb` that installs both binaries and never embeds the builder's home path.
+- Documents the Debian package process and the Pageweaver readiness review.
+
 ### 1.0.0
 
 Pageformer 1.0.0 is the first stable release. The template schema `0.7` and the document model are the compatibility contract: additive optional template keys are minor application releases and keep the schema version; removing a key or changing its meaning is a major release and bumps the schema version; a deprecated key keeps working for one minor cycle.

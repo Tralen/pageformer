@@ -10,7 +10,27 @@ Pageweaver is the separate WYSIWYG editor for Pageformer documents. It edits the
 
 ## Status
 
-Pageweaver work starts only after Pageformer reaches 1.0.0. Until then the Pageformer library, the CLI and `pageformer-publisher` are the priority; the editor is planned but not started.
+Pageformer is at 1.0.0, and Pageweaver work may start. The engine API described below is public, tested and released; the editor is planned but not started.
+
+## Readiness
+
+The library side is ready for the editor:
+
+- `pipeline::render` accepts a `Source::Buffer` with the Markdown text and a path, so an unsaved buffer is rendered without a temporary file. The path resolves the template and the images and does not need to exist. The `render` tests cover the buffer case for check, render and export.
+- `pipeline::render` returns the bytes and the warnings without choosing a path; `pipeline::export` writes atomically; `pipeline::resolve_template` returns the resolved template and its origin.
+- `html::stylesheet` exposes the CSS generated from the template, and `html::render` returns the full self-contained document with embedded CSS and data-URI images. That full document is the preview unit; there is no separate fragment API.
+- `Format::ALL`, `Format::name` and `Format::extension` enumerate the six formats, so the editor builds its format menu from the library instead of a hard-coded list.
+- `ConfidentialStore` and the loader keep values opaque; the editor and every diagnostic see names only.
+- The crate is `publish = false`, so Pageweaver depends on the Git tag `v1.0.0` of `Tralen/pageformer`, not on crates.io. A local `[patch]` may point at a sibling checkout during development.
+
+Four decisions belong to Pageweaver and do not need a Pageformer change:
+
+1. An untitled document has no natural path. The editor picks a provisional path in the folder the user chose, and moves the file and its state when the user saves. The template and the relative images resolve from that folder.
+2. The preview is the HTML backend, not the PDF. It is visually close; the browser decides line breaks and page size. Use CSS Paged Media for the print-like view and accept that the PDF remains the final appearance.
+3. A preview re-render reads the images and the template from disk. Debounce the edits and run the render on the worker thread, as `pageformer-publisher` already does.
+4. The Markdown serializer is Pageweaver's responsibility. It must preserve `-pagebreak-`, `-!-`, `-horizontal-`, `-width-`, `-height-`, `-align-`, `{NAME}`, frontmatter, tables, lists, footnotes and alerts. The examples under `assets/examples/` are the round-trip regression set.
+
+No blocking gap remains in the library. The only accepted limitation is the path for a never-saved buffer, which is a Pageweaver decision. The MSRV is not declared; edition 2024 requires Rust 1.85 or newer, so Pageweaver pins a toolchain at least that recent.
 
 ## Why two projects
 

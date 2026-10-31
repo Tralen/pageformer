@@ -280,7 +280,7 @@ Images in the Markdown body resolve relative to the Markdown file, not to the te
 A paragraph that contains only an image becomes an image block. A paragraph that contains text around the image keeps an inline image. The image block takes its width or height, its alignment and its frame from the markers below it and from `formatting.image`:
 
 ```markdown
-![Diagrama](diagrama.png)
+![Diagram](diagram.png)
 -width:70%-
 -align:center-
 ```
@@ -295,7 +295,7 @@ A marker is recognized only when it is a standalone line directly after the imag
 
 A value is a number in pixels, optionally followed by `px`, `mm`, `cm`, `in`, `pt` or `%`. A percentage is relative to the available text width, also when it sets the height. Only one dimension may be declared; declaring both is an error. A value larger than the width available inside the frame is reduced to that width. An unknown option, a duplicate option, an invalid value or an alignment outside the three names is an error when the line is attached to an image. A marker in ordinary text stays text.
 
-The technical report uses `Diagrama.png` with `-width:70%-` and `-align:center-`; its template declares a white background and a blue border around the image.
+The technical report uses `Diagram.png` with `-width:70%-` and `-align:center-`; its template declares a white background and a blue border around the image. The brief uses `Pipeline.png` with `-width:80%-` and the same alignment.
 
 ## How the backends use the template
 
@@ -311,10 +311,16 @@ pageformer --confidential-file assets/examples/confidencial/embargos.ini --outpu
 
 The embargos declares confidential fields, so the command names the fictional values file and writes outside the source tree.
 
-`assets/examples/tecnico/.pageformer.yaml` is a second example, in a nested directory. It replaces the shared template for `Relatorio.md`, has no letterhead, paints the page in a light blue and demonstrates every running slot, the footer, the table style under `formatting.table`, the image frame under `formatting.image`, the list markers and numbering including a nested list, a page break, a solid bar behind the level-one headings and a rule below the level-two headings. `Relatorio.md` uses `Diagrama.png` with `-width:70%-` and `-align:center-`. The rule is declared once on the base heading map and cleared on `h1`, where the bar replaces it:
+`assets/examples/technical/.pageformer.yaml` is a second example, in a nested directory. It replaces the shared template for `Report.md`, has no letterhead, paints the page in a light blue and demonstrates every running slot, the footer, the table style under `formatting.table`, the image frame under `formatting.image`, the list markers and numbering including a nested list, a page break, a solid bar behind the level-one headings and a rule below the level-two headings. `Report.md` uses `Diagram.png` with `-width:70%-` and `-align:center-`. The rule is declared once on the base heading map and cleared on `h1`, where the bar replaces it:
 
 ```sh
-pageformer assets/examples/tecnico/Relatorio.md
+pageformer assets/examples/technical/Report.md
+```
+
+`assets/examples/brief/.pageformer.yaml` is a third example and is independent of the other two. It belongs to `Brief.md`, uses an English `Letterhead.png` and a sans-serif body under serif headings, and declares only the page counter in the running header so the letterhead keeps its own top and bottom bands:
+
+```sh
+pageformer assets/examples/brief/Brief.md
 ```
 
 ## Errors

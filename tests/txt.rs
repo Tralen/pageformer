@@ -11,10 +11,10 @@ use tempfile::TempDir;
 
 const CONTRACT: &str = include_str!("../assets/examples/escritorio/Contrato.md");
 const EMBARGOS: &str = include_str!("../assets/examples/escritorio/Embargos.md");
-const REPORT: &str = include_str!("../assets/examples/tecnico/Relatorio.md");
+const REPORT: &str = include_str!("../assets/examples/technical/Report.md");
 const CONTRACT_TEXT: &str = include_str!("../assets/examples/publicacao/Contrato.txt");
 const EMBARGOS_TEXT: &str = include_str!("../assets/examples/publicacao/Embargos.txt");
-const REPORT_TEXT: &str = include_str!("../assets/examples/tecnico/Relatorio.txt");
+const REPORT_TEXT: &str = include_str!("../assets/examples/technical/Report.txt");
 const EMBARGOS_VALUES: &str = include_str!("../assets/examples/confidencial/embargos.ini");
 
 fn example_store() -> ConfidentialStore {
@@ -62,9 +62,9 @@ fn the_report_matches_its_text_golden() {
 #[test]
 fn a_block_image_becomes_its_alternative_text() {
     let document =
-        markdown::parse("![Diagrama](Diagrama.png)\n-width:70%-\n").expect("the image must parse");
+        markdown::parse("![Diagram](Diagram.png)\n-width:70%-\n").expect("the image must parse");
 
-    assert_eq!(txt::text(&document), "[Diagrama]\n");
+    assert_eq!(txt::text(&document), "[Diagram]\n");
 }
 
 #[test]

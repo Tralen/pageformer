@@ -1,0 +1,22 @@
+.TH PAGEFORMER-PUBLISHER 1 "2026-10-31" "Pageformer 1.0.0" "User Commands"
+.SH NAME
+pageformer-publisher \- minimal graphical converter for Pageformer documents
+.SH SYNOPSIS
+.B pageformer-publisher
+.SH DESCRIPTION
+.B pageformer-publisher
+opens a small window that converts a Markdown file with the Pageformer
+pipeline. Drop a file or click the box to choose one, select a format, export
+and open the result. The Advanced section holds an optional template override,
+the output directory and the confidential INI file.
+.PP
+The window calls the same library pipeline as
+.BR pageformer (1).
+It never parses, resolves or writes by itself, and it never displays a
+confidential value.
+.SH FILES
+.TP
+.I .pageformer.yaml
+The local template, resolved from the source directory upward.
+.SH SEE ALSO
+.BR pageformer (1)

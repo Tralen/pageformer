@@ -1,12 +1,12 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="en-US">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Relatório Técnico</title>
+<title>Technical Report</title>
 <meta name="author" content="Pageformer" />
-<meta name="description" content="Demonstração das funcionalidades do template" />
-<meta name="keywords" content="relatório, demonstração" />
+<meta name="description" content="A demonstration of the template features" />
+<meta name="keywords" content="report, demonstration" />
 <meta name="date" content="2026-03-10" />
 <style>
 /*<![CDATA[*/
@@ -574,21 +574,21 @@ a[role="doc-backlink"] {
       font-style: normal;
     }
     @top-center {
-      content: "Relatório Técnico";
+      content: "Technical Report";
       font-family: "Liberation Serif", "DejaVu Serif";
       font-size: 11.00pt;
       font-weight: 400;
       font-style: normal;
     }
     @top-right {
-      content: "Página " counter(page) " de " counter(pages);
+      content: "Page " counter(page) " of " counter(pages);
       font-family: "Liberation Serif", "DejaVu Serif";
       font-size: 11.00pt;
       font-weight: 400;
       font-style: normal;
     }
     @bottom-left {
-      content: "Documento de demonstração";
+      content: "Demonstration document";
       font-family: "Liberation Serif", "DejaVu Serif";
       font-size: 11.00pt;
       font-weight: 400;
@@ -608,135 +608,135 @@ a[role="doc-backlink"] {
 </head>
 <body>
 <main class="pageformer">
-<h1>Relatório Técnico</h1>
-<p class="body-paragraph">Este relatório demonstra, em um documento curto, o cabeçalho e o rodapé correntes, a quebra de página explícita, o estilo de tabela, as formatações em linha e os blocos de citação e de código.</p>
-<h2>Escopo</h2>
-<p class="body-paragraph">O exemplo usa um template próprio nesta pasta, que substitui o template compartilhado da pasta pai. Sem timbre, as duas margens ficam livres para o conteúdo corrente, e o nível 1 abre cada seção em uma página nova.</p>
-<h3>Formatações em linha</h3>
-<p class="body-paragraph">O texto aceita <em class="emphasis">ênfase</em>, <strong class="strong">negrito</strong>, <s class="strikethrough">riscado</s> e <code class="inline-code">código em linha</code>, além de <a href="https://example.com">links</a> e notas de rodapé.<sup><a href="#fn-1" id="fnref-1" role="doc-noteref">1</a></sup></p>
-<h2>Listas</h2>
+<h1>Technical Report</h1>
+<p class="body-paragraph">This report demonstrates, in a short document, the running header and footer, the explicit page break, the table style, the inline formatting and the quote and code blocks.</p>
+<h2>Scope</h2>
+<p class="body-paragraph">The example uses its own template in this folder, which replaces the shared template of the parent folder. Without a letterhead, both margins are free for the running content, and level one opens each section on a new page.</p>
+<h3>Inline formatting</h3>
+<p class="body-paragraph">The text accepts <em class="emphasis">emphasis</em>, <strong class="strong">bold</strong>, <s class="strikethrough">strikethrough</s> and <code class="inline-code">inline code</code>, as well as <a href="https://example.com">links</a> and footnotes.<sup><a href="#fn-1" id="fnref-1" role="doc-noteref">1</a></sup></p>
+<h2>Lists</h2>
 <ul class="list-depth-0">
-<li><p class="list-paragraph">Item simples;</p></li>
-<li><p class="list-paragraph">Item com <strong class="strong">negrito</strong> e <code class="inline-code">código</code>;</p>
+<li><p class="list-paragraph">A simple item;</p></li>
+<li><p class="list-paragraph">An item with <strong class="strong">bold</strong> and <code class="inline-code">code</code>;</p>
 <ul class="list-depth-1">
-<li><p class="list-paragraph">Subitem com marcador de segundo nível;</p>
+<li><p class="list-paragraph">A subitem with a second-level marker;</p>
 <ul class="list-depth-2">
-<li><p class="list-paragraph">Sub-subitem com marcador de terceiro nível;</p></li>
+<li><p class="list-paragraph">A sub-subitem with a third-level marker;</p></li>
 </ul></li>
 </ul></li>
-<li><p class="list-paragraph">Item com <a href="https://example.com">site de exemplo</a>.</p></li>
+<li><p class="list-paragraph">An item with an <a href="https://example.com">example site</a>.</p></li>
 </ul>
 <ol class="list-depth-0">
-<li><p class="list-paragraph">Primeiro passo;</p>
+<li><p class="list-paragraph">First step;</p>
 <ol class="list-depth-1">
-<li><p class="list-paragraph">Passo interno com numeração alfabética;</p></li>
-<li><p class="list-paragraph">Outro passo interno;</p></li>
+<li><p class="list-paragraph">An inner step with alphabetic numbering;</p></li>
+<li><p class="list-paragraph">Another inner step;</p></li>
 </ol></li>
-<li><p class="list-paragraph">Segundo passo;</p></li>
-<li><p class="list-paragraph">Terceiro passo.</p></li>
+<li><p class="list-paragraph">Second step;</p></li>
+<li><p class="list-paragraph">Third step.</p></li>
 </ol>
 <ul class="list-depth-0 task-list">
-<li><p class="list-paragraph"><span class="task-done">[x]</span> Tarefa concluída;</p></li>
-<li><p class="list-paragraph"><span class="task-todo">[ ]</span> Tarefa pendente.</p></li>
+<li><p class="list-paragraph"><span class="task-done">[x]</span> Completed task;</p></li>
+<li><p class="list-paragraph"><span class="task-todo">[ ]</span> Pending task.</p></li>
 </ul>
-<p class="body-paragraph">A tabela abaixo usa a borda, o preenchimento do cabeçalho e a cor definidos no template.</p>
+<p class="body-paragraph">The table below uses the border, the header fill and the color defined in the template.</p>
 <table>
 <thead>
 <tr>
-<th scope="col">Etapa</th>
-<th scope="col">Prazo</th>
-<th scope="col">Responsável</th>
+<th scope="col">Stage</th>
+<th scope="col">Deadline</th>
+<th scope="col">Owner</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>Levantamento</td>
-<td>5 dias</td>
-<td>Análise</td>
+<td>Survey</td>
+<td>5 days</td>
+<td>Analysis</td>
 </tr>
 <tr>
-<td>Execução</td>
-<td>10 dias</td>
-<td>Produção</td>
+<td>Execution</td>
+<td>10 days</td>
+<td>Production</td>
 </tr>
 <tr>
-<td>Revisão</td>
-<td>3 dias</td>
-<td>Qualidade</td>
+<td>Review</td>
+<td>3 days</td>
+<td>Quality</td>
 </tr>
 </tbody>
 </table>
-<p class="body-paragraph">O cabeçalho mostra o autor à esquerda, o título ao centro e a numeração à direita. O rodapé repete o aviso à esquerda e o nome do programa à direita em todas as páginas.</p>
-<h2>Citação e alerta</h2>
+<p class="body-paragraph">The header shows the author, the title and the page numbers; the footer repeats the notice and the program name.</p>
+<h2>Quote and alert</h2>
 <blockquote class="quote">
-<p>Uma citação em bloco, com <code class="inline-code">código</code> e <em class="emphasis">ênfase</em>, para mostrar a barra vertical e o fundo declarados no template.</p>
+<p>A block quote, with <code class="inline-code">code</code> and <em class="emphasis">emphasis</em>, to show the vertical bar and the background declared in the template.</p>
 </blockquote>
-<p class="body-paragraph">Um alerta usa a mesma sintaxe de citação, com um tipo entre colchetes:</p>
+<p class="body-paragraph">An alert uses the same quote syntax, with a type in brackets:</p>
 <aside class="quote alert alert-note" role="note">
 <p class="alert-label">[!NOTE]</p>
-<p>Um alerta é uma citação com tipo, e mantém o rótulo entre colchetes.</p>
+<p>An alert is a quote with a type, and keeps the label in brackets.</p>
 </aside>
-<h2>Código</h2>
-<p class="body-paragraph">O bloco abaixo usa a face monoespaçada, o fundo e os filetes declarados no template.</p>
+<h2>Code</h2>
+<p class="body-paragraph">The block below uses the monospaced face, the background and the rules declared in the template.</p>
 <pre class="code-block"><code class="language-rust">fn main() {
-    println!("olá");
+    println!("hello");
 }
 </code></pre>
-<p class="body-paragraph">Uma régua fecha esta seção.</p>
+<p class="body-paragraph">A rule closes this section.</p>
 <hr class="horizontal-rule" />
-<h2>Imagem</h2>
-<p class="body-paragraph">A imagem abaixo usa a largura, o alinhamento, a borda e o fundo definidos no template.</p>
-<figure class="image-block align-center"><span class="image-frame" style="width: 70.00%;"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAeAAAAEOCAIAAADe+FMwAAAEoUlEQVR4nO3ZMW4aYRhFUTuiyK5csYHUqVgCfSr3LIHKtTcwVTbkyoUlNylixQGBrJiJ/2s4pwe9Al0+zVw/PD5fAdDzZfQAAA4TaIAogQaIEmiAKIEGiBJogCiBBogSaIAogQaIEmiAKIEGiBJogCiBBogSaIAogQaIEmiAKIEGiBJogCiBBohanPLh5Xo71w6AczVtVu/7oAsaIEqgAaIEGiDqpGfQf3v3QxaA8zPLKzoXNECUQANECTRAlEADRAk0QJRAA0QJNECUQANECTRAlEADRAk0QJRAA0QJNECUQANECTRAlEADRAk0QJRAA0QJNECUQANECTRAlEADRAk0QJRAA0QJNECUQANECTRAlEADRAk0QJRAA0QJNECUQANECTRAlEADRAk0QNRi9IDDluvt6An8X9NmNXrCv/GbPHvB36QLGiBKoAGioo84/vj+bTl6AnO6u59GTzjVzx9fR09gTje3T6MnHOWCBogSaIAogQaIEmiAKIEGiBJogCiBBogSaIAogQaIEmiAKIEGiBJogCiBBogSaIAogQaIEmiAKIEGiBJogCiBBogSaIAogQaIEmiAKIEGiBJogCiBBogSaIAogQaIEmiAKIEGiBJogCiBBogSaIAogQaIEmiAKIEGiBJogCiBBogSaIAogQaIEmiAKIEGiBJogCiBBogSaIAogQaIEmiAKIEGiBJogCiBBogSaIAogQaIEmiAKIEGiBJogCiBBogSaIAogQaIEmiAKIEGiBJogCiBBogSaIAogQaIEmiAKIGGF8v1dvQE2CHQ8Gq53so0HQIN+zSaCIGGA5zSFAg0HCXTjLUYPYAL9YnC94mmcmZc0ABRAg0QJdAAUQINEOUlIWNMm9XoCfuOvQz8PdWrQj6eQMNRwX8RLopAwwHSTIFn0LBPnYlwQcMraSbFBQ0v1JkagQaIEmiAKIEGiBJogCiBBogSaIAogQaIEmiAKIEGiBJogCiBBogSaIAogQaIEmiAKIEGiBJogCiBBogSaIAogQaIEmiAKIEGiBJogCiBBogSaIAogQaIEmiAKIEGiBJogCiBBogSaIAogQaIEmiAKIEGiBJogCiBBogSaIAogQaIEmiAKIEGiBJogCiBBogSaIAogQaIEmiAKIEGiBJogCiBBogSaIAogQaIEmiAKIEGiBJogCiBBogSaIAogQaIEmiAKIEGiBJogCiBBogSaIAogQaIEmiAKIEGiBJogKjF6AFvuLufRk+AHTe3T6MncClc0ABRAg0QFX3EMW1WoyfADr9JPp4LGiBKoAGiBBogSqABogQaIEqgAaIEGiBKoAGiBBogSqABogQaIEqgAaIEGiBKoAGiBBogSqABogQaIEqgAaIEGiBKoAGiBBogSqABogQaIEqgAaIEGiBKoAGiBBogSqABogQaIEqgAaIEGiBKoAGiBBogSqABogQaIGox1xct19u5vgqAKxc0QJZAA0QJNEDU9cPj8+gNABzgggaIEmiAKIEGiBJogCiBBogSaIAogQaIEmiAKIEGiBJogCiBBogSaIAogQaIEmiAKIEGiBJogCiBBogSaICoXyPGPgj3AoegAAAAAElFTkSuQmCC" alt="Diagrama de exemplo" /></span></figure>
-<h2>Resultados</h2>
-<p class="body-paragraph">A paginação e a numeração são calculadas pelo motor de composição a partir do documento inteiro, de modo que o total de páginas no cabeçalho corresponde ao número final.</p>
-<p class="body-paragraph">O mesmo modelo gera os quatro formatos. O PDF usa o motor Typst como biblioteca, o ODT e o DOCX são montados por escritores internos e o TXT é uma vista do modelo para copiar como texto simples. Como o template é um só, a face, as cores, os espaçamentos e os blocos acompanham todos eles.</p>
-<p class="body-paragraph">A tabela abaixo resume o que cada formato preserva do template.</p>
+<h2>Image</h2>
+<p class="body-paragraph">The image below uses the width, the alignment, the border and the background defined in the template.</p>
+<figure class="image-block align-center"><span class="image-frame" style="width: 70.00%;"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAeAAAAEOCAIAAADe+FMwAAAEoUlEQVR4nO3ZMW4aYRhFUTuiyK5csYHUqVgCfSr3LIHKtTcwVTbkyoUlNylixQGBrJiJ/2s4pwe9Al0+zVw/PD5fAdDzZfQAAA4TaIAogQaIEmiAKIEGiBJogCiBBogSaIAogQaIEmiAKIEGiBJogCiBBogSaIAogQaIEmiAKIEGiBJogCiBBohanPLh5Xo71w6AczVtVu/7oAsaIEqgAaIEGiDqpGfQf3v3QxaA8zPLKzoXNECUQANECTRAlEADRAk0QJRAA0QJNECUQANECTRAlEADRAk0QJRAA0QJNECUQANECTRAlEADRAk0QJRAA0QJNECUQANECTRAlEADRAk0QJRAA0QJNECUQANECTRAlEADRAk0QJRAA0QJNECUQANECTRAlEADRAk0QNRi9IDDluvt6An8X9NmNXrCv/GbPHvB36QLGiBKoAGioo84/vj+bTl6AnO6u59GTzjVzx9fR09gTje3T6MnHOWCBogSaIAogQaIEmiAKIEGiBJogCiBBogSaIAogQaIEmiAKIEGiBJogCiBBogSaIAogQaIEmiAKIEGiBJogCiBBogSaIAogQaIEmiAKIEGiBJogCiBBogSaIAogQaIEmiAKIEGiBJogCiBBogSaIAogQaIEmiAKIEGiBJogCiBBogSaIAogQaIEmiAKIEGiBJogCiBBogSaIAogQaIEmiAKIEGiBJogCiBBogSaIAogQaIEmiAKIEGiBJogCiBBogSaIAogQaIEmiAKIEGiBJogCiBBogSaIAogQaIEmiAKIGGF8v1dvQE2CHQ8Gq53so0HQIN+zSaCIGGA5zSFAg0HCXTjLUYPYAL9YnC94mmcmZc0ABRAg0QJdAAUQINEOUlIWNMm9XoCfuOvQz8PdWrQj6eQMNRwX8RLopAwwHSTIFn0LBPnYlwQcMraSbFBQ0v1JkagQaIEmiAKIEGiBJogCiBBogSaIAogQaIEmiAKIEGiBJogCiBBogSaIAogQaIEmiAKIEGiBJogCiBBogSaIAogQaIEmiAKIEGiBJogCiBBogSaIAogQaIEmiAKIEGiBJogCiBBogSaIAogQaIEmiAKIEGiBJogCiBBogSaIAogQaIEmiAKIEGiBJogCiBBogSaIAogQaIEmiAKIEGiBJogCiBBogSaIAogQaIEmiAKIEGiBJogCiBBogSaIAogQaIEmiAKIEGiBJogCiBBogSaIAogQaIEmiAKIEGiBJogKjF6AFvuLufRk+AHTe3T6MncClc0ABRAg0QFX3EMW1WoyfADr9JPp4LGiBKoAGiBBogSqABogQaIEqgAaIEGiBKoAGiBBogSqABogQaIEqgAaIEGiBKoAGiBBogSqABogQaIEqgAaIEGiBKoAGiBBogSqABogQaIEqgAaIEGiBKoAGiBBogSqABogQaIEqgAaIEGiBKoAGiBBogSqABogQaIGox1xct19u5vgqAKxc0QJZAA0QJNEDU9cPj8+gNABzgggaIEmiAKIEGiBJogCiBBogSaIAogQaIEmiAKIEGiBJogCiBBogSaIAogQaIEmiAKIEGiBJogCiBBogSaICoXyPGPgj3AoegAAAAAElFTkSuQmCC" alt="Example diagram" /></span></figure>
+<h2>Results</h2>
+<p class="body-paragraph">The engine computes pagination and numbering from the whole document, so the total in the header matches the final number.</p>
+<p class="body-paragraph">The same model drives the six formats: Typst for PDF, internal writers for ODT and DOCX, a semantic view for HTML and EPUB, and a plain-text view for TXT. A single template keeps the face, the colors, the spacing and the blocks consistent.</p>
+<p class="body-paragraph">The table below summarizes what each format preserves from the template.</p>
 <table>
 <thead>
 <tr>
-<th scope="col">Formato</th>
+<th scope="col">Format</th>
 <th scope="col">Layout</th>
-<th scope="col">Cores</th>
-<th scope="col">Blocos</th>
+<th scope="col">Colors</th>
+<th scope="col">Blocks</th>
 </tr>
 </thead>
 <tbody>
 <tr>
 <td>PDF</td>
-<td>paginação própria</td>
-<td>sim</td>
-<td>sim</td>
+<td>own pagination</td>
+<td>yes</td>
+<td>yes</td>
 </tr>
 <tr>
-<td>ODT</td>
-<td>paginação do Writer</td>
-<td>sim</td>
-<td>sim</td>
+<td>ODT/DOCX</td>
+<td>Writer and Word pagination</td>
+<td>yes</td>
+<td>yes</td>
 </tr>
 <tr>
-<td>DOCX</td>
-<td>paginação do Word</td>
-<td>sim</td>
-<td>sim</td>
+<td>HTML/EPUB</td>
+<td>semantic and reflowable</td>
+<td>yes</td>
+<td>yes</td>
 </tr>
 <tr>
 <td>TXT</td>
-<td>sem layout</td>
-<td>não</td>
-<td>texto</td>
+<td>no layout</td>
+<td>no</td>
+<td>text</td>
 </tr>
 </tbody>
 </table>
-<p class="body-paragraph">O bloco seguinte força uma quebra de página explícita antes do anexo. Sem o marcador, o anexo continuaria na mesma página.</p>
+<p class="body-paragraph">This paragraph forces an explicit page break before the annex.</p>
 <div class="page-break" aria-hidden="true"></div>
-<h1>Anexo</h1>
-<p class="body-paragraph">O anexo começa em uma página nova por causa do parágrafo que contém apenas o marcador de quebra de página, escrito como <code class="inline-code">-pagebreak-</code> ou pelo atalho <code class="inline-code">-!-</code>. Qualquer outra ocorrência, como -!- nesta frase, permanece texto comum.</p>
-<h1>Apêndice</h1>
-<p class="body-paragraph">Este apêndice começa em uma página nova por causa de <code class="inline-code">page_break_before</code> no nível 1 do template, sem nenhum marcador no texto. A quebra é fraca, então não cria uma página vazia quando o título já está no topo.</p>
+<h1>Annex</h1>
+<p class="body-paragraph">The annex starts on a new page because of the paragraph that contains only the page-break marker, written as <code class="inline-code">-pagebreak-</code> or with the <code class="inline-code">-!-</code> shortcut. Any other occurrence, such as -!- in this sentence, remains ordinary text.</p>
+<h1>Appendix</h1>
+<p class="body-paragraph">This appendix starts on a new page because of <code class="inline-code">page_break_before</code> on level one of the template, without any marker in the text. The break is weak, so it does not create an empty page when the heading is already at the top.</p>
 <section class="footnotes" role="doc-endnotes">
 <ol>
 <li id="fn-1" role="doc-endnote">
-<p>A nota de rodapé é recolhida ao final do documento.</p>
+<p>The footnote is collected at the end of the document.</p>
 <p class="footnote-backrefs"><a href="#fnref-1" role="doc-backlink">↩</a></p>
 </li>
 </ol>

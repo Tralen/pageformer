@@ -4,6 +4,11 @@
 
 *Major updates and feature releases.*
 
+### 0.41.9
+
+- Escaped backslashes and quotes in the CLI confidential configuration fixture, so the folder mapping test writes valid YAML with Windows paths.
+- Regenerates the ODT examples for the version in `meta:generator`.
+
 ### 0.41.8
 
 - Escaped backslashes and quotes when the confidential folder tests write YAML fixtures, so Windows paths produce valid YAML and the mapping tests run on Windows.

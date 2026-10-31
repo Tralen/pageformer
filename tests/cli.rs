@@ -49,6 +49,10 @@ fn write_private(path: &Path, contents: &str) {
     make_private(path);
 }
 
+fn yaml_string(text: &str) -> String {
+    format!("\"{}\"", text.replace('\\', "\\\\").replace('"', "\\\""))
+}
+
 #[cfg(unix)]
 fn make_private(path: &Path) {
     use std::os::unix::fs::PermissionsExt;
@@ -113,15 +117,16 @@ fn write_confidential_config(source: &Path, source_name: &str, values: &str) -> 
     write_private(
         &secret.path().join("confidential.yaml"),
         &format!(
-            "version: 1\nfiles:\n  {source_name}: \"{}\"\n",
-            source.display()
+            "version: 1\nfiles:\n  {}: {}\n",
+            yaml_string(source_name),
+            yaml_string(&source.display().to_string())
         ),
     );
     fs::write(
         config_directory.join("config.yaml"),
         format!(
-            "version: 1\nconfidential_directories:\n  - \"{}\"\n",
-            secret.path().display()
+            "version: 1\nconfidential_directories:\n  - {}\n",
+            yaml_string(&secret.path().display().to_string())
         ),
     )
     .expect("the public configuration");

@@ -131,6 +131,13 @@ const BUTTON_HEIGHT: f32 = 36.0;
 const COPY_BUTTON_WIDTH: f32 = 48.0;
 /// The fill of the copy half of the split TXT button.
 const COPY_FILL: egui::Color32 = egui::Color32::from_rgb(0x45, 0x45, 0x45);
+/// The title shown at the top of the window.
+const TITLE: &str = "Pageformer Publisher";
+
+/// The version shown at the top right of the window.
+fn version_label() -> String {
+    format!("v{}", env!("CARGO_PKG_VERSION"))
+}
 
 /// The pure converter state: the input, the paths and the visible state.
 struct Session {
@@ -382,6 +389,17 @@ impl Publisher {
     }
 
     fn render(&mut self, ui: &mut egui::Ui) {
+        egui::Sides::new().shrink_left().truncate().show(
+            ui,
+            |ui| {
+                ui.label(egui::RichText::new(TITLE).size(20.0).strong());
+            },
+            |ui| {
+                ui.label(egui::RichText::new(version_label()).small());
+            },
+        );
+        ui.add_space(10.0);
+
         let template_label = self.template_label.clone();
         let template_path = self.template_path.clone();
         let mut edit_template = false;

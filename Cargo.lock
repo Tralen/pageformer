@@ -2710,7 +2710,7 @@ dependencies = [
 
 [[package]]
 name = "pageformer"
-version = "0.38.1"
+version = "0.39.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -2730,7 +2730,7 @@ dependencies = [
 
 [[package]]
 name = "pageformer-publisher"
-version = "0.38.1"
+version = "0.39.0"
 dependencies = [
  "eframe",
  "pageformer",

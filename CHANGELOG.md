@@ -4,6 +4,11 @@
 
 *Major updates and feature releases.*
 
+### 0.39.0
+
+- Added a title row to `pageformer-publisher`: `Pageformer Publisher` on the left in a larger face and the crate version as `v0.39.0` on the right in the small face.
+- Regenerates the ODT examples for the version in `meta:generator`.
+
 ### 0.38.1
 
 - Fixed the ODT image frame border: a uniform four-side border now uses `draw:stroke`, because LibreOffice ignored `fo:border-*` on the graphic style. A partial border still falls back to `fo:border-*`.

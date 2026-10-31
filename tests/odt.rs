@@ -738,10 +738,16 @@ fn a_block_image_takes_its_size_alignment_and_frame() {
         content.contains("fo:background-color=\"#ffffff\""),
         "{content}"
     );
+    assert!(content.contains("draw:stroke=\"solid\""), "{content}");
     assert!(
-        content.contains("fo:border-top=\"1.00pt solid #336699\""),
+        content.contains("draw:stroke-color=\"#336699\""),
         "{content}"
     );
+    assert!(
+        content.contains("draw:stroke-width=\"1.00pt\""),
+        "{content}"
+    );
+    assert!(content.contains("fo:padding=\"6.00pt\""), "{content}");
 }
 
 #[test]

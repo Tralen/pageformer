@@ -357,13 +357,14 @@ fn image_rules(template: &Template, paragraph_after: f64) -> String {
         "figure.image-block img",
         &[
             "display: block;".to_owned(),
-            format!("max-width: {max_width};"),
+            "width: 100%;".to_owned(),
+            "max-width: 100%;".to_owned(),
             "height: auto;".to_owned(),
         ],
     ));
     let mut frame = vec![
         "display: inline-block;".to_owned(),
-        "max-width: 100%;".to_owned(),
+        format!("max-width: {max_width};"),
     ];
     if fill_padding > 0.0 {
         frame.push(format!("padding: {};", points(fill_padding)));

@@ -452,7 +452,7 @@ impl<'a> Builder<'a> {
             self.document.push_str(&paragraph);
             return;
         }
-        let width = metrics::twips(layout.width());
+        let width = metrics::twips(layout.width() + 2.0 * padding);
         let mut table = String::from("<w:tbl><w:tblPr><w:tblW w:w=\"0\" w:type=\"auto\"/>");
         table.push_str(&format!("<w:jc w:val=\"{align}\"/>"));
         table.push_str(&table_borders(border));

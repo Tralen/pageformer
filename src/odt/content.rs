@@ -8,7 +8,7 @@ use crate::document::{
     ImageBlock, Inline, List, ListItem, ListStart, Quote, QuoteKind, Table, TableCell, TaskState,
 };
 use crate::image::{self, ImageAlignment};
-use crate::template::Template;
+use crate::template::{BlockBorder, Length, Template};
 
 use super::picture_name;
 use super::styles::{alignment, background_attribute, border_attributes, partial_properties};
@@ -713,8 +713,18 @@ fn image_styles(output: &mut String, template: &Template) {
             ),
         );
     }
-    let border = border_attributes(image.border());
-    let padding = if image.border().padding().points() > 0.0 {
+    let uniform = uniform_border(image.border());
+    let border = match uniform {
+        Some(thickness) => format!(
+            " draw:stroke=\"solid\" draw:stroke-color=\"{}\" draw:stroke-width=\"{}\"",
+            image.border().color().hex(),
+            xml::points(thickness)
+        ),
+        None => border_attributes(image.border()),
+    };
+    let padding = if image.border().padding().points() > 0.0
+        && (uniform.is_some() || image.background().is_some())
+    {
         format!(" fo:padding=\"{}\"", xml::points(image.border().padding()))
     } else {
         String::new()
@@ -726,6 +736,18 @@ fn image_styles(output: &mut String, template: &Template) {
             "<style:style style:name=\"ImageFrame\" style:family=\"graphic\"><style:graphic-properties{border}{padding}{background}/></style:style>\n"
         ),
     );
+}
+
+fn uniform_border(border: &BlockBorder) -> Option<Length> {
+    let thickness = border.top()?;
+    if border.bottom() == Some(thickness)
+        && border.left() == Some(thickness)
+        && border.right() == Some(thickness)
+    {
+        Some(thickness)
+    } else {
+        None
+    }
 }
 
 fn horizontal_line_style(output: &mut String, template: &Template) {

@@ -4,6 +4,13 @@
 
 *Major updates and feature releases.*
 
+### 0.38.1
+
+- Fixed the ODT image frame border: a uniform four-side border now uses `draw:stroke`, because LibreOffice ignored `fo:border-*` on the graphic style. A partial border still falls back to `fo:border-*`.
+- Fixed the DOCX image frame: the grid and cell widths now include both side paddings, so the image no longer reaches the right border.
+- Fixed the HTML and EPUB image frame: the requested width and the template maximum now belong to the `image-frame` span, and the image fills it with `width: 100%`. The box no longer expands to the full column or pushes the image to one side.
+- Regenerates the examples, and the ODT examples carry the version in `meta:generator`.
+
 ### 0.38.0
 
 - Added block images: a paragraph with only an image becomes `Block::Image`, with `-width:...-`, `-height:...-` and `-align:left|center|right-` markers on the adjacent lines. One dimension sets the other through the intrinsic ratio; values accept pixels, `px`, `mm`, `cm`, `in`, `pt` and percentages.

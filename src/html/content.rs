@@ -528,7 +528,7 @@ impl Builder<'_> {
             .map(|title| format!(" title=\"{}\"", escape::attribute(title)))
             .unwrap_or_default();
         format!(
-            "<figure class=\"image-block {class}\"><span class=\"image-frame\"><img src=\"{}\" alt=\"{}\"{title}{width} /></span></figure>",
+            "<figure class=\"image-block {class}\"><span class=\"image-frame\"{width}><img src=\"{}\" alt=\"{}\"{title} /></span></figure>",
             escape::attribute(&source),
             escape::attribute(&alternative)
         )

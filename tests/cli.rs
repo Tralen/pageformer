@@ -154,7 +154,7 @@ fn a_confidential_folder_mapping_supplies_the_ini() {
             output.path().as_os_str(),
             source.path().join("Doc.md").as_os_str(),
         ],
-        &[("XDG_CONFIG_HOME", config_home)],
+        &[("XDG_CONFIG_HOME", config_home), ("APPDATA", config_home)],
     );
     assert!(result.status.success(), "{}", stderr(&result));
     let text = fs::read_to_string(output.path().join("Doc.txt")).expect("the text must exist");
@@ -187,7 +187,7 @@ fn an_explicit_confidential_file_wins_over_the_folder_mapping() {
             output.path().as_os_str(),
             source.path().join("Doc.md").as_os_str(),
         ],
-        &[("XDG_CONFIG_HOME", config_home)],
+        &[("XDG_CONFIG_HOME", config_home), ("APPDATA", config_home)],
     );
     assert!(result.status.success(), "{}", stderr(&result));
     let text = fs::read_to_string(output.path().join("Doc.txt")).expect("the text must exist");

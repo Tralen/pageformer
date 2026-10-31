@@ -4,6 +4,11 @@
 
 *Major updates and feature releases.*
 
+### 0.41.10
+
+- Set `APPDATA` alongside `XDG_CONFIG_HOME` in the CLI confidential mapping tests, because Windows reads the user configuration directory from `%APPDATA%` and ignores `XDG_CONFIG_HOME`.
+- Regenerates the ODT examples for the version in `meta:generator`.
+
 ### 0.41.9
 
 - Escaped backslashes and quotes in the CLI confidential configuration fixture, so the folder mapping test writes valid YAML with Windows paths.

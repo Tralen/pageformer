@@ -482,10 +482,17 @@ mod tests {
         directory
     }
 
+    fn yaml_string(text: &str) -> String {
+        format!("\"{}\"", text.replace('\\', "\\\\").replace('"', "\\\""))
+    }
+
     fn write_public(path: &Path, directories: &[&Path]) {
         let mut text = String::from("version: 1\nconfidential_directories:\n");
         for directory in directories {
-            text.push_str(&format!("  - \"{}\"\n", directory.display()));
+            text.push_str(&format!(
+                "  - {}\n",
+                yaml_string(&directory.display().to_string())
+            ));
         }
         fs::write(path, text).expect("the public configuration must be written");
     }
@@ -493,7 +500,11 @@ mod tests {
     fn write_secret(directory: &Path, files: &[(&str, &Path)]) {
         let mut text = String::from("version: 1\nfiles:\n");
         for (name, folder) in files {
-            text.push_str(&format!("  \"{name}\": \"{}\"\n", folder.display()));
+            text.push_str(&format!(
+                "  {}: {}\n",
+                yaml_string(name),
+                yaml_string(&folder.display().to_string())
+            ));
         }
         let path = directory.join(SECRET_FILE_NAME);
         fs::write(&path, text).expect("the secret map must be written");

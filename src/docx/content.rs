@@ -5,7 +5,8 @@ use std::collections::BTreeMap;
 use crate::assets::Assets;
 use crate::document::{
     Block, CodeBlock, ColumnAlignment, Destination, Document, FootnoteDefinition, FootnoteId,
-    ImageBlock, Inline, List, ListItem, ListStart, Quote, QuoteKind, Table, TableCell, TaskState,
+    ImageBlock, Inline, ItemSpacing, List, ListItem, ListStart, Quote, QuoteKind, Table, TableCell,
+    TaskState,
 };
 use crate::image::{self, ImageAlignment};
 use crate::metrics;
@@ -13,7 +14,7 @@ use crate::template::{BlockBorder, Template};
 use crate::xml;
 
 use super::numbering::{Numbering, NumberingKind};
-use super::styles::partial_properties;
+use super::styles::{ShadingMode, partial_properties};
 
 /// A packaged image and the relationship that points to it.
 pub(crate) struct Media {
@@ -325,7 +326,7 @@ impl<'a> Builder<'a> {
                 merged.push_str(&partial_properties(
                     Some(self.template.formatting().paragraph().strikethrough()),
                     None,
-                    true,
+                    ShadingMode::Include,
                 ));
                 merged.push_str(properties);
                 self.runs(content, &merged)
@@ -542,15 +543,19 @@ impl<'a> Builder<'a> {
             format!("<w:numPr><w:ilvl w:val=\"{depth}\"/><w:numId w:val=\"{number}\"/></w:numPr>");
         for (index, item) in list.items().iter().enumerate() {
             let last = index.saturating_add(1) == list.items().len();
-            self.item(item, &marker, depth, list.is_tight() && !last);
+            let spacing = if list.is_tight() && !last {
+                ItemSpacing::Tight
+            } else {
+                ItemSpacing::Loose
+            };
+            self.item(item, &marker, depth, spacing);
         }
     }
 
-    fn item(&mut self, item: &ListItem, marker: &str, depth: usize, tight: bool) {
-        let extra = if tight {
-            format!("{marker}<w:spacing w:after=\"0\"/>")
-        } else {
-            marker.to_owned()
+    fn item(&mut self, item: &ListItem, marker: &str, depth: usize, spacing: ItemSpacing) {
+        let extra = match spacing {
+            ItemSpacing::Tight => format!("{marker}<w:spacing w:after=\"0\"/>"),
+            ItemSpacing::Loose => marker.to_owned(),
         };
         let task = self.task_marker(item.task());
         match item.blocks().first() {
@@ -589,7 +594,7 @@ impl<'a> Builder<'a> {
     fn table(&mut self, table: &Table) {
         let style = self.template.table();
         let columns = table.alignments().len().max(1);
-        let column_width = self.text_width / columns as f64;
+        let column_width = self.text_width / f64::from(u32::try_from(columns).unwrap_or(u32::MAX));
         let paragraph = self.template.formatting().paragraph();
         let horizontal = style.cell_padding().points();
         let vertical = (horizontal - paragraph.leading().points() / 2.0).max(0.0);

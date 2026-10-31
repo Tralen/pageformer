@@ -4,7 +4,7 @@ use crate::metrics;
 use crate::template::{ListStyle, Template};
 use crate::xml;
 
-use super::styles::partial_properties;
+use super::styles::{ShadingMode, partial_properties};
 
 /// The marker kind of a list.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -86,7 +86,7 @@ fn abstract_levels(output: &mut String, abstract_id: u8, kind: NumberingKind, li
             "<w:abstractNum w:abstractNumId=\"{abstract_id}\"><w:multiLevelType w:val=\"hybridMultilevel\"/>"
         ),
     );
-    let marker_rpr = partial_properties(Some(list.text()), None, false);
+    let marker_rpr = partial_properties(Some(list.text()), None, ShadingMode::Omit);
     let marker_rpr = if marker_rpr.is_empty() {
         String::new()
     } else {

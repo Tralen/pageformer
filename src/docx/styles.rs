@@ -117,7 +117,11 @@ pub(crate) fn styles_xml(document: &Document, template: &Template) -> String {
     let list_line = metrics::line_advance(face.size(), paragraph.leading());
     let list_after =
         metrics::paragraph_after(list.spacing().or(paragraph.spacing()), paragraph.leading());
-    let list_rpr = rpr(partial_properties(Some(list.text()), None, false));
+    let list_rpr = rpr(partial_properties(
+        Some(list.text()),
+        None,
+        ShadingMode::Omit,
+    ));
     xml::push_fmt(
         &mut output,
         format_args!(
@@ -129,7 +133,11 @@ pub(crate) fn styles_xml(document: &Document, template: &Template) -> String {
     );
 
     let quote = template.formatting().quote();
-    let quote_rpr = rpr(partial_properties(Some(quote.text()), None, false));
+    let quote_rpr = rpr(partial_properties(
+        Some(quote.text()),
+        None,
+        ShadingMode::Omit,
+    ));
     xml::push_fmt(
         &mut output,
         format_args!(
@@ -143,7 +151,7 @@ pub(crate) fn styles_xml(document: &Document, template: &Template) -> String {
     let code_rpr = rpr(partial_properties(
         Some(code_block.text()),
         Some("<w:rFonts w:ascii=\"Consolas\" w:hAnsi=\"Consolas\" w:cs=\"Consolas\"/>"),
-        false,
+        ShadingMode::Omit,
     ));
     xml::push_fmt(
         &mut output,
@@ -160,7 +168,7 @@ pub(crate) fn styles_xml(document: &Document, template: &Template) -> String {
          <w:style w:type=\"character\" w:styleId=\"FootnoteReference\"><w:name w:val=\"footnote reference\"/><w:rPr><w:vertAlign w:val=\"superscript\"/></w:rPr></w:style>\n",
     );
     let link = template.formatting().paragraph().link();
-    let mut link_properties = partial_properties(Some(link.text()), None, true);
+    let mut link_properties = partial_properties(Some(link.text()), None, ShadingMode::Include);
     if link.underline() {
         link_properties.push_str("<w:u w:val=\"single\"/>");
     }
@@ -175,7 +183,11 @@ pub(crate) fn styles_xml(document: &Document, template: &Template) -> String {
         ("TaskDone", "Task Done", task.done()),
         ("TaskTodo", "Task Todo", task.todo()),
     ] {
-        let properties = rpr(partial_properties(Some(marker.text()), None, true));
+        let properties = rpr(partial_properties(
+            Some(marker.text()),
+            None,
+            ShadingMode::Include,
+        ));
         xml::push_fmt(
             &mut output,
             format_args!(
@@ -235,7 +247,7 @@ fn run_fonts(face: &TextFace) -> String {
 /// A run property block for a partial style, with the default font kept when the
 /// template does not declare families.
 fn partial_rpr(style: Option<&PartialTextStyle>, default_fonts: Option<&str>) -> String {
-    let properties = partial_properties(style, default_fonts, true);
+    let properties = partial_properties(style, default_fonts, ShadingMode::Include);
     if properties.is_empty() {
         String::new()
     } else {
@@ -252,11 +264,18 @@ fn rpr(properties: String) -> String {
     }
 }
 
+/// Whether `partial_properties` emits the background shading.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ShadingMode {
+    Include,
+    Omit,
+}
+
 /// The run properties of a partial style, without the `w:rPr` wrapper.
 pub(crate) fn partial_properties(
     style: Option<&PartialTextStyle>,
     default_fonts: Option<&str>,
-    include_shading: bool,
+    mode: ShadingMode,
 ) -> String {
     let mut properties = String::new();
     match style
@@ -294,7 +313,9 @@ pub(crate) fn partial_properties(
             color.hex().trim_start_matches('#')
         ));
     }
-    if include_shading && let Some(color) = style.and_then(PartialTextStyle::background) {
+    if matches!(mode, ShadingMode::Include)
+        && let Some(color) = style.and_then(PartialTextStyle::background)
+    {
         properties.push_str(&shading(Some(color)));
     }
     properties

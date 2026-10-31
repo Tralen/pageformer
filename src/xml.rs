@@ -7,18 +7,26 @@ use crate::template::Length;
 /// Escapes text content.
 pub fn escape_text(text: &str) -> String {
     let mut output = String::with_capacity(text.len());
-    push_escaped(&mut output, text, false);
+    push_escaped(&mut output, text, EscapeMode::Text);
     output
 }
 
 /// Escapes an attribute value.
 pub fn escape_attribute(text: &str) -> String {
     let mut output = String::with_capacity(text.len());
-    push_escaped(&mut output, text, true);
+    push_escaped(&mut output, text, EscapeMode::Attribute);
     output
 }
 
-fn push_escaped(output: &mut String, text: &str, attribute: bool) {
+/// Where an escaped string will be written, which decides whether quotes need
+/// escaping.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum EscapeMode {
+    Text,
+    Attribute,
+}
+
+fn push_escaped(output: &mut String, text: &str, mode: EscapeMode) {
     for character in text.chars() {
         if !is_xml_character(character) {
             output.push('\u{fffd}');
@@ -28,8 +36,8 @@ fn push_escaped(output: &mut String, text: &str, attribute: bool) {
             '&' => output.push_str("&amp;"),
             '<' => output.push_str("&lt;"),
             '>' => output.push_str("&gt;"),
-            '"' if attribute => output.push_str("&quot;"),
-            '\'' if attribute => output.push_str("&apos;"),
+            '"' if matches!(mode, EscapeMode::Attribute) => output.push_str("&quot;"),
+            '\'' if matches!(mode, EscapeMode::Attribute) => output.push_str("&apos;"),
             other => output.push(other),
         }
     }

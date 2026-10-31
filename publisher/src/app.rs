@@ -69,13 +69,19 @@ enum WorkerOutcome {
     Copied { text: String, warnings: Vec<String> },
 }
 
+/// What one format button does.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ExportAction {
+    Convert(Format),
+    ConvertAndCopy(Format),
+}
+
 /// One colored export button in the right column.
 struct ExportButton {
     label: &'static str,
     fill: egui::Color32,
     text: egui::Color32,
-    format: Option<Format>,
-    copy: bool,
+    action: ExportAction,
 }
 
 /// The export buttons, in display order. Every format now has a backend.
@@ -84,43 +90,37 @@ const EXPORT_BUTTONS: [ExportButton; 6] = [
         label: "PDF",
         fill: egui::Color32::from_rgb(0xc6, 0x28, 0x28),
         text: egui::Color32::WHITE,
-        format: Some(Format::Pdf),
-        copy: false,
+        action: ExportAction::Convert(Format::Pdf),
     },
     ExportButton {
         label: "ODT",
         fill: egui::Color32::from_rgb(0x2e, 0x7d, 0x32),
         text: egui::Color32::WHITE,
-        format: Some(Format::Odt),
-        copy: false,
+        action: ExportAction::Convert(Format::Odt),
     },
     ExportButton {
         label: "DOCX",
         fill: egui::Color32::from_rgb(0x15, 0x65, 0xc0),
         text: egui::Color32::WHITE,
-        format: Some(Format::Docx),
-        copy: false,
+        action: ExportAction::Convert(Format::Docx),
     },
     ExportButton {
         label: "HTML",
         fill: egui::Color32::from_rgb(0xef, 0x6c, 0x00),
         text: egui::Color32::WHITE,
-        format: Some(Format::Html),
-        copy: false,
+        action: ExportAction::Convert(Format::Html),
     },
     ExportButton {
         label: "EPUB",
         fill: egui::Color32::from_rgb(0xf9, 0xa8, 0x25),
         text: egui::Color32::BLACK,
-        format: Some(Format::Epub),
-        copy: false,
+        action: ExportAction::Convert(Format::Epub),
     },
     ExportButton {
         label: "TXT",
         fill: egui::Color32::from_rgb(0x61, 0x61, 0x61),
         text: egui::Color32::WHITE,
-        format: Some(Format::Txt),
-        copy: true,
+        action: ExportAction::ConvertAndCopy(Format::Txt),
     },
 ];
 
@@ -409,8 +409,6 @@ impl Publisher {
         );
         ui.add_space(10.0);
 
-        let template_label = self.template_label.clone();
-        let template_path = self.template_path.clone();
         let mut edit_template = false;
         let mut open_template_folder = None;
         egui::Sides::new()
@@ -425,19 +423,19 @@ impl Publisher {
                     );
                     with_tooltip(
                         ui.add(egui::Label::new(
-                            egui::RichText::new(&template_label).small(),
+                            egui::RichText::new(self.template_label.as_str()).small(),
                         )),
-                        &template_label,
+                        self.template_label.as_str(),
                     );
                 },
                 |ui| {
-                    if template_path.is_some() {
+                    if let Some(template_path) = self.template_path.as_deref() {
                         edit_template = with_tooltip(
                             ui.small_button("Edit"),
                             "Open the template in the default editor.",
                         )
                         .clicked();
-                        if let Some(folder) = template_path.as_deref().and_then(Path::parent) {
+                        if let Some(folder) = template_path.parent() {
                             let folder = folder.to_path_buf();
                             let open_folder = with_tooltip(
                                 ui.small_button("Folder"),
@@ -450,8 +448,8 @@ impl Publisher {
                     }
                 },
             );
-        if edit_template && let Some(path) = &template_path {
-            self.open(path);
+        if edit_template && let Some(path) = self.template_path.clone() {
+            self.open(&path);
         }
         if let Some(folder) = open_template_folder {
             self.open(&folder);
@@ -463,29 +461,30 @@ impl Publisher {
         let gap = 12.0;
         let spacing = ui.spacing().item_spacing.x;
         let button_spacing = ui.spacing().item_spacing.y;
-        let column_height = EXPORT_BUTTONS.len() as f32 * BUTTON_HEIGHT
-            + (EXPORT_BUTTONS.len() as f32 - 1.0) * button_spacing;
+        let button_count = f32::from(u16::try_from(EXPORT_BUTTONS.len()).unwrap_or(u16::MAX));
+        let column_height = button_count * BUTTON_HEIGHT + (button_count - 1.0) * button_spacing;
         let drop_height = column_height.max(184.0);
         let drop_width = (ui.available_width() - button_width - gap - spacing).max(140.0);
         let working = matches!(self.session.state, State::Working { .. } | State::Copying);
         ui.horizontal_top(|ui| {
             let (rect, response) =
                 ui.allocate_exact_size(egui::vec2(drop_width, drop_height), egui::Sense::click());
-            let visuals = ui.visuals().clone();
-            let fill = if response.hovered() {
-                visuals.widgets.hovered.bg_fill
-            } else {
-                visuals.extreme_bg_color
+            let (fill, stroke, color) = {
+                let visuals = ui.visuals();
+                (
+                    if response.hovered() {
+                        visuals.widgets.hovered.bg_fill
+                    } else {
+                        visuals.extreme_bg_color
+                    },
+                    visuals.widgets.inactive.bg_stroke,
+                    visuals.text_color(),
+                )
             };
             ui.painter().rect_filled(rect, 8.0, fill);
-            ui.painter().rect_stroke(
-                rect,
-                8.0,
-                visuals.widgets.inactive.bg_stroke,
-                egui::StrokeKind::Inside,
-            );
+            ui.painter()
+                .rect_stroke(rect, 8.0, stroke, egui::StrokeKind::Inside);
             let font = egui::FontId::proportional(16.0);
-            let color = visuals.text_color();
             let first = if self.session.input.is_some() {
                 "Drop another .md here"
             } else {
@@ -518,8 +517,8 @@ impl Publisher {
                 ui.set_width(button_width);
                 let enabled = self.session.can_export();
                 for entry in &EXPORT_BUTTONS {
-                    match entry.format {
-                        Some(format) if entry.copy => {
+                    match entry.action {
+                        ExportAction::ConvertAndCopy(format) => {
                             ui.horizontal(|ui| {
                                 ui.spacing_mut().item_spacing.x = 0.0;
                                 let main_width = BUTTON_WIDTH - COPY_BUTTON_WIDTH;
@@ -568,7 +567,7 @@ impl Publisher {
                                 }
                             });
                         }
-                        Some(format) => {
+                        ExportAction::Convert(format) => {
                             let button = egui::Button::new(
                                 egui::RichText::new(entry.label).color(entry.text),
                             )
@@ -585,23 +584,12 @@ impl Publisher {
                                 self.start(format);
                             }
                         }
-                        None => {
-                            let button = egui::Button::new(
-                                egui::RichText::new(entry.label).color(entry.text),
-                            )
-                            .fill(entry.fill)
-                            .min_size(egui::vec2(BUTTON_WIDTH, BUTTON_HEIGHT));
-                            with_tooltip(
-                                ui.add_enabled(false, button),
-                                &format!("{} export is not available yet.", entry.label),
-                            );
-                        }
                     }
                 }
             });
         });
 
-        if let Some(input) = self.session.input.clone() {
+        if let Some(input) = &self.session.input {
             ui.add_space(4.0);
             with_tooltip(
                 ui.colored_label(
@@ -656,7 +644,23 @@ impl Publisher {
         );
 
         ui.add_space(8.0);
-        match self.session.state.clone() {
+        if let Some(path) = self.render_status(ui) {
+            self.open(&path);
+        }
+
+        if let Some(message) = &self.message {
+            ui.add_space(4.0);
+            with_tooltip(
+                ui.colored_label(egui::Color32::from_rgb(0xb0, 0x2a, 0x2a), message),
+                "A message about the file picker or the desktop action.",
+            );
+        }
+    }
+
+    /// Draws the status area and reports a path the user asked to open.
+    fn render_status(&self, ui: &mut egui::Ui) -> Option<PathBuf> {
+        let mut request = None;
+        match &self.session.state {
             State::Idle => {
                 with_tooltip(
                     ui.label("Drop a Markdown file or click the box to choose."),
@@ -703,7 +707,7 @@ impl Publisher {
                         "Open the generated file in the default application.",
                     );
                     if open.clicked() {
-                        self.open(&output);
+                        request = Some(output.clone());
                     }
                     if let Some(folder) = output.parent() {
                         let folder = folder.to_path_buf();
@@ -712,12 +716,12 @@ impl Publisher {
                             "Open the folder that contains the generated file.",
                         );
                         if open_folder.clicked() {
-                            self.open(&folder);
+                            request = Some(folder);
                         }
                     }
                 });
                 for warning in warnings {
-                    with_tooltip(ui.label(warning), "A warning from the renderer.");
+                    with_tooltip(ui.label(warning.as_str()), "A warning from the renderer.");
                 }
             }
             State::Copied { warnings } => {
@@ -729,24 +733,17 @@ impl Publisher {
                     "The document text is on the clipboard; it is never displayed here.",
                 );
                 for warning in warnings {
-                    with_tooltip(ui.label(warning), "A warning from the renderer.");
+                    with_tooltip(ui.label(warning.as_str()), "A warning from the renderer.");
                 }
             }
             State::Failed { message } => {
                 with_tooltip(
-                    ui.colored_label(egui::Color32::from_rgb(0xb0, 0x2a, 0x2a), message),
+                    ui.colored_label(egui::Color32::from_rgb(0xb0, 0x2a, 0x2a), message.as_str()),
                     "The export failed; correct the input, template or output folder and try again.",
                 );
             }
         }
-
-        if let Some(message) = &self.message {
-            ui.add_space(4.0);
-            with_tooltip(
-                ui.colored_label(egui::Color32::from_rgb(0xb0, 0x2a, 0x2a), message),
-                "A message about the file picker or the desktop action.",
-            );
-        }
+        request
     }
 }
 
@@ -1065,9 +1062,18 @@ mod tests {
         let labels: Vec<&str> = EXPORT_BUTTONS.iter().map(|button| button.label).collect();
 
         assert_eq!(labels, ["PDF", "ODT", "DOCX", "HTML", "EPUB", "TXT"]);
-        assert_eq!(EXPORT_BUTTONS[3].format, Some(Format::Html));
-        assert_eq!(EXPORT_BUTTONS[4].format, Some(Format::Epub));
-        assert!(EXPORT_BUTTONS[5].copy);
+        assert_eq!(
+            EXPORT_BUTTONS[3].action,
+            ExportAction::Convert(Format::Html)
+        );
+        assert_eq!(
+            EXPORT_BUTTONS[4].action,
+            ExportAction::Convert(Format::Epub)
+        );
+        assert_eq!(
+            EXPORT_BUTTONS[5].action,
+            ExportAction::ConvertAndCopy(Format::Txt)
+        );
     }
 
     #[test]

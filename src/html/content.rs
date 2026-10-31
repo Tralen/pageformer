@@ -4,7 +4,7 @@ use std::collections::BTreeMap;
 
 use crate::assets::{Assets, media_type};
 use crate::document::{
-    Alert, Block, CodeBlock, ColumnAlignment, Destination, Document, FootnoteDefinition,
+    Alert, Block, CellKind, CodeBlock, ColumnAlignment, Destination, Document, FootnoteDefinition,
     FootnoteId, ImageBlock, Inline, List, ListItem, ListStart, Quote, QuoteKind, Table, TableCell,
     TaskState,
 };
@@ -46,6 +46,13 @@ struct Note {
     definition: FootnoteDefinition,
     refs: Vec<String>,
     body: Option<String>,
+}
+
+/// Where a paragraph sits: the body owns the fill, nested blocks do not.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ParagraphPlacement {
+    Body,
+    Nested,
 }
 
 struct Builder<'a> {
@@ -90,7 +97,7 @@ pub(crate) fn render_with(
         text_width,
     };
     builder.collect_definitions(document.blocks());
-    let body = builder.blocks_to_string(document.blocks(), 0, true);
+    let body = builder.blocks_to_string(document.blocks(), 0, ParagraphPlacement::Body);
     builder.render_notes();
     let footnotes = builder.footnotes();
     Content {
@@ -127,10 +134,15 @@ impl Builder<'_> {
         }
     }
 
-    fn blocks_to_string(&mut self, blocks: &[Block], depth: usize, body: bool) -> String {
+    fn blocks_to_string(
+        &mut self,
+        blocks: &[Block],
+        depth: usize,
+        placement: ParagraphPlacement,
+    ) -> String {
         let mut rendered = Vec::new();
         for block in blocks {
-            let text = self.block(block, depth, body);
+            let text = self.block(block, depth, placement);
             if !text.is_empty() {
                 rendered.push(text);
             }
@@ -138,16 +150,16 @@ impl Builder<'_> {
         rendered.join("\n")
     }
 
-    fn block(&mut self, block: &Block, depth: usize, body: bool) -> String {
+    fn block(&mut self, block: &Block, depth: usize, placement: ParagraphPlacement) -> String {
         match block {
             Block::Heading(heading) => {
                 let level = heading.level().get();
                 format!("<h{level}>{}</h{level}>", self.inlines(heading.content()))
             }
-            Block::Paragraph(inlines) => self.paragraph(inlines, body, None),
+            Block::Paragraph(inlines) => self.paragraph(inlines, placement, None),
             Block::Image(image) => self.image_block(image),
             Block::NumberedParagraph(paragraph) => {
-                self.paragraph(paragraph.content(), body, Some(paragraph.number()))
+                self.paragraph(paragraph.content(), placement, Some(paragraph.number()))
             }
             Block::List(list) => self.list(list, depth),
             Block::Table(table) => self.table(table),
@@ -159,11 +171,16 @@ impl Builder<'_> {
         }
     }
 
-    fn paragraph(&mut self, inlines: &[Inline], body: bool, number: Option<u64>) -> String {
+    fn paragraph(
+        &mut self,
+        inlines: &[Inline],
+        placement: ParagraphPlacement,
+        number: Option<u64>,
+    ) -> String {
         let content = self.inlines(inlines);
         match number {
             Some(number) => {
-                let class = if body {
+                let class = if matches!(placement, ParagraphPlacement::Body) {
                     " class=\"body-paragraph numbered\""
                 } else {
                     " class=\"numbered\""
@@ -171,7 +188,7 @@ impl Builder<'_> {
                 format!("<p{class}><span class=\"number\">{number}.</span> {content}</p>")
             }
             None => {
-                let class = if body {
+                let class = if matches!(placement, ParagraphPlacement::Body) {
                     " class=\"body-paragraph\""
                 } else {
                     ""
@@ -221,13 +238,21 @@ impl Builder<'_> {
             output.push_str("</p>");
             if !rest.is_empty() {
                 output.push('\n');
-                output.push_str(&self.blocks_to_string(rest, depth.saturating_add(1), false));
+                output.push_str(&self.blocks_to_string(
+                    rest,
+                    depth.saturating_add(1),
+                    ParagraphPlacement::Nested,
+                ));
             }
         } else {
             if let Some(separator) = &separator {
                 output.push_str(separator);
             }
-            output.push_str(&self.blocks_to_string(blocks, depth.saturating_add(1), false));
+            output.push_str(&self.blocks_to_string(
+                blocks,
+                depth.saturating_add(1),
+                ParagraphPlacement::Nested,
+            ));
         }
         output
     }
@@ -251,14 +276,14 @@ impl Builder<'_> {
     fn table(&mut self, table: &Table) -> String {
         let mut output = String::from("<table>\n<thead>\n<tr>\n");
         for (cell, alignment) in table.header().iter().zip(table.alignments()) {
-            output.push_str(&self.cell("th", cell, *alignment, true));
+            output.push_str(&self.cell(CellKind::Header, cell, *alignment));
             output.push('\n');
         }
         output.push_str("</tr>\n</thead>\n<tbody>\n");
         for row in table.rows() {
             output.push_str("<tr>\n");
             for (cell, alignment) in row.iter().zip(table.alignments()) {
-                output.push_str(&self.cell("td", cell, *alignment, false));
+                output.push_str(&self.cell(CellKind::Data, cell, *alignment));
                 output.push('\n');
             }
             output.push_str("</tr>\n");
@@ -267,20 +292,17 @@ impl Builder<'_> {
         output
     }
 
-    fn cell(
-        &mut self,
-        tag: &str,
-        cell: &TableCell,
-        alignment: ColumnAlignment,
-        header: bool,
-    ) -> String {
+    fn cell(&mut self, kind: CellKind, cell: &TableCell, alignment: ColumnAlignment) -> String {
         let class = match alignment {
             ColumnAlignment::Default => "",
             ColumnAlignment::Left => " class=\"align-left\"",
             ColumnAlignment::Center => " class=\"align-center\"",
             ColumnAlignment::Right => " class=\"align-right\"",
         };
-        let scope = if header { " scope=\"col\"" } else { "" };
+        let (tag, scope) = match kind {
+            CellKind::Header => ("th", " scope=\"col\""),
+            CellKind::Data => ("td", ""),
+        };
         format!(
             "<{tag}{scope}{class}>{}</{tag}>",
             self.inlines(cell.content())
@@ -303,7 +325,7 @@ impl Builder<'_> {
                 escape::text(alert.label())
             ));
         }
-        let content = self.blocks_to_string(quote.blocks(), depth, false);
+        let content = self.blocks_to_string(quote.blocks(), depth, ParagraphPlacement::Nested);
         output.push_str(&content);
         if !content.is_empty() {
             output.push('\n');
@@ -558,14 +580,18 @@ impl Builder<'_> {
                 index
             }
         };
-        let number = self.notes[index].number;
-        let reference = self.notes[index].refs.len().saturating_add(1);
+        let Some(note) = self.notes.get_mut(index) else {
+            self.warn("a footnote was lost while numbering; it was rendered as text".to_owned());
+            return escape::text(&format!("[^{key}]"));
+        };
+        let number = note.number;
+        let reference = note.refs.len().saturating_add(1);
         let dom_id = if reference == 1 {
             format!("fnref-{number}")
         } else {
             format!("fnref-{number}-{reference}")
         };
-        self.notes[index].refs.push(dom_id.clone());
+        note.refs.push(dom_id.clone());
         format!(
             "<sup><a href=\"#fn-{number}\" id=\"{dom_id}\" role=\"doc-noteref\">{number}</a></sup>"
         )
@@ -573,13 +599,15 @@ impl Builder<'_> {
 
     fn render_notes(&mut self) {
         let mut index = 0;
-        while index < self.notes.len() {
-            let id = self.notes[index].id.clone();
-            let definition = self.notes[index].definition.clone();
+        while let Some(note) = self.notes.get(index) {
+            let id = note.id.clone();
+            let definition = note.definition.clone();
             self.active.push(id);
-            let body = self.blocks_to_string(definition.blocks(), 0, false);
+            let body = self.blocks_to_string(definition.blocks(), 0, ParagraphPlacement::Nested);
             self.active.pop();
-            self.notes[index].body = Some(body);
+            if let Some(note) = self.notes.get_mut(index) {
+                note.body = Some(body);
+            }
             index = index.saturating_add(1);
         }
     }

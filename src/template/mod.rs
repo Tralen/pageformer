@@ -1061,6 +1061,8 @@ pub struct ParagraphStyle {
 }
 
 impl ParagraphStyle {
+    // The constructor mirrors the declared paragraph style field by field, so a
+    // parameter struct would only repeat the same names without adding safety.
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         face: TextFace,
@@ -1491,6 +1493,8 @@ pub struct Formatting {
 }
 
 impl Formatting {
+    // The constructor mirrors the declared formatting sections field by field, so
+    // a parameter struct would only repeat the same names without adding safety.
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         paragraph: ParagraphStyle,
@@ -1707,6 +1711,8 @@ pub struct ListStyle {
 }
 
 impl ListStyle {
+    // The constructor mirrors the declared list style field by field, so a
+    // parameter struct would only repeat the same names without adding safety.
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         text: PartialTextStyle,

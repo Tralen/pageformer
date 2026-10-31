@@ -157,7 +157,7 @@ pub fn load_assets(
         let extension = supported_extension(&path)?;
         let asset = format!("assets/letterhead.{extension}");
         assets.files.insert(asset.clone(), read_asset(&path)?);
-        assets.map = assets.map.clone().with_letterhead(asset);
+        assets.map = assets.map.with_letterhead(asset);
     }
 
     Ok(assets)

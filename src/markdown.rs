@@ -284,7 +284,11 @@ impl<'source> DocumentParser<'source> {
                 }
                 Some(Event::TaskListMarker(checked)) if blocks.is_empty() && task.is_none() => {
                     self.index += 1;
-                    task = Some(task_state(checked));
+                    task = Some(if checked {
+                        TaskState::Done
+                    } else {
+                        TaskState::Todo
+                    });
                 }
                 Some(Event::Start(Tag::Paragraph)) => {
                     self.index += 1;
@@ -325,7 +329,11 @@ impl<'source> DocumentParser<'source> {
         match self.peek().cloned() {
             Some(Event::TaskListMarker(checked)) => {
                 self.index += 1;
-                Some(task_state(checked))
+                Some(if checked {
+                    TaskState::Done
+                } else {
+                    TaskState::Todo
+                })
             }
             _ => None,
         }
@@ -842,14 +850,6 @@ fn column_alignment(alignment: Alignment) -> ColumnAlignment {
         Alignment::Left => ColumnAlignment::Left,
         Alignment::Center => ColumnAlignment::Center,
         Alignment::Right => ColumnAlignment::Right,
-    }
-}
-
-fn task_state(checked: bool) -> TaskState {
-    if checked {
-        TaskState::Done
-    } else {
-        TaskState::Todo
     }
 }
 

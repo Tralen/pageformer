@@ -56,14 +56,9 @@ pub fn render(
 ) -> Result<Vec<u8>, DocxError> {
     let media = content::media_plan(assets);
     let built = content::build(document, template, assets, &media);
-    let content_types =
-        package::content_types(&media, built.header.is_some(), built.footer.is_some())?;
-    let relationships = package::document_relationships(
-        &media,
-        &built.hyperlinks,
-        built.header.is_some(),
-        built.footer.is_some(),
-    );
+    let parts = package::RunningParts::new(built.header.as_deref(), built.footer.as_deref());
+    let content_types = package::content_types(&media, parts)?;
+    let relationships = package::document_relationships(&media, &built.hyperlinks, parts);
     let styles = styles::styles_xml(document, template);
     let numbering = built.numbering.xml(template);
     let core = package::core_xml(document);

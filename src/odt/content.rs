@@ -4,8 +4,9 @@ use std::collections::BTreeMap;
 
 use crate::assets::Assets;
 use crate::document::{
-    Block, CodeBlock, ColumnAlignment, Destination, Document, FootnoteDefinition, FootnoteId,
-    ImageBlock, Inline, List, ListItem, ListStart, Quote, QuoteKind, Table, TableCell, TaskState,
+    Block, CellKind, CodeBlock, ColumnAlignment, Destination, Document, FootnoteDefinition,
+    FootnoteId, ImageBlock, Inline, ItemSpacing, List, ListItem, ListStart, Quote, QuoteKind,
+    Table, TableCell, TaskState,
 };
 use crate::image::{self, ImageAlignment};
 use crate::template::{BlockBorder, Length, Template};
@@ -239,15 +240,23 @@ impl<'a> Builder<'a> {
                 xml::push(&mut self.body, "<text:list-item>\n");
             }
             let last = index.saturating_add(1) == list.items().len();
-            self.item(item, list.is_tight() && !last);
+            let spacing = if list.is_tight() && !last {
+                ItemSpacing::Tight
+            } else {
+                ItemSpacing::Loose
+            };
+            self.item(item, spacing);
             xml::push(&mut self.body, "</text:list-item>\n");
             number = number.saturating_add(1);
         }
         xml::push(&mut self.body, "</text:list>\n");
     }
 
-    fn item(&mut self, item: &ListItem, tight: bool) {
-        let base = if tight { "ListItem" } else { "ListLooseItem" };
+    fn item(&mut self, item: &ListItem, spacing: ItemSpacing) {
+        let base = match spacing {
+            ItemSpacing::Tight => "ListItem",
+            ItemSpacing::Loose => "ListLooseItem",
+        };
         match item.blocks().first() {
             Some(Block::Paragraph(inlines)) => {
                 let style = self.style_with_break(base);
@@ -291,7 +300,7 @@ impl<'a> Builder<'a> {
         self.table_count += 1;
         let name = format!("Table{}", self.table_count);
         let columns = table.alignments().len().max(1);
-        let column_width = self.text_width / columns as f64;
+        let column_width = self.text_width / f64::from(u32::try_from(columns).unwrap_or(u32::MAX));
         let style = self.template.table();
         let border = xml::points(style.border());
         let color = style.border_color().hex();
@@ -332,7 +341,7 @@ impl<'a> Builder<'a> {
             ),
         );
         for (cell, alignment) in table.header().iter().zip(table.alignments()) {
-            self.cell(cell, *alignment, true, &name);
+            self.cell(cell, *alignment, CellKind::Header, &name);
         }
         xml::push(
             &mut self.body,
@@ -341,19 +350,20 @@ impl<'a> Builder<'a> {
         for row in table.rows() {
             xml::push(&mut self.body, "<table:table-row>\n");
             for (cell, alignment) in row.iter().zip(table.alignments()) {
-                self.cell(cell, *alignment, false, &name);
+                self.cell(cell, *alignment, CellKind::Data, &name);
             }
             xml::push(&mut self.body, "</table:table-row>\n");
         }
         xml::push(&mut self.body, "</table:table>\n");
     }
 
-    fn cell(&mut self, cell: &TableCell, alignment: ColumnAlignment, header: bool, table: &str) {
-        let style = if header && self.template.table().header_fill().is_some() {
-            format!("{table}.Header")
-        } else {
-            format!("{table}.Cell")
-        };
+    fn cell(&mut self, cell: &TableCell, alignment: ColumnAlignment, kind: CellKind, table: &str) {
+        let style =
+            if matches!(kind, CellKind::Header) && self.template.table().header_fill().is_some() {
+                format!("{table}.Header")
+            } else {
+                format!("{table}.Cell")
+            };
         let paragraph = match alignment {
             ColumnAlignment::Default => "CellDefault",
             ColumnAlignment::Left => "CellLeft",

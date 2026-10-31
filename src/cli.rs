@@ -324,21 +324,58 @@ impl ColorChoice {
         }
     }
 
-    pub fn enabled(self, stream: Stream) -> bool {
-        self.resolve(
-            stream.is_terminal(),
-            env::var_os("NO_COLOR").is_some(),
-            env::var_os("TERM").is_some_and(|term| term.to_string_lossy() == "dumb"),
-        )
+    pub fn support(self, stream: Stream) -> ColorSupport {
+        if self.resolve(stream.attachment(), ColorEnvironment::detect()) {
+            ColorSupport::Styled
+        } else {
+            ColorSupport::Plain
+        }
     }
 
-    pub fn resolve(self, is_terminal: bool, no_color: bool, term_dumb: bool) -> bool {
+    fn resolve(self, terminal: Terminal, environment: ColorEnvironment) -> bool {
         match self {
             Self::Always => true,
             Self::Never => false,
-            Self::Auto => is_terminal && !no_color && !term_dumb,
+            Self::Auto => matches!(
+                (terminal, environment),
+                (Terminal::Attached, ColorEnvironment::Automatic)
+            ),
         }
     }
+}
+
+/// Whether the stream is attached to a terminal.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Terminal {
+    Attached,
+    Detached,
+}
+
+/// Whether the environment allows automatic color.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ColorEnvironment {
+    Automatic,
+    Suppressed,
+}
+
+impl ColorEnvironment {
+    fn detect() -> Self {
+        let no_color = env::var_os("NO_COLOR").is_some();
+        let dumb_terminal =
+            env::var_os("TERM").is_some_and(|term| term.to_string_lossy() == "dumb");
+        if no_color || dumb_terminal {
+            Self::Suppressed
+        } else {
+            Self::Automatic
+        }
+    }
+}
+
+/// Whether the painter applies ANSI styles.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ColorSupport {
+    Styled,
+    Plain,
 }
 
 /// The stream whose terminal capability is being checked.
@@ -349,10 +386,15 @@ pub enum Stream {
 }
 
 impl Stream {
-    fn is_terminal(self) -> bool {
-        match self {
+    fn attachment(self) -> Terminal {
+        let attached = match self {
             Self::Stdout => io::stdout().is_terminal(),
             Self::Stderr => io::stderr().is_terminal(),
+        };
+        if attached {
+            Terminal::Attached
+        } else {
+            Terminal::Detached
         }
     }
 }
@@ -388,19 +430,18 @@ const RESET: &str = "\x1b[0m";
 /// Applies ANSI styles when the target stream accepts them.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Painter {
-    enabled: bool,
+    support: ColorSupport,
 }
 
 impl Painter {
-    pub fn new(enabled: bool) -> Self {
-        Self { enabled }
+    pub fn new(support: ColorSupport) -> Self {
+        Self { support }
     }
 
     pub fn render(self, style: Style, text: &str) -> String {
-        if self.enabled {
-            format!("{}{}{}", style.open(), text, RESET)
-        } else {
-            text.to_owned()
+        match self.support {
+            ColorSupport::Styled => format!("{}{}{}", style.open(), text, RESET),
+            ColorSupport::Plain => text.to_owned(),
         }
     }
 
@@ -557,28 +598,30 @@ mod tests {
     #[test]
     fn an_enabled_painter_emits_ansi() {
         assert_eq!(
-            Painter::new(true).render(Style::Error, "error"),
+            Painter::new(ColorSupport::Styled).render(Style::Error, "error"),
             "\x1b[1;31merror\x1b[0m"
         );
     }
 
     #[test]
     fn a_disabled_painter_emits_plain_text() {
-        assert_eq!(Painter::new(false).render(Style::Error, "error"), "error");
+        assert_eq!(
+            Painter::new(ColorSupport::Plain).render(Style::Error, "error"),
+            "error"
+        );
     }
 
     #[test]
     fn auto_color_needs_a_terminal_and_no_opt_out() {
-        assert!(ColorChoice::Auto.resolve(true, false, false));
-        assert!(!ColorChoice::Auto.resolve(false, false, false));
-        assert!(!ColorChoice::Auto.resolve(true, true, false));
-        assert!(!ColorChoice::Auto.resolve(true, false, true));
+        assert!(ColorChoice::Auto.resolve(Terminal::Attached, ColorEnvironment::Automatic));
+        assert!(!ColorChoice::Auto.resolve(Terminal::Detached, ColorEnvironment::Automatic));
+        assert!(!ColorChoice::Auto.resolve(Terminal::Attached, ColorEnvironment::Suppressed));
     }
 
     #[test]
     fn forced_and_disabled_colors_ignore_the_environment() {
-        assert!(ColorChoice::Always.resolve(false, true, true));
-        assert!(!ColorChoice::Never.resolve(true, false, false));
+        assert!(ColorChoice::Always.resolve(Terminal::Detached, ColorEnvironment::Suppressed));
+        assert!(!ColorChoice::Never.resolve(Terminal::Attached, ColorEnvironment::Automatic));
     }
 
     #[test]

@@ -4,6 +4,12 @@
 
 *Major updates and feature releases.*
 
+### 0.41.3
+
+- Audited the Rust sources against `LANGUAGE.md` 1.0.0 and replaced behavior-selecting booleans with explicit enums: `ColorSupport`, `Terminal`, `ColorEnvironment`, `ItemSpacing`, `ItemPosition`, `CellKind`, `ParagraphPlacement`, `RunningParts`, `ShadingMode`, `EscapeMode` and `ExportAction`.
+- Replaced numeric `as` casts with `TryFrom`/`From`, justified the three `too_many_arguments` allowances, removed avoidable clones in the asset map, the PDF paragraph fill and the publisher template row and status area, and made the HTML endnote lookups total with `get`/`get_mut`.
+- No rendered output changes; the ODT examples are regenerated for the version in `meta:generator`.
+
 ### 0.41.2
 
 - The `pageformer-publisher` title is now light gray instead of pure white, which softens it against the dark window.

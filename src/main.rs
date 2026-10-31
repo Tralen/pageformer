@@ -64,8 +64,8 @@ fn main() -> ExitCode {
         .get_one::<String>("color")
         .and_then(|value| ColorChoice::parse(value))
         .unwrap_or(ColorChoice::Auto);
-    let stdout_painter = Painter::new(color.enabled(Stream::Stdout));
-    let stderr_painter = Painter::new(color.enabled(Stream::Stderr));
+    let stdout_painter = Painter::new(color.support(Stream::Stdout));
+    let stderr_painter = Painter::new(color.support(Stream::Stderr));
 
     let Some(inputs) = matches.get_many::<String>("input") else {
         eprintln!(
@@ -463,6 +463,7 @@ fn file_word(count: usize) -> &'static str {
 
 #[cfg(test)]
 mod tests {
+    use super::cli::ColorSupport;
     use super::*;
 
     #[test]
@@ -536,11 +537,11 @@ mod tests {
     #[test]
     fn the_summary_counts_files() {
         assert_eq!(
-            summary(Painter::new(false), 1, 0, Mode::Check),
+            summary(Painter::new(ColorSupport::Plain), 1, 0, Mode::Check),
             "1 file checked."
         );
         assert_eq!(
-            summary(Painter::new(false), 2, 1, Mode::Render),
+            summary(Painter::new(ColorSupport::Plain), 2, 1, Mode::Render),
             "2 files rendered, 1 failed."
         );
     }

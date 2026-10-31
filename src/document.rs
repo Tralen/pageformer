@@ -581,10 +581,26 @@ impl List {
         self.tight
     }
 
+    /// The spacing used for one list item by the paged renderers.
+    pub fn item_spacing(&self) -> ItemSpacing {
+        if self.tight {
+            ItemSpacing::Tight
+        } else {
+            ItemSpacing::Loose
+        }
+    }
+
     /// Whether every item carries a task state.
     pub fn is_task_list(&self) -> bool {
         !self.items.is_empty() && self.items.iter().all(|item| item.task().is_some())
     }
+}
+
+/// How a renderer spaces one list item.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ItemSpacing {
+    Tight,
+    Loose,
 }
 
 /// How a list starts.
@@ -674,6 +690,13 @@ impl Table {
     pub fn rows(&self) -> &[Vec<TableCell>] {
         &self.rows
     }
+}
+
+/// Whether a table cell belongs to the header row or the body.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CellKind {
+    Header,
+    Data,
 }
 
 /// One table cell.

@@ -34,12 +34,37 @@ const HYPERLINK: &str =
 /// The fixed timestamp of the document properties.
 const FIXED_DATE: &str = "2026-01-01T00:00:00Z";
 
+/// Which running parts the package declares.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub(crate) enum RunningParts {
+    #[default]
+    None,
+    Header,
+    Footer,
+    Both,
+}
+
+impl RunningParts {
+    pub(crate) fn new(header: Option<&str>, footer: Option<&str>) -> Self {
+        match (header.is_some(), footer.is_some()) {
+            (true, true) => Self::Both,
+            (true, false) => Self::Header,
+            (false, true) => Self::Footer,
+            (false, false) => Self::None,
+        }
+    }
+
+    fn has_header(self) -> bool {
+        matches!(self, Self::Header | Self::Both)
+    }
+
+    fn has_footer(self) -> bool {
+        matches!(self, Self::Footer | Self::Both)
+    }
+}
+
 /// Generates `[Content_Types].xml`.
-pub(crate) fn content_types(
-    media: &[Media],
-    header: bool,
-    footer: bool,
-) -> Result<String, DocxError> {
+pub(crate) fn content_types(media: &[Media], parts: RunningParts) -> Result<String, DocxError> {
     let mut extensions = BTreeSet::new();
     for entry in media {
         let name = entry.package_path.rsplit('/').next().unwrap_or_default();
@@ -69,13 +94,13 @@ pub(crate) fn content_types(
          <Override PartName=\"/word/footnotes.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.wordprocessingml.footnotes+xml\"/>\n\
          <Override PartName=\"/word/settings.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml\"/>\n",
     );
-    if header {
+    if parts.has_header() {
         xml::push(
             &mut output,
             "<Override PartName=\"/word/header1.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml\"/>\n",
         );
     }
-    if footer {
+    if parts.has_footer() {
         xml::push(
             &mut output,
             "<Override PartName=\"/word/footer1.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml\"/>\n",
@@ -113,8 +138,7 @@ pub(crate) fn root_relationships() -> String {
 pub(crate) fn document_relationships(
     media: &[Media],
     hyperlinks: &[String],
-    header: bool,
-    footer: bool,
+    parts: RunningParts,
 ) -> String {
     let mut output = String::new();
     xml::push_fmt(
@@ -127,13 +151,13 @@ pub(crate) fn document_relationships(
              <Relationship Id=\"rId4\" Type=\"{SETTINGS}\" Target=\"settings.xml\"/>\n"
         ),
     );
-    if header {
+    if parts.has_header() {
         xml::push_fmt(
             &mut output,
             format_args!("<Relationship Id=\"rId5\" Type=\"{HEADER}\" Target=\"header1.xml\"/>\n"),
         );
     }
-    if footer {
+    if parts.has_footer() {
         xml::push_fmt(
             &mut output,
             format_args!("<Relationship Id=\"rId6\" Type=\"{FOOTER}\" Target=\"footer1.xml\"/>\n"),
@@ -295,12 +319,27 @@ mod tests {
 
     #[test]
     fn the_content_types_declare_every_part() {
-        let types = content_types(&[], true, true).expect("the content types");
+        let types = content_types(&[], RunningParts::Both).expect("the content types");
 
         assert!(types.contains("/word/document.xml"));
         assert!(types.contains("/word/header1.xml"));
         assert!(types.contains("/word/footer1.xml"));
         assert!(types.contains("/docProps/core.xml"));
+    }
+
+    #[test]
+    fn the_running_parts_are_independent() {
+        let header =
+            content_types(&[], RunningParts::new(Some("header"), None)).expect("the content types");
+
+        assert!(header.contains("/word/header1.xml"));
+        assert!(!header.contains("/word/footer1.xml"));
+
+        let footer =
+            content_types(&[], RunningParts::new(None, Some("footer"))).expect("the content types");
+
+        assert!(!footer.contains("/word/header1.xml"));
+        assert!(footer.contains("/word/footer1.xml"));
     }
 
     #[test]
@@ -311,7 +350,7 @@ mod tests {
             relationship: "rId7".to_owned(),
         }];
 
-        let types = content_types(&media, false, false).expect("the content types");
+        let types = content_types(&media, RunningParts::None).expect("the content types");
 
         assert!(types.contains("<Default Extension=\"png\" ContentType=\"image/png\"/>"));
     }
@@ -323,8 +362,11 @@ mod tests {
             package_path: "word/media/image-0.png".to_owned(),
             relationship: "rId7".to_owned(),
         }];
-        let rels =
-            document_relationships(&media, &["https://example.org".to_owned()], false, false);
+        let rels = document_relationships(
+            &media,
+            &["https://example.org".to_owned()],
+            RunningParts::None,
+        );
 
         assert!(rels.contains("Id=\"rId10\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink\""));
         assert!(rels.contains("TargetMode=\"External\""));

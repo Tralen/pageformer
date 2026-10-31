@@ -9,8 +9,8 @@ use std::fmt::Write;
 
 use crate::assets::Assets;
 use crate::document::{
-    Block, CodeBlock, ColumnAlignment, Document, ImageBlock, Inline, Language, List, ListItem,
-    ListStart, QuoteKind, Table, TaskState,
+    Block, CodeBlock, ColumnAlignment, Document, ImageBlock, Inline, ItemSpacing, Language, List,
+    ListItem, ListStart, QuoteKind, Table, TaskState,
 };
 use crate::image::{self, ImageAlignment};
 use crate::template::{
@@ -21,6 +21,16 @@ use crate::template::{
 
 use super::assets::AssetMap;
 use super::{FIXED_DAY, FIXED_MONTH, FIXED_YEAR, PdfError};
+
+/// The position of an item in its list, which decides whether a tight fill
+/// extends into the gap above or below.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ItemPosition {
+    Only,
+    First,
+    Middle,
+    Last,
+}
 
 /// Builds the Typst source for a document and a template.
 pub fn typst_source(
@@ -557,7 +567,7 @@ impl<'a> SourceBuilder<'a> {
     /// Quotes and lists keep their own background.
     fn open_paragraph(&mut self) {
         if !self.nested && self.paragraph_fill.is_some() {
-            let spacing = self.paragraph_spacing.clone();
+            let spacing = &self.paragraph_spacing;
             if let Some(fill) = self.paragraph_fill {
                 let _ = write!(
                     self.output,
@@ -728,13 +738,13 @@ impl<'a> SourceBuilder<'a> {
         if list.items().is_empty() {
             return Ok(());
         }
-        let spacing = if list.is_tight() {
-            String::new()
-        } else {
-            self.list.spacing().map_or_else(String::new, |spacing| {
+        let spacing = match list.item_spacing() {
+            ItemSpacing::Tight => String::new(),
+            ItemSpacing::Loose => self.list.spacing().map_or_else(String::new, |spacing| {
                 format!(", spacing: {}", typst_length(spacing))
-            })
+            }),
         };
+        let tight = matches!(list.item_spacing(), ItemSpacing::Tight);
         match list.start() {
             ListStart::Unordered => {
                 let suppress_bullet = !self.list.task().bullet() && list.is_task_list();
@@ -743,17 +753,12 @@ impl<'a> SourceBuilder<'a> {
                 } else {
                     ""
                 };
-                let _ = writeln!(
-                    self.output,
-                    "#list(tight: {}{spacing}{marker},",
-                    list.is_tight()
-                );
+                let _ = writeln!(self.output, "#list(tight: {tight}{spacing}{marker},");
             }
             ListStart::Ordered(start) => {
                 let _ = writeln!(
                     self.output,
-                    "#enum(tight: {}, start: {start}{spacing},",
-                    list.is_tight()
+                    "#enum(tight: {tight}, start: {start}{spacing},"
                 );
             }
         }
@@ -765,7 +770,13 @@ impl<'a> SourceBuilder<'a> {
             self.output.push_str("  [");
             let first = index == 0 && !nested_list;
             let last = index.saturating_add(1) == count && !nested_list;
-            self.item(item, list.is_tight(), first, last)?;
+            let position = match (first, last) {
+                (true, true) => ItemPosition::Only,
+                (true, false) => ItemPosition::First,
+                (false, true) => ItemPosition::Last,
+                (false, false) => ItemPosition::Middle,
+            };
+            self.item(item, list.item_spacing(), position)?;
             self.output.push_str("],\n");
         }
         self.list_depth = self.list_depth.saturating_sub(1);
@@ -781,23 +792,31 @@ impl<'a> SourceBuilder<'a> {
     fn item(
         &mut self,
         item: &ListItem,
-        tight: bool,
-        first: bool,
-        last: bool,
+        spacing: ItemSpacing,
+        position: ItemPosition,
     ) -> Result<(), PdfError> {
         if let Some(fill) = self.list_fill
             && let Some(Block::Paragraph(inlines)) = item.blocks().first()
         {
-            let outset = if tight {
-                let top = if first { 0.0 } else { self.list_fill_outset };
-                let bottom = if last { 0.0 } else { self.list_fill_outset };
-                if top > 0.0 || bottom > 0.0 {
-                    format!(", outset: (top: {top:.3}pt, bottom: {bottom:.3}pt)")
-                } else {
-                    String::new()
+            let outset = match spacing {
+                ItemSpacing::Tight => {
+                    let top = if matches!(position, ItemPosition::First | ItemPosition::Only) {
+                        0.0
+                    } else {
+                        self.list_fill_outset
+                    };
+                    let bottom = if matches!(position, ItemPosition::Last | ItemPosition::Only) {
+                        0.0
+                    } else {
+                        self.list_fill_outset
+                    };
+                    if top > 0.0 || bottom > 0.0 {
+                        format!(", outset: (top: {top:.3}pt, bottom: {bottom:.3}pt)")
+                    } else {
+                        String::new()
+                    }
                 }
-            } else {
-                String::new()
+                ItemSpacing::Loose => String::new(),
             };
             let _ = write!(
                 self.output,

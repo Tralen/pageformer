@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Relatório Técnico</title>
+<meta name="author" content="Pageformer" />
+<meta name="description" content="Demonstração das funcionalidades do template" />
+<meta name="keywords" content="relatório, demonstração" />
+<meta name="date" content="2026-03-10" />
+<style>
+/*<![CDATA[*/
+/* Pageformer HTML stylesheet. */
+:root { color-scheme: light; }
+* { box-sizing: border-box; }
+html { background: #f2f2f2; }
+body { margin: 0; background: #f2f2f2; }
+main.pageformer {
+  width: 595.28pt;
+  max-width: 100%;
+  margin: 24pt auto;
+  padding: 70.87pt 70.87pt 70.87pt 70.87pt;
+  background: #ffffff;
+  font-family: "Liberation Serif", "DejaVu Serif";
+  font-size: 11.00pt;
+  font-weight: 400;
+  font-style: normal;
+  line-height: 1.2934;
+  text-align: justify;
+}
+p {
+  margin: 0 0 3.00pt 0;
+}
+p.numbered .number {
+  margin-inline-end: 0.35em;
+}
+main.pageformer > :last-child {
+  margin-bottom: 0;
+}
+em.emphasis {
+  font-family: "Liberation Serif", "DejaVu Serif";
+  font-size: 11.00pt;
+  font-weight: 400;
+  font-style: italic;
+}
+strong.strong {
+  font-family: "Liberation Serif", "DejaVu Serif";
+  font-size: 11.00pt;
+  font-weight: 700;
+  font-style: normal;
+}
+code.inline-code {
+  font-family: "Liberation Mono", "DejaVu Sans Mono";
+  font-size: 11.00pt;
+  font-weight: 400;
+  font-style: normal;
+  color: #7a2a5a;
+  background-color: #f2eef6;
+}
+s.strikethrough {
+  font-family: "Liberation Serif", "DejaVu Serif";
+  font-size: 11.00pt;
+  font-weight: 400;
+  font-style: normal;
+  color: #7a2a2a;
+  text-decoration: line-through;
+}
+a {
+  font-family: "Liberation Serif", "DejaVu Serif";
+  font-size: 11.00pt;
+  font-weight: 400;
+  font-style: normal;
+  color: #336699;
+  text-decoration: underline;
+}
+h1 {
+  font-family: "Liberation Sans", "DejaVu Sans";
+  font-size: 18.00pt;
+  font-weight: 700;
+  font-style: normal;
+  margin: 0.00pt 0 12.00pt 0;
+  line-height: normal;
+  background-color: #e8eef5;
+  padding: 4.32pt 0 4.32pt 0;
+  break-before: page;
+  page-break-before: always;
+}
+h2 {
+  font-family: "Liberation Sans", "DejaVu Sans";
+  font-size: 14.00pt;
+  font-weight: 700;
+  font-style: normal;
+  margin: 16.00pt 0 6.00pt 0;
+  line-height: normal;
+  border-bottom: 0.75pt solid #336699;
+  padding: 0.00pt 0 3.00pt 0;
+}
+h3 {
+  font-family: "Liberation Sans", "DejaVu Sans";
+  font-size: 12.00pt;
+  font-weight: 700;
+  font-style: normal;
+  margin: 12.00pt 0 4.00pt 0;
+  line-height: normal;
+  border-bottom: 0.75pt solid #336699;
+  padding: 0.00pt 0 3.00pt 0;
+}
+h4 {
+  font-family: "Liberation Sans", "DejaVu Sans";
+  font-size: 12.00pt;
+  font-weight: 700;
+  font-style: normal;
+  margin: 18.00pt 0 6.00pt 0;
+  line-height: normal;
+  border-bottom: 0.75pt solid #336699;
+  padding: 0.00pt 0 3.00pt 0;
+}
+h5 {
+  font-family: "Liberation Sans", "DejaVu Sans";
+  font-size: 12.00pt;
+  font-weight: 700;
+  font-style: normal;
+  margin: 18.00pt 0 6.00pt 0;
+  line-height: normal;
+  border-bottom: 0.75pt solid #336699;
+  padding: 0.00pt 0 3.00pt 0;
+}
+h6 {
+  font-family: "Liberation Sans", "DejaVu Sans";
+  font-size: 12.00pt;
+  font-weight: 700;
+  font-style: normal;
+  margin: 18.00pt 0 6.00pt 0;
+  line-height: normal;
+  border-bottom: 0.75pt solid #336699;
+  padding: 0.00pt 0 3.00pt 0;
+}
+hr.horizontal-rule {
+  border: 0;
+  border-top: 0.50pt solid #000000;
+  margin: 0.65em 0 0.65em 0;
+  height: 0;
+}
+blockquote.quote, aside.quote {
+  font-family: "Liberation Serif", "DejaVu Serif";
+  font-size: 11.00pt;
+  font-weight: 400;
+  font-style: normal;
+  color: #2a4d7a;
+  background-color: #f7fafd;
+  text-align: left;
+  border-style: solid;
+  border-color: #336699;
+  border-width: 0 0 0 3.00pt;
+  padding: 2.64pt 0.00pt 2.64pt 8.00pt;
+  margin: 0 0 3.00pt 0;
+}
+blockquote.quote > :first-child, aside.quote > :first-child { margin-top: 0; }
+blockquote.quote > :last-child, aside.quote > :last-child { margin-bottom: 0; }
+.alert-label {
+  margin: 0 0 0.35em 0;
+  font-weight: inherit;
+}
+pre.code-block {
+  font-family: "Liberation Mono", "DejaVu Sans Mono";
+  font-size: 11.00pt;
+  font-weight: 400;
+  font-style: normal;
+  background-color: #f4f4f4;
+  text-align: left;
+  border-style: solid;
+  border-color: #999999;
+  border-width: 0.50pt 0 0.50pt 0;
+  padding: 6.00pt 0.00pt 6.00pt 0.00pt;
+  margin: 0 0 3.00pt 0;
+}
+pre.code-block { white-space: pre-wrap; overflow-wrap: anywhere; }
+pre.code-block code { font: inherit; white-space: inherit; }
+ul, ol {
+  margin: 0 0 3.00pt 0;
+  padding-inline-start: 34.02pt;
+  list-style-position: outside;
+}
+li {
+  font-family: "Liberation Serif", "DejaVu Serif";
+  font-size: 11.00pt;
+  font-weight: 400;
+  font-style: normal;
+  color: #334455;
+  background-color: #f5f7fa;
+  text-align: left;
+}
+li > p {
+  margin: 0;
+}
+li > ul, li > ol {
+  margin-bottom: 0;
+}
+@counter-style pf-bullet-0 { system: cyclic; symbols: "•"; suffix: " "; }
+@counter-style pf-bullet-1 { system: cyclic; symbols: "–"; suffix: " "; }
+@counter-style pf-number-0 { system: extends decimal; suffix: ". "; }
+@counter-style pf-number-1 { system: extends lower-alpha; suffix: ". "; }
+ul.list-depth-0 { list-style-type: pf-bullet-0; }
+ol.list-depth-0 { list-style-type: pf-number-0; }
+ul.list-depth-1 { list-style-type: pf-bullet-1; }
+ol.list-depth-1 { list-style-type: pf-number-1; }
+ul.list-depth-2 { list-style-type: pf-bullet-0; }
+ol.list-depth-2 { list-style-type: pf-number-0; }
+ul.list-depth-3 { list-style-type: pf-bullet-1; }
+ol.list-depth-3 { list-style-type: pf-number-1; }
+ul.list-depth-4 { list-style-type: pf-bullet-0; }
+ol.list-depth-4 { list-style-type: pf-number-0; }
+ul.list-depth-5 { list-style-type: pf-bullet-1; }
+ol.list-depth-5 { list-style-type: pf-number-1; }
+ul.list-depth-6 { list-style-type: pf-bullet-0; }
+ol.list-depth-6 { list-style-type: pf-number-0; }
+ul.list-depth-7 { list-style-type: pf-bullet-1; }
+ol.list-depth-7 { list-style-type: pf-number-1; }
+ul.list-depth-8 { list-style-type: pf-bullet-0; }
+ol.list-depth-8 { list-style-type: pf-number-0; }
+ul.list-depth-9 { list-style-type: pf-bullet-1; }
+ol.list-depth-9 { list-style-type: pf-number-1; }
+ul.list-depth-10 { list-style-type: pf-bullet-0; }
+ol.list-depth-10 { list-style-type: pf-number-0; }
+ul.list-depth-11 { list-style-type: pf-bullet-1; }
+ol.list-depth-11 { list-style-type: pf-number-1; }
+ul.list-depth-12 { list-style-type: pf-bullet-0; }
+ol.list-depth-12 { list-style-type: pf-number-0; }
+ul.list-depth-13 { list-style-type: pf-bullet-1; }
+ol.list-depth-13 { list-style-type: pf-number-1; }
+ul.list-depth-14 { list-style-type: pf-bullet-0; }
+ol.list-depth-14 { list-style-type: pf-number-0; }
+ul.list-depth-15 { list-style-type: pf-bullet-1; }
+ol.list-depth-15 { list-style-type: pf-number-1; }
+ul.list-depth-16 { list-style-type: pf-bullet-0; }
+ol.list-depth-16 { list-style-type: pf-number-0; }
+ul.list-depth-17 { list-style-type: pf-bullet-1; }
+ol.list-depth-17 { list-style-type: pf-number-1; }
+ul.list-depth-18 { list-style-type: pf-bullet-0; }
+ol.list-depth-18 { list-style-type: pf-number-0; }
+ul.list-depth-19 { list-style-type: pf-bullet-1; }
+ol.list-depth-19 { list-style-type: pf-number-1; }
+ul.list-depth-20 { list-style-type: pf-bullet-0; }
+ol.list-depth-20 { list-style-type: pf-number-0; }
+ul.list-depth-21 { list-style-type: pf-bullet-1; }
+ol.list-depth-21 { list-style-type: pf-number-1; }
+ul.list-depth-22 { list-style-type: pf-bullet-0; }
+ol.list-depth-22 { list-style-type: pf-number-0; }
+ul.list-depth-23 { list-style-type: pf-bullet-1; }
+ol.list-depth-23 { list-style-type: pf-number-1; }
+ul.list-depth-24 { list-style-type: pf-bullet-0; }
+ol.list-depth-24 { list-style-type: pf-number-0; }
+ul.list-depth-25 { list-style-type: pf-bullet-1; }
+ol.list-depth-25 { list-style-type: pf-number-1; }
+ul.list-depth-26 { list-style-type: pf-bullet-0; }
+ol.list-depth-26 { list-style-type: pf-number-0; }
+ul.list-depth-27 { list-style-type: pf-bullet-1; }
+ol.list-depth-27 { list-style-type: pf-number-1; }
+ul.list-depth-28 { list-style-type: pf-bullet-0; }
+ol.list-depth-28 { list-style-type: pf-number-0; }
+ul.list-depth-29 { list-style-type: pf-bullet-1; }
+ol.list-depth-29 { list-style-type: pf-number-1; }
+ul.list-depth-30 { list-style-type: pf-bullet-0; }
+ol.list-depth-30 { list-style-type: pf-number-0; }
+ul.list-depth-31 { list-style-type: pf-bullet-1; }
+ol.list-depth-31 { list-style-type: pf-number-1; }
+ul.list-depth-32 { list-style-type: pf-bullet-0; }
+ol.list-depth-32 { list-style-type: pf-number-0; }
+ul.list-depth-33 { list-style-type: pf-bullet-1; }
+ol.list-depth-33 { list-style-type: pf-number-1; }
+ul.list-depth-34 { list-style-type: pf-bullet-0; }
+ol.list-depth-34 { list-style-type: pf-number-0; }
+ul.list-depth-35 { list-style-type: pf-bullet-1; }
+ol.list-depth-35 { list-style-type: pf-number-1; }
+ul.list-depth-36 { list-style-type: pf-bullet-0; }
+ol.list-depth-36 { list-style-type: pf-number-0; }
+ul.list-depth-37 { list-style-type: pf-bullet-1; }
+ol.list-depth-37 { list-style-type: pf-number-1; }
+ul.list-depth-38 { list-style-type: pf-bullet-0; }
+ol.list-depth-38 { list-style-type: pf-number-0; }
+ul.list-depth-39 { list-style-type: pf-bullet-1; }
+ol.list-depth-39 { list-style-type: pf-number-1; }
+ul.list-depth-40 { list-style-type: pf-bullet-0; }
+ol.list-depth-40 { list-style-type: pf-number-0; }
+ul.list-depth-41 { list-style-type: pf-bullet-1; }
+ol.list-depth-41 { list-style-type: pf-number-1; }
+ul.list-depth-42 { list-style-type: pf-bullet-0; }
+ol.list-depth-42 { list-style-type: pf-number-0; }
+ul.list-depth-43 { list-style-type: pf-bullet-1; }
+ol.list-depth-43 { list-style-type: pf-number-1; }
+ul.list-depth-44 { list-style-type: pf-bullet-0; }
+ol.list-depth-44 { list-style-type: pf-number-0; }
+ul.list-depth-45 { list-style-type: pf-bullet-1; }
+ol.list-depth-45 { list-style-type: pf-number-1; }
+ul.list-depth-46 { list-style-type: pf-bullet-0; }
+ol.list-depth-46 { list-style-type: pf-number-0; }
+ul.list-depth-47 { list-style-type: pf-bullet-1; }
+ol.list-depth-47 { list-style-type: pf-number-1; }
+ul.list-depth-48 { list-style-type: pf-bullet-0; }
+ol.list-depth-48 { list-style-type: pf-number-0; }
+ul.list-depth-49 { list-style-type: pf-bullet-1; }
+ol.list-depth-49 { list-style-type: pf-number-1; }
+ul.list-depth-50 { list-style-type: pf-bullet-0; }
+ol.list-depth-50 { list-style-type: pf-number-0; }
+ul.list-depth-51 { list-style-type: pf-bullet-1; }
+ol.list-depth-51 { list-style-type: pf-number-1; }
+ul.list-depth-52 { list-style-type: pf-bullet-0; }
+ol.list-depth-52 { list-style-type: pf-number-0; }
+ul.list-depth-53 { list-style-type: pf-bullet-1; }
+ol.list-depth-53 { list-style-type: pf-number-1; }
+ul.list-depth-54 { list-style-type: pf-bullet-0; }
+ol.list-depth-54 { list-style-type: pf-number-0; }
+ul.list-depth-55 { list-style-type: pf-bullet-1; }
+ol.list-depth-55 { list-style-type: pf-number-1; }
+ul.list-depth-56 { list-style-type: pf-bullet-0; }
+ol.list-depth-56 { list-style-type: pf-number-0; }
+ul.list-depth-57 { list-style-type: pf-bullet-1; }
+ol.list-depth-57 { list-style-type: pf-number-1; }
+ul.list-depth-58 { list-style-type: pf-bullet-0; }
+ol.list-depth-58 { list-style-type: pf-number-0; }
+ul.list-depth-59 { list-style-type: pf-bullet-1; }
+ol.list-depth-59 { list-style-type: pf-number-1; }
+ul.list-depth-60 { list-style-type: pf-bullet-0; }
+ol.list-depth-60 { list-style-type: pf-number-0; }
+ul.list-depth-61 { list-style-type: pf-bullet-1; }
+ol.list-depth-61 { list-style-type: pf-number-1; }
+ul.list-depth-62 { list-style-type: pf-bullet-0; }
+ol.list-depth-62 { list-style-type: pf-number-0; }
+ul.list-depth-63 { list-style-type: pf-bullet-1; }
+ol.list-depth-63 { list-style-type: pf-number-1; }
+ul.list-depth-64 { list-style-type: pf-bullet-0; }
+ol.list-depth-64 { list-style-type: pf-number-0; }
+ul.list-depth-65 { list-style-type: pf-bullet-1; }
+ol.list-depth-65 { list-style-type: pf-number-1; }
+ul.list-depth-66 { list-style-type: pf-bullet-0; }
+ol.list-depth-66 { list-style-type: pf-number-0; }
+ul.list-depth-67 { list-style-type: pf-bullet-1; }
+ol.list-depth-67 { list-style-type: pf-number-1; }
+ul.list-depth-68 { list-style-type: pf-bullet-0; }
+ol.list-depth-68 { list-style-type: pf-number-0; }
+ul.list-depth-69 { list-style-type: pf-bullet-1; }
+ol.list-depth-69 { list-style-type: pf-number-1; }
+ul.list-depth-70 { list-style-type: pf-bullet-0; }
+ol.list-depth-70 { list-style-type: pf-number-0; }
+ul.list-depth-71 { list-style-type: pf-bullet-1; }
+ol.list-depth-71 { list-style-type: pf-number-1; }
+ul.list-depth-72 { list-style-type: pf-bullet-0; }
+ol.list-depth-72 { list-style-type: pf-number-0; }
+ul.list-depth-73 { list-style-type: pf-bullet-1; }
+ol.list-depth-73 { list-style-type: pf-number-1; }
+ul.list-depth-74 { list-style-type: pf-bullet-0; }
+ol.list-depth-74 { list-style-type: pf-number-0; }
+ul.list-depth-75 { list-style-type: pf-bullet-1; }
+ol.list-depth-75 { list-style-type: pf-number-1; }
+ul.list-depth-76 { list-style-type: pf-bullet-0; }
+ol.list-depth-76 { list-style-type: pf-number-0; }
+ul.list-depth-77 { list-style-type: pf-bullet-1; }
+ol.list-depth-77 { list-style-type: pf-number-1; }
+ul.list-depth-78 { list-style-type: pf-bullet-0; }
+ol.list-depth-78 { list-style-type: pf-number-0; }
+ul.list-depth-79 { list-style-type: pf-bullet-1; }
+ol.list-depth-79 { list-style-type: pf-number-1; }
+ul.list-depth-80 { list-style-type: pf-bullet-0; }
+ol.list-depth-80 { list-style-type: pf-number-0; }
+ul.list-depth-81 { list-style-type: pf-bullet-1; }
+ol.list-depth-81 { list-style-type: pf-number-1; }
+ul.list-depth-82 { list-style-type: pf-bullet-0; }
+ol.list-depth-82 { list-style-type: pf-number-0; }
+ul.list-depth-83 { list-style-type: pf-bullet-1; }
+ol.list-depth-83 { list-style-type: pf-number-1; }
+ul.list-depth-84 { list-style-type: pf-bullet-0; }
+ol.list-depth-84 { list-style-type: pf-number-0; }
+ul.list-depth-85 { list-style-type: pf-bullet-1; }
+ol.list-depth-85 { list-style-type: pf-number-1; }
+ul.list-depth-86 { list-style-type: pf-bullet-0; }
+ol.list-depth-86 { list-style-type: pf-number-0; }
+ul.list-depth-87 { list-style-type: pf-bullet-1; }
+ol.list-depth-87 { list-style-type: pf-number-1; }
+ul.list-depth-88 { list-style-type: pf-bullet-0; }
+ol.list-depth-88 { list-style-type: pf-number-0; }
+ul.list-depth-89 { list-style-type: pf-bullet-1; }
+ol.list-depth-89 { list-style-type: pf-number-1; }
+ul.list-depth-90 { list-style-type: pf-bullet-0; }
+ol.list-depth-90 { list-style-type: pf-number-0; }
+ul.list-depth-91 { list-style-type: pf-bullet-1; }
+ol.list-depth-91 { list-style-type: pf-number-1; }
+ul.list-depth-92 { list-style-type: pf-bullet-0; }
+ol.list-depth-92 { list-style-type: pf-number-0; }
+ul.list-depth-93 { list-style-type: pf-bullet-1; }
+ol.list-depth-93 { list-style-type: pf-number-1; }
+ul.list-depth-94 { list-style-type: pf-bullet-0; }
+ol.list-depth-94 { list-style-type: pf-number-0; }
+ul.list-depth-95 { list-style-type: pf-bullet-1; }
+ol.list-depth-95 { list-style-type: pf-number-1; }
+ul.list-depth-96 { list-style-type: pf-bullet-0; }
+ol.list-depth-96 { list-style-type: pf-number-0; }
+ul.list-depth-97 { list-style-type: pf-bullet-1; }
+ol.list-depth-97 { list-style-type: pf-number-1; }
+ul.list-depth-98 { list-style-type: pf-bullet-0; }
+ol.list-depth-98 { list-style-type: pf-number-0; }
+ul.list-depth-99 { list-style-type: pf-bullet-1; }
+ol.list-depth-99 { list-style-type: pf-number-1; }
+ul.list-depth-100 { list-style-type: pf-bullet-0; }
+ol.list-depth-100 { list-style-type: pf-number-0; }
+ul.list-depth-101 { list-style-type: pf-bullet-1; }
+ol.list-depth-101 { list-style-type: pf-number-1; }
+ul.list-depth-102 { list-style-type: pf-bullet-0; }
+ol.list-depth-102 { list-style-type: pf-number-0; }
+ul.list-depth-103 { list-style-type: pf-bullet-1; }
+ol.list-depth-103 { list-style-type: pf-number-1; }
+ul.list-depth-104 { list-style-type: pf-bullet-0; }
+ol.list-depth-104 { list-style-type: pf-number-0; }
+ul.list-depth-105 { list-style-type: pf-bullet-1; }
+ol.list-depth-105 { list-style-type: pf-number-1; }
+ul.list-depth-106 { list-style-type: pf-bullet-0; }
+ol.list-depth-106 { list-style-type: pf-number-0; }
+ul.list-depth-107 { list-style-type: pf-bullet-1; }
+ol.list-depth-107 { list-style-type: pf-number-1; }
+ul.list-depth-108 { list-style-type: pf-bullet-0; }
+ol.list-depth-108 { list-style-type: pf-number-0; }
+ul.list-depth-109 { list-style-type: pf-bullet-1; }
+ol.list-depth-109 { list-style-type: pf-number-1; }
+ul.list-depth-110 { list-style-type: pf-bullet-0; }
+ol.list-depth-110 { list-style-type: pf-number-0; }
+ul.list-depth-111 { list-style-type: pf-bullet-1; }
+ol.list-depth-111 { list-style-type: pf-number-1; }
+ul.list-depth-112 { list-style-type: pf-bullet-0; }
+ol.list-depth-112 { list-style-type: pf-number-0; }
+ul.list-depth-113 { list-style-type: pf-bullet-1; }
+ol.list-depth-113 { list-style-type: pf-number-1; }
+ul.list-depth-114 { list-style-type: pf-bullet-0; }
+ol.list-depth-114 { list-style-type: pf-number-0; }
+ul.list-depth-115 { list-style-type: pf-bullet-1; }
+ol.list-depth-115 { list-style-type: pf-number-1; }
+ul.list-depth-116 { list-style-type: pf-bullet-0; }
+ol.list-depth-116 { list-style-type: pf-number-0; }
+ul.list-depth-117 { list-style-type: pf-bullet-1; }
+ol.list-depth-117 { list-style-type: pf-number-1; }
+ul.list-depth-118 { list-style-type: pf-bullet-0; }
+ol.list-depth-118 { list-style-type: pf-number-0; }
+ul.list-depth-119 { list-style-type: pf-bullet-1; }
+ol.list-depth-119 { list-style-type: pf-number-1; }
+ul.list-depth-120 { list-style-type: pf-bullet-0; }
+ol.list-depth-120 { list-style-type: pf-number-0; }
+ul.list-depth-121 { list-style-type: pf-bullet-1; }
+ol.list-depth-121 { list-style-type: pf-number-1; }
+ul.list-depth-122 { list-style-type: pf-bullet-0; }
+ol.list-depth-122 { list-style-type: pf-number-0; }
+ul.list-depth-123 { list-style-type: pf-bullet-1; }
+ol.list-depth-123 { list-style-type: pf-number-1; }
+ul.list-depth-124 { list-style-type: pf-bullet-0; }
+ol.list-depth-124 { list-style-type: pf-number-0; }
+ul.list-depth-125 { list-style-type: pf-bullet-1; }
+ol.list-depth-125 { list-style-type: pf-number-1; }
+ul.list-depth-126 { list-style-type: pf-bullet-0; }
+ol.list-depth-126 { list-style-type: pf-number-0; }
+ul.list-depth-127 { list-style-type: pf-bullet-1; }
+ol.list-depth-127 { list-style-type: pf-number-1; }
+ul.list-depth-128 { list-style-type: pf-bullet-0; }
+ol.list-depth-128 { list-style-type: pf-number-0; }
+.task-done {
+  font-weight: 700;
+  color: #2f7d32;
+}
+.task-todo {
+  color: #666666;
+}
+ul.task-list, ol.task-list {
+  list-style: none;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0 0 3.00pt 0;
+}
+th, td {
+  border: 0.50pt solid #336699;
+  padding: 6.00pt;
+  text-align: left;
+  vertical-align: top;
+}
+th {
+  font-weight: inherit;
+  text-align: inherit;
+}
+thead th {
+  background-color: #e8eef5;
+}
+tr {
+  break-inside: avoid;
+}
+.align-left {
+  text-align: left;
+}
+.align-center {
+  text-align: center;
+}
+.align-right {
+  text-align: right;
+}
+section.footnotes {
+  margin-top: 3.00pt;
+  border-top: 0.50pt solid #000000;
+  padding-top: 6pt;
+}
+section.footnotes ol {
+  margin: 0;
+  padding-inline-start: 19.84pt;
+}
+section.footnotes li {
+  margin-bottom: 3.00pt;
+}
+section.footnotes li > p {
+  margin: 0 0 3.00pt 0;
+}
+section.footnotes li > p:last-child {
+  margin-bottom: 0;
+}
+a[role="doc-backlink"] {
+  text-decoration: none;
+}
+.page-break {
+  height: 0;
+  margin: 0;
+  border: 0;
+}
+@media screen and (max-width: 720pt) { main.pageformer { width: 100%; padding: 24pt; } }
+@media print {
+  html, body { background: #ffffff; }
+  main.pageformer { width: auto; max-width: none; margin: 0; padding: 0; background: transparent; }
+  .page-break { break-after: page; page-break-after: always; }
+  @page {
+    size: 595.28pt 841.89pt;
+    margin: 70.87pt 70.87pt 70.87pt 70.87pt;
+    @top-left {
+      content: "Pageformer";
+      font-family: "Liberation Serif", "DejaVu Serif";
+      font-size: 11.00pt;
+      font-weight: 400;
+      font-style: normal;
+    }
+    @top-center {
+      content: "Relatório Técnico";
+      font-family: "Liberation Serif", "DejaVu Serif";
+      font-size: 11.00pt;
+      font-weight: 400;
+      font-style: normal;
+    }
+    @top-right {
+      content: "Página " counter(page) " de " counter(pages);
+      font-family: "Liberation Serif", "DejaVu Serif";
+      font-size: 11.00pt;
+      font-weight: 400;
+      font-style: normal;
+    }
+    @bottom-left {
+      content: "Documento de demonstração";
+      font-family: "Liberation Serif", "DejaVu Serif";
+      font-size: 11.00pt;
+      font-weight: 400;
+      font-style: normal;
+    }
+    @bottom-right {
+      content: "Pageformer";
+      font-family: "Liberation Serif", "DejaVu Serif";
+      font-size: 11.00pt;
+      font-weight: 400;
+      font-style: normal;
+    }
+  }
+}
+/*]]>*/
+</style>
+</head>
+<body>
+<main class="pageformer">
+<h1>Relatório Técnico</h1>
+<p class="body-paragraph">Este relatório demonstra, em um documento curto, o cabeçalho e o rodapé correntes, a quebra de página explícita, o estilo de tabela, as formatações em linha e os blocos de citação e de código.</p>
+<h2>Escopo</h2>
+<p class="body-paragraph">O exemplo usa um template próprio nesta pasta, que substitui o template compartilhado da pasta pai. Sem timbre, as duas margens ficam livres para o conteúdo corrente, e o nível 1 abre cada seção em uma página nova.</p>
+<h3>Formatações em linha</h3>
+<p class="body-paragraph">O texto aceita <em class="emphasis">ênfase</em>, <strong class="strong">negrito</strong>, <s class="strikethrough">riscado</s> e <code class="inline-code">código em linha</code>, além de <a href="https://example.com">links</a> e notas de rodapé.<sup><a href="#fn-1" id="fnref-1" role="doc-noteref">1</a></sup></p>
+<h2>Listas</h2>
+<ul class="list-depth-0">
+<li><p>Item simples;</p></li>
+<li><p>Item com <strong class="strong">negrito</strong> e <code class="inline-code">código</code>;</p>
+<ul class="list-depth-1">
+<li><p>Subitem com marcador de segundo nível;</p>
+<ul class="list-depth-2">
+<li><p>Sub-subitem com marcador de terceiro nível;</p></li>
+</ul></li>
+</ul></li>
+<li><p>Item com <a href="https://example.com">site de exemplo</a>.</p></li>
+</ul>
+<ol class="list-depth-0">
+<li><p>Primeiro passo;</p>
+<ol class="list-depth-1">
+<li><p>Passo interno com numeração alfabética;</p></li>
+<li><p>Outro passo interno;</p></li>
+</ol></li>
+<li><p>Segundo passo;</p></li>
+<li><p>Terceiro passo.</p></li>
+</ol>
+<ul class="list-depth-0 task-list">
+<li><p><span class="task-done">[x]</span> Tarefa concluída;</p></li>
+<li><p><span class="task-todo">[ ]</span> Tarefa pendente.</p></li>
+</ul>
+<p class="body-paragraph">A tabela abaixo usa a borda, o preenchimento do cabeçalho e a cor definidos no template.</p>
+<table>
+<thead>
+<tr>
+<th scope="col">Etapa</th>
+<th scope="col">Prazo</th>
+<th scope="col">Responsável</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Levantamento</td>
+<td>5 dias</td>
+<td>Análise</td>
+</tr>
+<tr>
+<td>Execução</td>
+<td>10 dias</td>
+<td>Produção</td>
+</tr>
+<tr>
+<td>Revisão</td>
+<td>3 dias</td>
+<td>Qualidade</td>
+</tr>
+</tbody>
+</table>
+<p class="body-paragraph">O cabeçalho mostra o autor à esquerda, o título ao centro e a numeração à direita. O rodapé repete o aviso à esquerda e o nome do programa à direita em todas as páginas.</p>
+<h2>Citação e alerta</h2>
+<blockquote class="quote">
+<p>Uma citação em bloco, com <code class="inline-code">código</code> e <em class="emphasis">ênfase</em>, para mostrar a barra vertical e o fundo declarados no template.</p>
+</blockquote>
+<p class="body-paragraph">Um alerta usa a mesma sintaxe de citação, com um tipo entre colchetes:</p>
+<aside class="quote alert alert-note" role="note">
+<p class="alert-label">[!NOTE]</p>
+<p>Um alerta é uma citação com tipo, e mantém o rótulo entre colchetes.</p>
+</aside>
+<h2>Código</h2>
+<p class="body-paragraph">O bloco abaixo usa a face monoespaçada, o fundo e os filetes declarados no template.</p>
+<pre class="code-block"><code class="language-rust">fn main() {
+    println!("olá");
+}
+</code></pre>
+<p class="body-paragraph">Uma régua fecha esta seção.</p>
+<hr class="horizontal-rule" />
+<h2>Resultados</h2>
+<p class="body-paragraph">A paginação e a numeração são calculadas pelo motor de composição a partir do documento inteiro, de modo que o total de páginas no cabeçalho corresponde ao número final.</p>
+<p class="body-paragraph">O mesmo modelo gera os quatro formatos. O PDF usa o motor Typst como biblioteca, o ODT e o DOCX são montados por escritores internos e o TXT é uma vista do modelo para copiar como texto simples. Como o template é um só, a face, as cores, os espaçamentos e os blocos acompanham todos eles.</p>
+<p class="body-paragraph">A tabela abaixo resume o que cada formato preserva do template.</p>
+<table>
+<thead>
+<tr>
+<th scope="col">Formato</th>
+<th scope="col">Layout</th>
+<th scope="col">Cores</th>
+<th scope="col">Blocos</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>PDF</td>
+<td>paginação própria</td>
+<td>sim</td>
+<td>sim</td>
+</tr>
+<tr>
+<td>ODT</td>
+<td>paginação do Writer</td>
+<td>sim</td>
+<td>sim</td>
+</tr>
+<tr>
+<td>DOCX</td>
+<td>paginação do Word</td>
+<td>sim</td>
+<td>sim</td>
+</tr>
+<tr>
+<td>TXT</td>
+<td>sem layout</td>
+<td>não</td>
+<td>texto</td>
+</tr>
+</tbody>
+</table>
+<p class="body-paragraph">O bloco seguinte força uma quebra de página explícita antes do anexo. Sem o marcador, o anexo continuaria na mesma página.</p>
+<div class="page-break" aria-hidden="true"></div>
+<h1>Anexo</h1>
+<p class="body-paragraph">O anexo começa em uma página nova por causa do parágrafo que contém apenas o marcador de quebra de página, escrito como <code class="inline-code">-pagebreak-</code> ou pelo atalho <code class="inline-code">-!-</code>. Qualquer outra ocorrência, como -!- nesta frase, permanece texto comum.</p>
+<h1>Apêndice</h1>
+<p class="body-paragraph">Este apêndice começa em uma página nova por causa de <code class="inline-code">page_break_before</code> no nível 1 do template, sem nenhum marcador no texto. A quebra é fraca, então não cria uma página vazia quando o título já está no topo.</p>
+<section class="footnotes" role="doc-endnotes">
+<ol>
+<li id="fn-1" role="doc-endnote">
+<p>A nota de rodapé é recolhida ao final do documento.</p>
+<p class="footnote-backrefs"><a href="#fnref-1" role="doc-backlink">↩</a></p>
+</li>
+</ol>
+</section>
+</main>
+</body>
+</html>

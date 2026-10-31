@@ -809,6 +809,64 @@ impl Destination {
     pub fn as_str(&self) -> &str {
         &self.0
     }
+
+    /// Classifies the destination without resolving it.
+    ///
+    /// A destination without a scheme, or with a colon only after a path or
+    /// fragment separator, is relative. A destination with a scheme is compared
+    /// case-insensitively, and a destination with a control character is never
+    /// allowed.
+    pub fn scheme(&self) -> LinkScheme {
+        let text = self.0.trim();
+        if text.chars().any(char::is_control) {
+            return LinkScheme::Other;
+        }
+        let Some(colon) = text.find(':') else {
+            return LinkScheme::Relative;
+        };
+        let authority = &text[..colon];
+        if authority.contains(['/', '?', '#']) {
+            return LinkScheme::Relative;
+        }
+        let mut characters = authority.chars();
+        let Some(first) = characters.next() else {
+            return LinkScheme::Other;
+        };
+        if !first.is_ascii_alphabetic()
+            || !characters.all(|character| {
+                character.is_ascii_alphanumeric() || matches!(character, '+' | '-' | '.')
+            })
+        {
+            return LinkScheme::Other;
+        }
+        match authority.to_ascii_lowercase().as_str() {
+            "http" => LinkScheme::Http,
+            "https" => LinkScheme::Https,
+            "mailto" => LinkScheme::Mailto,
+            _ => LinkScheme::Other,
+        }
+    }
+}
+
+/// The scheme of a destination, as far as a reflowable backend needs it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum LinkScheme {
+    Relative,
+    Http,
+    Https,
+    Mailto,
+    Other,
+}
+
+impl LinkScheme {
+    /// Whether an external link may be emitted without a security check.
+    pub fn is_allowed(self) -> bool {
+        matches!(
+            self,
+            Self::Relative | Self::Http | Self::Https | Self::Mailto
+        )
+    }
 }
 
 #[cfg(test)]
@@ -993,5 +1051,33 @@ mod tests {
         );
         assert_eq!(document.block_count(), 4);
         assert_eq!(document.heading_count(), 2);
+    }
+
+    #[test]
+    fn a_destination_scheme_is_classified_conservatively() {
+        let scheme = |text| Destination::new(text).scheme();
+
+        assert_eq!(scheme("https://example.org"), LinkScheme::Https);
+        assert_eq!(scheme("HTTP://example.org"), LinkScheme::Http);
+        assert_eq!(scheme("mailto:someone@example.org"), LinkScheme::Mailto);
+        assert_eq!(scheme("docs/contrato.md"), LinkScheme::Relative);
+        assert_eq!(scheme("/docs/contrato.md"), LinkScheme::Relative);
+        assert_eq!(scheme("#nota"), LinkScheme::Relative);
+        assert_eq!(scheme("docs/a:b.md"), LinkScheme::Relative);
+        assert_eq!(scheme("javascript:alert(1)"), LinkScheme::Other);
+        assert_eq!(scheme("JaVaScRiPt:alert(1)"), LinkScheme::Other);
+        assert_eq!(scheme("data:text/html,hello"), LinkScheme::Other);
+        assert_eq!(scheme("file:///etc/passwd"), LinkScheme::Other);
+        assert_eq!(scheme("java\nscript:alert(1)"), LinkScheme::Other);
+        assert_eq!(scheme("://missing"), LinkScheme::Other);
+    }
+
+    #[test]
+    fn only_web_schemes_and_relative_destinations_are_allowed() {
+        assert!(LinkScheme::Relative.is_allowed());
+        assert!(LinkScheme::Http.is_allowed());
+        assert!(LinkScheme::Https.is_allowed());
+        assert!(LinkScheme::Mailto.is_allowed());
+        assert!(!LinkScheme::Other.is_allowed());
     }
 }

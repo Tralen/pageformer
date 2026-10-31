@@ -14,6 +14,7 @@ pub mod confidential;
 pub mod document;
 pub mod docx;
 pub mod format;
+pub mod html;
 pub mod markdown;
 pub mod odt;
 pub mod pdf;

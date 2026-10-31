@@ -272,7 +272,7 @@ fn command() -> Command {
             Arg::new("format")
                 .long("format")
                 .value_name("FORMAT")
-                .help("Output format: pdf, txt, odt or docx")
+                .help("Output format: pdf, txt, odt, docx or html")
                 .value_parser(clap::builder::ValueParser::new(Format::from_str))
                 .default_value("pdf"),
         )

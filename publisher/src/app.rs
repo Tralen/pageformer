@@ -77,8 +77,8 @@ struct ExportButton {
     copy: bool,
 }
 
-/// The export buttons, in display order. HTML and EPUB are placeholders until
-/// their backends exist, so they carry no `Format` and render disabled.
+/// The export buttons, in display order. EPUB is a placeholder until its
+/// backend exists, so it carries no `Format` and renders disabled.
 const EXPORT_BUTTONS: [ExportButton; 6] = [
     ExportButton {
         label: "PDF",
@@ -105,7 +105,7 @@ const EXPORT_BUTTONS: [ExportButton; 6] = [
         label: "HTML",
         fill: egui::Color32::from_rgb(0xef, 0x6c, 0x00),
         text: egui::Color32::WHITE,
-        format: None,
+        format: Some(Format::Html),
         copy: false,
     },
     ExportButton {
@@ -1037,7 +1037,7 @@ mod tests {
         let labels: Vec<&str> = EXPORT_BUTTONS.iter().map(|button| button.label).collect();
 
         assert_eq!(labels, ["PDF", "ODT", "DOCX", "HTML", "EPUB", "TXT"]);
-        assert_eq!(EXPORT_BUTTONS[3].format, None);
+        assert_eq!(EXPORT_BUTTONS[3].format, Some(Format::Html));
         assert_eq!(EXPORT_BUTTONS[4].format, None);
         assert!(EXPORT_BUTTONS[5].copy);
     }

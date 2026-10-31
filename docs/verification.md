@@ -95,7 +95,7 @@ A passing PDF/A run prints `PASS <path> 2b`. The tests also assert the PDF heade
 
 `pageformer-publisher` is the minimal converter window in the `publisher/` workspace member. It calls `pipeline::render` and `pipeline::export` on a worker thread and never parses, resolves or writes itself. The pure state machine, input acceptance, output paths and the source-root rule are covered by its unit tests.
 
-The window itself is the only manual part of the suite: run `cargo run -p pageformer-publisher`, drop a Markdown file or click the drop box to choose one, choose a format, export and open the output. The format column lists PDF, ODT, DOCX, HTML, EPUB and TXT in that order, colored red, green, blue, orange, yellow and gray; HTML and EPUB are disabled placeholders, and TXT is split into an export half and a `Copy` half for the clipboard. Advanced holds a template override, the output directory and the confidential file, all as aligned path rows with a Choose button; the output starts as the Markdown folder, and an empty template field keeps automatic resolution. The selected file appears in a quiet baby blue. The window embeds Liberation Sans Regular as its first proportional font, so every label, button and tooltip shares one regular-weight face on every platform; it is licensed under the SIL Open Font License 1.1, and `publisher/assets/fonts/OFL.txt` carries the notice. Hovering a label or a field shows a compact light-gray tooltip with dark-gray text, a thin border and its own shadow at 14 points. The window height follows the content, including the status footer, the open Advanced body and the full button column, and the minimum inner width of 520 points is enforced programmatically, so the format and Choose buttons cannot be clipped by a narrower resize. The template path truncates and keeps Edit and Folder visible. On Linux the chooser is `zenity`, so it works on i3 without a desktop portal; on Windows and macOS it is the native `rfd` dialog. Drag and drop works from caja; zzzFM on i3 does not deliver XDND, also to Engrampa, so use the picker there. A windowed smoke test still needs a desktop session.
+The window itself is the only manual part of the suite: run `cargo run -p pageformer-publisher`, drop a Markdown file or click the drop box to choose one, choose a format, export and open the output. The format column lists PDF, ODT, DOCX, HTML, EPUB and TXT in that order, colored red, green, blue, orange, yellow and gray; EPUB is a disabled placeholder, HTML exports, and TXT is split into an export half and a `Copy` half for the clipboard. Advanced holds a template override, the output directory and the confidential file, all as aligned path rows with a Choose button; the output starts as the Markdown folder, and an empty template field keeps automatic resolution. The selected file appears in a quiet baby blue. The window embeds Liberation Sans Regular as its first proportional font, so every label, button and tooltip shares one regular-weight face on every platform; it is licensed under the SIL Open Font License 1.1, and `publisher/assets/fonts/OFL.txt` carries the notice. Hovering a label or a field shows a compact light-gray tooltip with dark-gray text, a thin border and its own shadow at 14 points. The window height follows the content, including the status footer, the open Advanced body and the full button column, and the minimum inner width of 520 points is enforced programmatically, so the format and Choose buttons cannot be clipped by a narrower resize. The template path truncates and keeps Edit and Folder visible. On Linux the chooser is `zenity`, so it works on i3 without a desktop portal; on Windows and macOS it is the native `rfd` dialog. Drag and drop works from caja; zzzFM on i3 does not deliver XDND, also to Engrampa, so use the picker there. The user accepted the window, so a windowed smoke test is no longer a prerequisite for the backend work.
 
 ## ODT packages
 
@@ -120,6 +120,23 @@ soffice --headless --convert-to pdf --outdir /tmp/office-check assets/examples/p
 ```
 
 The DOCX target is a faithful package, not a page-count match: Word and LibreOffice lay out lines with their own engines.
+
+## HTML documents
+
+`tests/html.rs` renders the three fixtures with their resolved templates and assets, checks that two renders are byte-identical, parses the output with `roxmltree`, and asserts the semantic elements, the head metadata, the endnotes, the data-URI letterhead and the absence of a script or an unsafe link. The fixtures' text is also compared after whitespace normalization. The HTML examples in `assets/examples/publicacao/` and `assets/examples/tecnico/` are generated with the command below:
+
+```sh
+cargo run -- --format html --confidential-file assets/examples/confidencial/embargos.ini --output assets/examples/publicacao assets/examples/escritorio/
+cargo run -- --format html --output assets/examples/tecnico assets/examples/tecnico/Relatorio.md
+```
+
+The second command writes under the output directory so the fixture is not regenerated beside its source. The generated file opens offline: it contains embedded CSS and data-URI images and performs no network request. The `@page` letterhead and running content are honored by print engines that implement those CSS Paged Media features; browsers that do not implement them omit those decorations.
+
+The output is XHTML-compatible, so `xmllint` provides an independent well-formedness check:
+
+```sh
+xmllint --noout assets/examples/publicacao/Contrato.html assets/examples/publicacao/Embargos.html assets/examples/tecnico/Relatorio.html
+```
 
 ## Plain-text goldens
 

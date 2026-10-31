@@ -48,6 +48,7 @@ The inline model covers every construct of that subset: text, code spans, emphas
 - `src/txt.rs` is the plain-text backend. It needs no assets and cannot fail.
 - `src/odt/` is the ODT backend: `content.rs`, `styles.rs` and `meta.rs` generate the XML parts, and `src/zip.rs` builds the deterministic stored ZIP package.
 - `src/docx/` is the DOCX backend: `content.rs`, `styles.rs`, `numbering.rs` and `package.rs` generate the OOXML parts, reusing the same ZIP and metrics.
+- `src/html/` is the HTML backend: `content.rs` maps the model, `css.rs` derives the stylesheet, `escape.rs` escapes text and attributes and `data_uri.rs` embeds the images.
 - `src/xml.rs`, `src/metrics.rs` and `src/image.rs` hold the XML escaping, the Typst spacing model and the intrinsic image sizes shared by the office backends.
 - `src/main.rs` is the CLI. It parses each input, resolves the template and either renders the chosen format or reports the pipeline result.
 
@@ -101,7 +102,7 @@ Metadata comes from the frontmatter only. The template carries no document metad
 
 ## Renderer boundary
 
-Every format implements `Renderer`: the pipeline resolves the document, the template and the assets the backend needs, then calls `render`, which returns bytes plus warnings. The trait is deliberately small so the minimal GUI and the separate editor, Pageweaver, can call the same function as the command line, and `render` never reads a file, the environment or the clock. Asset loading is a separate, explicitly named step because the policy differs per format: PDF reads images and the letterhead, while plain text reads no assets at all. Pageweaver exports through this library and never reimplements the pipeline; see [`pageweaver.md`](pageweaver.md). The effectful edge is `src/pipeline.rs`: `DocumentJob` and `Source`, `resolve_template`, `check`, `render` and `export`; the CLI, `pageformer-publisher` and Pageweaver call them. The window itself is `publisher/`, a separate workspace member.
+Every format implements `Renderer`: the pipeline resolves the document, the template and the assets the backend needs, then calls `render`, which returns bytes plus warnings. The trait is deliberately small so the minimal GUI and the separate editor, Pageweaver, can call the same function as the command line, and `render` never reads a file, the environment or the clock. Asset loading is a separate, explicitly named step because the policy differs per format: PDF, ODT, DOCX and HTML read images and the letterhead, while plain text reads no assets at all. Pageweaver exports through this library and never reimplements the pipeline; see [`pageweaver.md`](pageweaver.md). The effectful edge is `src/pipeline.rs`: `DocumentJob` and `Source`, `resolve_template`, `check`, `render` and `export`; the CLI, `pageformer-publisher` and Pageweaver call them. The window itself is `publisher/`, a separate workspace member.
 
 ## Plain text
 
@@ -113,7 +114,7 @@ Plain text is a view of the model, used by the copy-as-plain-text action. The ou
 - ODT is the paged format for office review and is implemented with the internal writer below.
 - DOCX is the review and exchange format and is implemented with the internal OOXML writer below.
 - Plain text is implemented and carries the copy-as-plain-text view.
-- HTML and EPUB reuse the same document model. HTML is the basis for EPUB, which splits chapters at first-level headings and uses deterministic metadata.
+- HTML is implemented as one self-contained semantic file with embedded CSS and data-URI images. It is the basis for EPUB, which splits chapters at first-level headings and uses deterministic metadata.
 
 ## ODT writer
 
@@ -130,6 +131,20 @@ DOCX uses an internal OOXML writer that reuses the deterministic ZIP and the sha
 Every list gets its own numbering instance, and an ordered list that does not start at one carries a start override, so legal numbering restarts where the source says. The abstract numbering levels carry the template bullets, numbering format, suffix, indent, gap and marker run properties, and the item paragraph uses `ListParagraph` for the face, color, fill, alignment and spacing. A task-only unordered list with the bullet hidden uses a third abstract numbering with `w:numFmt` `none`, no level text and no hanging indent; the `TaskDone` and `TaskTodo` character styles carry the declared marker overrides. Table header rows repeat through `w:tblHeader`, the template supplies the borders, the header fill and the cell padding, and the Markdown alignment sets the cell alignment. Heading backgrounds become paragraph shading, a heading rule becomes the bottom border of its style with the gap as the border spacing, text colors become `w:color` on the default style, on the heading styles and on the emphasis, strong and link runs, and the thematic break becomes a bottom paragraph border with the template thickness, color and spacing. Links carry the generated `Hyperlink` character style, including the template color, fill and optional underline. The running header and footer use tab stops for the three slots, `PAGE` and `NUMPAGES` fields for the page tokens, and the letterhead as a floating image anchored to the page behind the text. Footnotes are inline note references with collected bodies. Metadata carries the title, author, subject, keywords and language, and never a body value.
 
 Word hyphenates only when the reader enables it: automatic hyphenation is left out of the package, because enabling it in the settings made LibreOffice ask for a dictionary even when the system package was installed. The document language is still written in the styles, so the editor uses the right spelling and can turn hyphenation on. Line breaks can therefore differ slightly from the PDF.
+
+## HTML writer
+
+HTML is one file with no network request: the stylesheet sits in a `<style>` element and every image, including the letterhead, becomes a data URI. The markup is HTML5 serialized so an XML parser can read it, which keeps the structural tests on the existing `roxmltree` dependency and lets the EPUB backend reuse the same block and inline conversion. Text and attributes are escaped once at the boundary; template strings that reach CSS, such as font names, bullets, suffixes and running content, pass through a CSS string escaper that also prevents a value from closing the style element or the CDATA section.
+
+The body follows the model: headings, body paragraphs, numbered paragraphs, lists with their start value and depth, task markers, tables with a `thead`, quotes and alerts, fenced code with a language class, thematic breaks and page breaks. Footnotes are collected in a `section` with `role="doc-endnotes"`, numbered in first-reference order and linked with backlinks; an unreferenced definition is not emitted, matching the paged formats. A footnote reference without a definition stays literal text and produces a warning.
+
+The stylesheet derives the page size, orientation and margins, the paragraph face, leading, spacing and alignment, the inline styles, every heading level, the horizontal rule, quote and code blocks, lists and task markers, the table grid and the footnote separator from the template. On screen the document sits in a page-like container with the template width and padding; it does not fake pagination. In print, `@page` carries the size and margins, explicit page breaks become `break-after: page` and `page_break_before` becomes `break-before: page`; the browser decides the pagination.
+
+The letterhead is print-only, as a page background, because the fixture is a full A4 image that would be a distorted banner on screen. The running header and footer are print-only `@page` margin boxes: `{page}` and `{pages}` become `counter(page)` and `counter(pages)`, while `{title}` and `{author}` come from the frontmatter. Browsers that do not implement page backgrounds or margin boxes simply omit them; the HTML remains valid and offline. The screen view has no running content, so it never displays a page number the document cannot know.
+
+Links allow relative destinations and the `http`, `https` and `mailto` schemes. Any other scheme, including `javascript:`, `data:`, `file:` and `vbscript:`, is rendered as plain text with a warning and never reaches `href`. Images are local assets loaded by the pipeline and embedded as data URIs; a missing asset falls back to the alternative text and a warning. The output has no script and no external resource.
+
+The output is deterministic: attributes and CSS rules have a fixed order, notes follow reference order and assets follow a `BTreeMap`. It carries no generator or version, so a patch release does not change the HTML examples. `html::stylesheet` exposes the generated screen and structural print CSS for the Pageweaver preview, which consumes the same class names instead of reparsing the template.
 
 ## PDF engine
 

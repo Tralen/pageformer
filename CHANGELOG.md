@@ -4,6 +4,16 @@
 
 *Major updates and feature releases.*
 
+### 0.35.0
+
+- Added the self-contained HTML backend and `--format html`: one semantic HTML5 file with embedded CSS, data-URI images and no network request.
+- The HTML follows the document model with headings, paragraphs, lists and tasks, tables with a `thead`, block quotes and alerts, code blocks with language classes, images with `alt`, and endnotes with `role="doc-endnotes"` and backlinks.
+- The stylesheet derives page size, margins, fonts, leading, paragraph spacing, alignment, headings, rules, quote and code blocks, lists, tables and footnotes from the template. Print rules include page breaks, the letterhead as a page background, and the running header and footer as `@page` margin boxes with `counter(page)` and `counter(pages)`.
+- Links allow relative destinations, `http`, `https` and `mailto`; an unsafe scheme becomes plain text with a warning and never reaches `href`.
+- `html::stylesheet` exposes the generated CSS to the Pageweaver preview, and `Destination::scheme` centralizes the destination classification for later backends.
+- The `pageformer-publisher` HTML button now exports instead of rendering as a placeholder. EPUB remains a placeholder.
+- Regenerates the HTML examples and the ODT examples for the version in `meta:generator`.
+
 ### 0.34.1
 
 - Added group comments to `assets/default.pageformer.yaml` explaining `page`, `formatting`, `paragraph`, `quote`, `code_block`, `list`, `heading`, `horizontal_rule` and `table`.

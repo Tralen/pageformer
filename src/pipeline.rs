@@ -16,6 +16,7 @@ use crate::confidential::{self, ConfidentialStore, ResolveError};
 use crate::document::Document;
 use crate::docx::{DocxError, DocxRenderer};
 use crate::format::Format;
+use crate::html::{HtmlError, HtmlRenderer};
 use crate::markdown::{self, MarkdownError};
 use crate::odt::{OdtError, OdtRenderer};
 use crate::pdf::{self, PdfError, PdfRenderer};
@@ -185,6 +186,7 @@ pub enum ExportError {
     Pdf(PdfError),
     Odt(OdtError),
     Docx(DocxError),
+    Html(HtmlError),
     ConfidentialOutput { root: PathBuf },
     OutputPath { path: PathBuf },
     CreateDirectory { path: PathBuf, source: io::Error },
@@ -206,6 +208,7 @@ impl fmt::Display for ExportError {
             Self::Pdf(error) => write!(formatter, "cannot render the PDF: {error}"),
             Self::Odt(error) => write!(formatter, "cannot render the ODT: {error}"),
             Self::Docx(error) => write!(formatter, "cannot render the DOCX: {error}"),
+            Self::Html(error) => write!(formatter, "cannot render the HTML: {error}"),
             Self::ConfidentialOutput { root } => write!(
                 formatter,
                 "a document with confidential fields must be written outside its source tree, which is {}",
@@ -244,6 +247,7 @@ impl std::error::Error for ExportError {
             Self::Pdf(error) => Some(error),
             Self::Odt(error) => Some(error),
             Self::Docx(error) => Some(error),
+            Self::Html(error) => Some(error),
             Self::ConfidentialOutput { .. } | Self::OutputPath { .. } => None,
         }
     }
@@ -282,6 +286,12 @@ impl From<OdtError> for ExportError {
 impl From<DocxError> for ExportError {
     fn from(error: DocxError) -> Self {
         Self::Docx(error)
+    }
+}
+
+impl From<HtmlError> for ExportError {
+    fn from(error: HtmlError) -> Self {
+        Self::Html(error)
     }
 }
 
@@ -373,6 +383,13 @@ fn render_document(
         )?
         .render(document, template)?,
         Format::Docx => DocxRenderer::load(
+            document,
+            template,
+            source_directory,
+            resolved.base_directory(),
+        )?
+        .render(document, template)?,
+        Format::Html => HtmlRenderer::load(
             document,
             template,
             source_directory,

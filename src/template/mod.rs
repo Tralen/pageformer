@@ -1515,6 +1515,17 @@ impl NumberingFormat {
         }
     }
 
+    /// The predefined CSS counter style this format extends.
+    pub fn css_name(self) -> &'static str {
+        match self {
+            Self::Decimal => "decimal",
+            Self::LowerAlpha => "lower-alpha",
+            Self::UpperAlpha => "upper-alpha",
+            Self::LowerRoman => "lower-roman",
+            Self::UpperRoman => "upper-roman",
+        }
+    }
+
     /// The Typst numbering symbol.
     pub fn typst_symbol(self) -> char {
         match self {

@@ -12,6 +12,13 @@ pub(crate) const CAP_HEIGHT_RATIO: f64 = 0.657;
 pub(crate) const HEADING_TOP_TRIM: f64 = 6.0;
 /// How much of the heading space below the line box the editor already adds.
 pub(crate) const HEADING_BOTTOM_TRIM: f64 = 10.0;
+/// The vertical padding of a fill, as a fraction of the text size.
+pub(crate) const FILL_PADDING_RATIO: f64 = 0.24;
+
+/// The vertical padding a fill adds around its text box.
+pub(crate) fn fill_padding(size: Length) -> f64 {
+    size.points() * FILL_PADDING_RATIO
+}
 
 /// The line advance Typst produces: the leading plus the cap height.
 pub(crate) fn line_advance(size: Length, leading: Length) -> f64 {
@@ -82,6 +89,11 @@ mod tests {
     #[test]
     fn the_line_advance_adds_the_leading_to_the_cap_height() {
         assert!((line_advance(length(12.0), length(8.0)) - 15.884).abs() < 0.001);
+    }
+
+    #[test]
+    fn the_fill_padding_follows_the_text_size() {
+        assert!((fill_padding(length(20.0)) - 4.8).abs() < 0.001);
     }
 
     #[test]

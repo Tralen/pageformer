@@ -11,11 +11,12 @@ pub enum Format {
     Txt,
     Odt,
     Docx,
+    Html,
 }
 
 impl Format {
     /// Every format the library can render today.
-    pub const ALL: [Self; 4] = [Self::Pdf, Self::Txt, Self::Odt, Self::Docx];
+    pub const ALL: [Self; 5] = [Self::Pdf, Self::Txt, Self::Odt, Self::Docx, Self::Html];
 
     /// The name used on the command line and in the format menu.
     pub fn name(self) -> &'static str {
@@ -24,6 +25,7 @@ impl Format {
             Self::Txt => "txt",
             Self::Odt => "odt",
             Self::Docx => "docx",
+            Self::Html => "html",
         }
     }
 
@@ -34,6 +36,7 @@ impl Format {
             Self::Txt => "txt",
             Self::Odt => "odt",
             Self::Docx => "docx",
+            Self::Html => "html",
         }
     }
 }
@@ -53,6 +56,7 @@ impl FromStr for Format {
             "txt" => Ok(Self::Txt),
             "odt" => Ok(Self::Odt),
             "docx" => Ok(Self::Docx),
+            "html" => Ok(Self::Html),
             other => Err(FormatError::Unknown(other.to_owned())),
         }
     }
@@ -70,7 +74,7 @@ impl fmt::Display for FormatError {
             Self::Unknown(name) => {
                 write!(
                     formatter,
-                    "unknown format `{name}`; use pdf, txt, odt or docx"
+                    "unknown format `{name}`; use pdf, txt, odt, docx or html"
                 )
             }
         }
@@ -89,9 +93,11 @@ mod tests {
         assert_eq!(Format::Txt.extension(), "txt");
         assert_eq!(Format::Odt.extension(), "odt");
         assert_eq!(Format::Docx.extension(), "docx");
+        assert_eq!(Format::Html.extension(), "html");
         assert_eq!("txt".parse::<Format>(), Ok(Format::Txt));
         assert_eq!("odt".parse::<Format>(), Ok(Format::Odt));
         assert_eq!("docx".parse::<Format>(), Ok(Format::Docx));
+        assert_eq!("html".parse::<Format>(), Ok(Format::Html));
     }
 
     #[test]
@@ -99,7 +105,7 @@ mod tests {
         let error = "epub".parse::<Format>().expect_err("an unknown format");
 
         assert!(
-            error.to_string().contains("pdf, txt, odt or docx"),
+            error.to_string().contains("pdf, txt, odt, docx or html"),
             "{error}"
         );
     }

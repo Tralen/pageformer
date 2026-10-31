@@ -305,20 +305,22 @@ fn every_inline_construct_renders() {
 fn unicode_task_markers_are_embedded() {
     let document =
         markdown::parse("- [x] Feito\n- [ ] Pendente\n").expect("the document must parse");
+    // Libertinus Serif is embedded and covers these glyphs on every platform,
+    // so the test does not depend on a system font being installed.
     let template = Template::from_yaml(
         r##"
 version: "0.7"
 formatting:
   paragraph:
     font_families:
-      - DejaVu Sans
+      - Libertinus Serif
   list:
     task:
       bullet: false
       done:
-        marker: "☑"
+        marker: "✔"
       todo:
-        marker: "☐"
+        marker: "✘"
 "##,
     )
     .expect("the template must be valid");

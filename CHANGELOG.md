@@ -4,6 +4,11 @@
 
 *Major updates and feature releases.*
 
+### 0.41.7
+
+- Changed the Unicode task-marker PDF test to use the embedded Libertinus Serif and glyphs it covers (`✔` and `✘`), so the test no longer depends on DejaVu Sans being installed on the runner.
+- Regenerates the ODT examples for the version in `meta:generator`.
+
 ### 0.41.6
 
 - Made the confidential folder tests canonicalize their expected paths, so they pass on macOS, where `/var` resolves to `/private/var`.

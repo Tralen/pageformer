@@ -560,8 +560,8 @@ fn with_tooltip(response: egui::Response, text: &str) -> egui::Response {
 /// every theme and does not inherit the window fill.
 fn tooltip_frame() -> egui::Frame {
     egui::Frame::new()
-        .fill(egui::Color32::from_gray(245))
-        .stroke(egui::Stroke::new(1.0, egui::Color32::from_gray(140)))
+        .fill(egui::Color32::from_gray(224))
+        .stroke(egui::Stroke::new(1.0, egui::Color32::from_gray(150)))
         .corner_radius(4)
         .inner_margin(egui::Margin::symmetric(10, 8))
         .shadow(egui::Shadow {
@@ -575,7 +575,7 @@ fn tooltip_frame() -> egui::Frame {
 fn show_tooltip(ui: &mut egui::Ui, text: &str) {
     ui.label(
         egui::RichText::new(text)
-            .color(egui::Color32::BLACK)
+            .color(egui::Color32::from_gray(48))
             .size(14.0),
     );
 }

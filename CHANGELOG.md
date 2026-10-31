@@ -4,6 +4,11 @@
 
 *Major updates and feature releases.*
 
+### 0.32.4
+
+- Softened the `pageformer-publisher` tooltip: the text is now dark gray (48) and the frame a less light gray (224), with a lighter border, so the hint no longer jumps against the dark window.
+- Regenerates the ODT examples for the version in `meta:generator`.
+
 ### 0.32.3
 
 - `pageformer-publisher` now embeds Liberation Sans Regular and registers it as the first proportional font, so every label, button, drop-box line and tooltip uses one regular-weight face on every platform. The system font probe is gone; the font is licensed under the SIL Open Font License 1.1, with the notice in `publisher/assets/fonts/OFL.txt`.

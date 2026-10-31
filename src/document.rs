@@ -6,8 +6,10 @@
 use std::fmt;
 use std::num::NonZeroU8;
 
+use crate::image::{ImageAlignment, ImageSize};
+
 /// A parsed Markdown document and its frontmatter metadata.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Document {
     metadata: Metadata,
     blocks: Vec<Block>,
@@ -421,11 +423,12 @@ impl fmt::Display for MetadataError {
 impl std::error::Error for MetadataError {}
 
 /// A semantic block of the document.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub enum Block {
     Heading(Heading),
     Paragraph(Vec<Inline>),
+    Image(ImageBlock),
     NumberedParagraph(NumberedParagraph),
     List(List),
     Table(Table),
@@ -434,6 +437,54 @@ pub enum Block {
     ThematicBreak,
     PageBreak,
     FootnoteDefinition(FootnoteDefinition),
+}
+
+/// A standalone image with its own block geometry.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ImageBlock {
+    destination: Destination,
+    title: Option<String>,
+    alternative: Vec<Inline>,
+    size: ImageSize,
+    alignment: Option<ImageAlignment>,
+}
+
+impl ImageBlock {
+    pub fn new(
+        destination: Destination,
+        title: Option<String>,
+        alternative: Vec<Inline>,
+        size: ImageSize,
+        alignment: Option<ImageAlignment>,
+    ) -> Self {
+        Self {
+            destination,
+            title,
+            alternative,
+            size,
+            alignment,
+        }
+    }
+
+    pub fn destination(&self) -> &Destination {
+        &self.destination
+    }
+
+    pub fn title(&self) -> Option<&str> {
+        self.title.as_deref()
+    }
+
+    pub fn alternative(&self) -> &[Inline] {
+        &self.alternative
+    }
+
+    pub fn size(&self) -> ImageSize {
+        self.size
+    }
+
+    pub fn alignment(&self) -> Option<ImageAlignment> {
+        self.alignment
+    }
 }
 
 /// A numbered paragraph, such as the manual numbering in legal documents.
@@ -501,7 +552,7 @@ impl HeadingLevel {
 }
 
 /// A list, ordered or unordered.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct List {
     start: ListStart,
     items: Vec<ListItem>,
@@ -544,7 +595,7 @@ pub enum ListStart {
 }
 
 /// One list item and its optional task state.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ListItem {
     task: Option<TaskState>,
     blocks: Vec<Block>,
@@ -690,7 +741,7 @@ pub enum ColumnAlignment {
 }
 
 /// A block quote, optionally tagged as a GFM alert.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Quote {
     kind: QuoteKind,
     blocks: Vec<Block>,
@@ -778,7 +829,7 @@ impl CodeLanguage {
 }
 
 /// A footnote definition and the blocks that belong to it.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct FootnoteDefinition {
     id: FootnoteId,
     blocks: Vec<Block>,

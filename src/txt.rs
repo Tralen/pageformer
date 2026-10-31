@@ -70,6 +70,7 @@ fn block_text(block: &Block, footnotes: &mut Vec<String>) -> String {
     match block {
         Block::Heading(heading) => inline(heading.content()),
         Block::Paragraph(content) => inline(content),
+        Block::Image(image) => format!("[{}]", inline(image.alternative())),
         Block::NumberedParagraph(paragraph) => numbered(paragraph),
         Block::List(value) => list(value, footnotes),
         Block::Table(value) => table(value),

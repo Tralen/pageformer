@@ -5,10 +5,12 @@ use std::collections::BTreeMap;
 use crate::assets::{Assets, media_type};
 use crate::document::{
     Alert, Block, CodeBlock, ColumnAlignment, Destination, Document, FootnoteDefinition,
-    FootnoteId, Inline, List, ListItem, ListStart, Quote, QuoteKind, Table, TableCell, TaskState,
+    FootnoteId, ImageBlock, Inline, List, ListItem, ListStart, Quote, QuoteKind, Table, TableCell,
+    TaskState,
 };
 use crate::html::data_uri::data_uri;
 use crate::html::escape;
+use crate::image::{self, ImageAlignment, ImageDimension, ImageSize};
 use crate::template::Template;
 
 /// The rendered body, its endnotes and the warnings it produced.
@@ -55,6 +57,7 @@ struct Builder<'a> {
     note_index: BTreeMap<String, usize>,
     active: Vec<String>,
     warnings: Vec<String>,
+    text_width: f64,
 }
 
 /// Renders the document body and its collected endnotes.
@@ -70,6 +73,11 @@ pub(crate) fn render_with(
     assets: &Assets,
     image_source: ImageSource<'_>,
 ) -> Content {
+    let page = template.page();
+    let dimensions = page.dimensions();
+    let margins = page.margins();
+    let text_width =
+        (dimensions.width().points() - margins.left().points() - margins.right().points()).max(1.0);
     let mut builder = Builder {
         template,
         assets,
@@ -79,6 +87,7 @@ pub(crate) fn render_with(
         note_index: BTreeMap::new(),
         active: Vec::new(),
         warnings: Vec::new(),
+        text_width,
     };
     builder.collect_definitions(document.blocks());
     let body = builder.blocks_to_string(document.blocks(), 0, true);
@@ -108,6 +117,7 @@ impl Builder<'_> {
                 Block::Quote(quote) => self.collect_definitions(quote.blocks()),
                 Block::Heading(_)
                 | Block::Paragraph(_)
+                | Block::Image(_)
                 | Block::NumberedParagraph(_)
                 | Block::Table(_)
                 | Block::CodeBlock(_)
@@ -135,6 +145,7 @@ impl Builder<'_> {
                 format!("<h{level}>{}</h{level}>", self.inlines(heading.content()))
             }
             Block::Paragraph(inlines) => self.paragraph(inlines, body, None),
+            Block::Image(image) => self.image_block(image),
             Block::NumberedParagraph(paragraph) => {
                 self.paragraph(paragraph.content(), body, Some(paragraph.number()))
             }
@@ -429,6 +440,95 @@ impl Builder<'_> {
             .unwrap_or_default();
         format!(
             "<img src=\"{}\" alt=\"{}\"{title} />",
+            escape::attribute(&source),
+            escape::attribute(&alternative)
+        )
+    }
+
+    fn image_block(&mut self, image: &ImageBlock) -> String {
+        let alternative = plain_text(image.alternative());
+        let Some(asset) = self.assets.map().image(image.destination().as_str()) else {
+            self.warn(format!(
+                "image `{}` has no resolved asset; its alternative text was used",
+                image.destination().as_str()
+            ));
+            return format!(
+                "<p class=\"image-block\">[{}]</p>",
+                escape::text(&alternative)
+            );
+        };
+        let Some(bytes) = self.assets.files().get(asset) else {
+            self.warn(format!(
+                "image `{}` has bytes that were not loaded; its alternative text was used",
+                image.destination().as_str()
+            ));
+            return format!(
+                "<p class=\"image-block\">[{}]</p>",
+                escape::text(&alternative)
+            );
+        };
+        let Some(media) = media_type(asset) else {
+            self.warn(format!(
+                "image `{}` has an unsupported media type; its alternative text was used",
+                image.destination().as_str()
+            ));
+            return format!(
+                "<p class=\"image-block\">[{}]</p>",
+                escape::text(&alternative)
+            );
+        };
+        let source = match self.image_source {
+            ImageSource::DataUri => data_uri(media, bytes),
+            ImageSource::Relative(prefix) => {
+                format!(
+                    "{prefix}{}",
+                    asset.rsplit_once('/').map_or(asset, |(_, name)| name)
+                )
+            }
+        };
+        let image_style = self.template.formatting().image();
+        let padding = if image_style.background().is_some() || !image_style.border().is_empty() {
+            image_style.border().padding().points()
+        } else {
+            0.0
+        };
+        let layout = image::layout(
+            image::intrinsic(bytes),
+            self.text_width,
+            image.size(),
+            image_style.max_width(),
+            padding,
+        );
+        if layout.is_capped() {
+            self.warn(format!(
+                "image `{}` was reduced to the text width",
+                image.destination().as_str()
+            ));
+        }
+        let alignment = image
+            .alignment()
+            .unwrap_or_else(|| self.template.formatting().image().alignment());
+        let class = match alignment {
+            ImageAlignment::Left => "align-left",
+            ImageAlignment::Center => "align-center",
+            ImageAlignment::Right => "align-right",
+        };
+        let width = match image.size() {
+            ImageSize::Auto => String::new(),
+            ImageSize::Width(ImageDimension::Percent(percent))
+            | ImageSize::Height(ImageDimension::Percent(percent)) => {
+                format!(" style=\"width: {percent:.2}%;\"")
+            }
+            ImageSize::Width(_) | ImageSize::Height(_) => {
+                format!(" style=\"width: {:.2}pt;\"", layout.width())
+            }
+        };
+        let title = image
+            .title()
+            .map(|title| format!(" title=\"{}\"", escape::attribute(title)))
+            .unwrap_or_default();
+        format!(
+            "<figure class=\"image-block {class}\"><span class=\"image-frame\"><img src=\"{}\" alt=\"{}\"{title}{width} /></span></figure>",
             escape::attribute(&source),
             escape::attribute(&alternative)
         )

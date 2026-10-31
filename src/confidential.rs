@@ -177,7 +177,7 @@ pub(crate) fn normalize_absolute(path: &Path) -> Option<PathBuf> {
 
 /// A document with its confidential fields resolved and the names that were
 /// found, in a deterministic order.
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq)]
 pub struct Resolution {
     document: Document,
     names: Vec<ConfidentialName>,
@@ -284,6 +284,13 @@ fn resolve_block(
         Block::Paragraph(inlines) => Ok(Block::Paragraph(resolve_inlines(
             inlines, store, names, location,
         )?)),
+        Block::Image(image) => Ok(Block::Image(crate::document::ImageBlock::new(
+            image.destination().clone(),
+            image.title().map(str::to_owned),
+            resolve_inlines(image.alternative(), store, names, location)?,
+            image.size(),
+            image.alignment(),
+        ))),
         Block::NumberedParagraph(paragraph) => {
             let content = resolve_inlines(paragraph.content(), store, names, location)?;
             Ok(Block::NumberedParagraph(NumberedParagraph::new(

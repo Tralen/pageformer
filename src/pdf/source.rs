@@ -7,14 +7,16 @@
 use std::collections::BTreeMap;
 use std::fmt::Write;
 
+use crate::assets::Assets;
 use crate::document::{
-    Block, CodeBlock, ColumnAlignment, Document, Inline, Language, List, ListItem, ListStart,
-    QuoteKind, Table, TaskState,
+    Block, CodeBlock, ColumnAlignment, Document, ImageBlock, Inline, Language, List, ListItem,
+    ListStart, QuoteKind, Table, TaskState,
 };
+use crate::image::{self, ImageAlignment};
 use crate::template::{
-    BlockStyle, Color, HeadingStyle, InlineStyle, Length, LinkStyle, ListStyle, ParagraphAlignment,
-    PartialTextStyle, RuleStyle, RunningText, TableStyle, TaskMarkerStyle, Template, TextFace,
-    is_lowercase_token,
+    BlockStyle, Color, HeadingStyle, ImageStyle, InlineStyle, Length, LinkStyle, ListStyle,
+    ParagraphAlignment, PartialTextStyle, RuleStyle, RunningText, TableStyle, TaskMarkerStyle,
+    Template, TextFace, is_lowercase_token,
 };
 
 use super::assets::AssetMap;
@@ -26,18 +28,43 @@ pub fn typst_source(
     template: &Template,
     assets: &AssetMap,
 ) -> Result<String, PdfError> {
-    let mut builder = SourceBuilder::new(document, template, assets);
+    let empty = BTreeMap::new();
+    source(document, template, assets, &empty).map(|(source, _warnings)| source)
+}
+
+/// Builds the Typst source with the loaded image bytes, so block images can
+/// resolve their intrinsic ratio.
+pub(crate) fn typst_source_with_assets(
+    document: &Document,
+    template: &Template,
+    assets: &Assets,
+) -> Result<(String, Vec<String>), PdfError> {
+    source(document, template, assets.map(), assets.files())
+}
+
+fn source(
+    document: &Document,
+    template: &Template,
+    assets: &AssetMap,
+    files: &BTreeMap<String, Vec<u8>>,
+) -> Result<(String, Vec<String>), PdfError> {
+    let mut builder = SourceBuilder::new(document, template, assets, files);
     builder.preamble(document, template);
     builder.heading_style(template);
     builder.blocks(document.blocks())?;
-    Ok(builder.output)
+    Ok((builder.output, builder.warnings))
 }
 
 struct SourceBuilder<'a> {
     output: String,
     assets: &'a AssetMap,
+    files: &'a BTreeMap<String, Vec<u8>>,
+    warnings: Vec<String>,
+    text_width: f64,
+    paragraph_after: f64,
     table: &'a TableStyle,
     rule: &'a RuleStyle,
+    image: &'a ImageStyle,
     list: &'a ListStyle,
     list_fill: Option<Color>,
     list_fill_padding: f64,
@@ -51,7 +78,12 @@ struct SourceBuilder<'a> {
 }
 
 impl<'a> SourceBuilder<'a> {
-    fn new(document: &Document, template: &'a Template, assets: &'a AssetMap) -> Self {
+    fn new(
+        document: &Document,
+        template: &'a Template,
+        assets: &'a AssetMap,
+        files: &'a BTreeMap<String, Vec<u8>>,
+    ) -> Self {
         let mut footnotes = BTreeMap::new();
         collect_footnotes(document.blocks(), &mut footnotes);
         let list = template.formatting().list();
@@ -63,11 +95,24 @@ impl<'a> SourceBuilder<'a> {
             .points()
             * FILL_PADDING;
         let list_fill_outset = template.formatting().paragraph().leading().points();
+        let dimensions = template.page().dimensions();
+        let margins = template.page().margins();
+        let text_width =
+            (dimensions.width().points() - margins.left().points() - margins.right().points())
+                .max(1.0);
+        let paragraph = template.formatting().paragraph();
+        let paragraph_after =
+            crate::metrics::paragraph_after(paragraph.spacing(), paragraph.leading());
         Self {
             output: String::new(),
             assets,
+            files,
+            warnings: Vec::new(),
+            text_width,
+            paragraph_after,
             table: template.table(),
             rule: template.formatting().horizontal_rule(),
+            image: template.formatting().image(),
             list,
             list_fill,
             list_fill_padding,
@@ -551,6 +596,7 @@ impl<'a> SourceBuilder<'a> {
                 self.inlines(inlines)?;
                 self.close_paragraph();
             }
+            Block::Image(image) => self.image_block(image)?,
             Block::NumberedParagraph(paragraph) => {
                 self.open_paragraph();
                 self.output
@@ -862,6 +908,104 @@ impl<'a> SourceBuilder<'a> {
         }
     }
 
+    fn image_block(&mut self, image: &ImageBlock) -> Result<(), PdfError> {
+        let asset = self
+            .assets
+            .image(image.destination().as_str())
+            .ok_or_else(|| PdfError::MissingAsset {
+                destination: image.destination().as_str().to_owned(),
+            })?;
+        let intrinsic = self
+            .files
+            .get(asset)
+            .map_or((300.0, 150.0), |bytes| image::intrinsic(bytes));
+        let has_fill = self.image.background().is_some();
+        let has_border = !self.image.border().is_empty();
+        let padding = if has_fill || has_border {
+            self.image.border().padding().points()
+        } else {
+            0.0
+        };
+
+        let layout = image::layout(
+            intrinsic,
+            self.text_width,
+            image.size(),
+            self.image.max_width(),
+            padding,
+        );
+        if layout.is_capped() {
+            self.warnings.push(format!(
+                "image `{}` was reduced to the text width",
+                image.destination().as_str()
+            ));
+        }
+        let alignment = image.alignment().unwrap_or_else(|| self.image.alignment());
+        let align = match alignment {
+            ImageAlignment::Left => "left",
+            ImageAlignment::Center => "center",
+            ImageAlignment::Right => "right",
+        };
+        let _ = write!(
+            self.output,
+            "#block(width: 100%, below: {:.3}pt)[#align({align})[",
+            self.paragraph_after
+        );
+        let boxed = has_fill || has_border || padding > 0.0;
+        if boxed {
+            self.output.push_str("#block(");
+            let mut arguments = Vec::new();
+            if let Some(background) = self.image.background() {
+                arguments.push(format!("fill: rgb(\"{}\")", background.hex()));
+            }
+            if has_border {
+                let border = self.image.border();
+                let mut sides = Vec::new();
+                for (side, thickness) in [
+                    ("top", border.top()),
+                    ("bottom", border.bottom()),
+                    ("left", border.left()),
+                    ("right", border.right()),
+                ] {
+                    if let Some(thickness) = thickness {
+                        sides.push(format!(
+                            "{side}: {} + rgb(\"{}\")",
+                            typst_length(thickness),
+                            border.color().hex()
+                        ));
+                    }
+                }
+                if !sides.is_empty() {
+                    arguments.push(format!("stroke: ({})", sides.join(", ")));
+                }
+            }
+            if padding > 0.0 {
+                arguments.push(format!(
+                    "inset: (top: {padding:.3}pt, bottom: {padding:.3}pt, left: {padding:.3}pt, right: {padding:.3}pt)"
+                ));
+            }
+            let _ = write!(self.output, "{})[", arguments.join(", "));
+        }
+        self.output.push_str("#image(");
+        self.output.push_str(&typst_string(asset));
+        let _ = write!(
+            self.output,
+            ", width: {:.3}pt, height: {:.3}pt",
+            layout.width(),
+            layout.height()
+        );
+        let alternative = plain_text(image.alternative());
+        if !alternative.is_empty() {
+            let _ = write!(self.output, ", alt: {}", typst_string(&alternative));
+        }
+        self.output.push(')');
+        if boxed {
+            self.output.push(']');
+        }
+        self.output.push_str("]]\n");
+        Ok(())
+    }
+
     fn code_block(&mut self, code: &CodeBlock) {
         self.output.push_str("#raw(");
         self.output.push_str(&typst_string(code.text()));
@@ -889,6 +1033,7 @@ fn collect_footnotes(blocks: &[Block], footnotes: &mut BTreeMap<String, Vec<Bloc
             Block::Quote(quote) => collect_footnotes(quote.blocks(), footnotes),
             Block::Heading(_)
             | Block::Paragraph(_)
+            | Block::Image(_)
             | Block::NumberedParagraph(_)
             | Block::Table(_)
             | Block::CodeBlock(_)
@@ -1388,6 +1533,39 @@ mod tests {
                 .contains("#raw(\"let s = \\\"a\\\\\\\\b\\\";\\n\", lang: \"rust\", block: true)"),
             "{source}"
         );
+    }
+
+    #[test]
+    fn an_image_block_carries_its_size_alignment_and_frame() {
+        let document = Document::new(
+            Metadata::default(),
+            vec![Block::Image(ImageBlock::new(
+                Destination::new("logo.png"),
+                None,
+                vec![Inline::Text("Logo".to_owned())],
+                crate::image::ImageSize::Width(crate::image::ImageDimension::Percent(50.0)),
+                Some(ImageAlignment::Right),
+            ))],
+        );
+        let template = Template::from_yaml(
+            "version: \"0.7\"\nformatting:\n  image:\n    alignment: center\n    max_width: 80%\n    background: \"#ffffff\"\n    border:\n      top: 1pt\n      bottom: 1pt\n      color: \"#123456\"\n      padding: 4\n",
+        )
+        .expect("the template");
+        let assets = AssetMap::new().with_image("logo.png", "assets/image-0.png");
+        let source = typst_source(&document, &template, &assets).expect("the source");
+
+        assert!(source.contains("#align(right)"), "{source}");
+        assert!(source.contains("width: 240.945pt"), "{source}");
+        assert!(source.contains("height: 120.472pt"), "{source}");
+        assert!(source.contains("fill: rgb(\"#ffffff\")"), "{source}");
+        assert!(
+            source.contains(
+                "stroke: (top: 1.000pt + rgb(\"#123456\"), bottom: 1.000pt + rgb(\"#123456\"))"
+            ),
+            "{source}"
+        );
+        assert!(source.contains("inset: (top: 4.000pt"), "{source}");
+        assert!(source.contains("alt: \"Logo\""), "{source}");
     }
 
     #[test]

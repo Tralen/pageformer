@@ -248,6 +248,31 @@ fn the_committed_examples_match_a_fresh_render() {
 }
 
 #[test]
+fn a_block_image_keeps_its_frame_and_relative_source() {
+    let directory = example_directory("tecnico");
+    let document = markdown::parse("![Diagrama](Diagrama.png)\n-width:70%-\n-align:center-\n")
+        .expect("the image must parse");
+    let assets = load_images(&document, &directory).expect("the image must load");
+    let template = pageformer::template::Template::from_yaml(
+        "version: \"0.7\"\nformatting:\n  image:\n    alignment: center\n    max_width: 100%\n    background: \"#ffffff\"\n    border:\n      top: 1pt\n      right: 1pt\n      bottom: 1pt\n      left: 1pt\n      color: \"#336699\"\n      padding: 6\n",
+    )
+    .expect("the template must be valid");
+    let rendered = epub::render(&document, &template, &assets).expect("the package");
+    let mut archive = archive(rendered.into_bytes());
+    let chapter = entry(&mut archive, "OEBPS/chapter-1.xhtml");
+    let css = entry(&mut archive, "OEBPS/style.css");
+
+    assert!(
+        chapter.contains("<figure class=\"image-block align-center\">"),
+        "{chapter}"
+    );
+    assert!(chapter.contains("src=\"images/image-0.png\""), "{chapter}");
+    assert!(css.contains("figure.image-block"), "{css}");
+    assert!(css.contains("background-color: #ffffff;"), "{css}");
+    assert!(css.contains("border-width: 1.00pt"), "{css}");
+}
+
+#[test]
 fn a_body_image_is_packaged_and_referenced_relatively() {
     let project = TempDir::new().expect("a temporary project");
     fs::write(

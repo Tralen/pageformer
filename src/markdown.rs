@@ -13,10 +13,11 @@ use serde::Deserialize;
 
 use crate::document::{
     Alert, Author, Block, CodeBlock, CodeLanguage, ColumnAlignment, Destination, Document,
-    DocumentDate, FootnoteDefinition, FootnoteId, Heading, HeadingLevel, Identifier, Inline,
-    Keyword, Language, List, ListItem, ListStart, Metadata, MetadataError, NumberedParagraph,
-    Quote, QuoteKind, Subject, Table, TableCell, TableError, TaskState, Title,
+    DocumentDate, FootnoteDefinition, FootnoteId, Heading, HeadingLevel, Identifier, ImageBlock,
+    Inline, Keyword, Language, List, ListItem, ListStart, Metadata, MetadataError,
+    NumberedParagraph, Quote, QuoteKind, Subject, Table, TableCell, TableError, TaskState, Title,
 };
+use crate::image::{ImageAlignment, ImageDimension, ImageSize};
 
 /// The deepest tag nesting accepted. A deeper document is rejected instead of
 /// overflowing the stack of the recursive descent.
@@ -106,7 +107,10 @@ impl<'source> DocumentParser<'source> {
         while let Some(event) = self.next() {
             blocks.extend(self.parse_block_event(event, 0)?);
         }
-        Ok(Document::new(self.metadata.unwrap_or_default(), blocks))
+        Ok(Document::new(
+            self.metadata.unwrap_or_default(),
+            normalize_blocks(blocks)?,
+        ))
     }
 
     fn next(&mut self) -> Option<Event<'source>> {
@@ -162,7 +166,7 @@ impl<'source> DocumentParser<'source> {
             Tag::BlockQuote(kind) => {
                 let end = TagEnd::BlockQuote(kind);
                 let quote_kind = quote_kind(kind);
-                let blocks = self.parse_blocks(end, depth + 1)?;
+                let blocks = normalize_blocks(self.parse_blocks(end, depth + 1)?)?;
                 Ok(vec![Block::Quote(Quote::new(quote_kind, blocks))])
             }
             Tag::List(start) => {
@@ -197,7 +201,8 @@ impl<'source> DocumentParser<'source> {
             Tag::FootnoteDefinition(name) => {
                 let id = FootnoteId::parse(&name)
                     .ok_or_else(|| malformed("a footnote definition has an empty label"))?;
-                let blocks = self.parse_blocks(TagEnd::FootnoteDefinition, depth + 1)?;
+                let blocks =
+                    normalize_blocks(self.parse_blocks(TagEnd::FootnoteDefinition, depth + 1)?)?;
                 Ok(vec![Block::FootnoteDefinition(FootnoteDefinition::new(
                     id, blocks,
                 ))])
@@ -273,7 +278,7 @@ impl<'source> DocumentParser<'source> {
                 Some(Event::End(TagEnd::Item)) => {
                     self.index += 1;
                     return Ok(ParsedItem {
-                        item: ListItem::new(task, blocks),
+                        item: ListItem::new(task, normalize_blocks(blocks)?),
                         tight,
                     });
                 }
@@ -526,6 +531,213 @@ impl<'source> DocumentParser<'source> {
         self.metadata = Some(frontmatter_metadata(&yaml)?);
         Ok(())
     }
+}
+
+/// Attaches the image option paragraphs that follow a standalone image and
+/// turns the pair into one image block.
+fn normalize_blocks(blocks: Vec<Block>) -> Result<Vec<Block>, MarkdownError> {
+    let mut output = Vec::with_capacity(blocks.len());
+    let mut blocks = blocks.into_iter().peekable();
+    while let Some(block) = blocks.next() {
+        let Some((image, mut options)) = image_paragraph(&block)? else {
+            output.push(block);
+            continue;
+        };
+        while let Some(Block::Paragraph(content)) = blocks.peek() {
+            let Some(option) = single_image_option(content)? else {
+                break;
+            };
+            options.push(option);
+            blocks.next();
+        }
+        output.push(Block::Image(image_block(image, options)?));
+    }
+    Ok(output)
+}
+
+/// The parts of an image taken from an inline paragraph.
+struct ImageParts {
+    destination: Destination,
+    title: Option<String>,
+    alternative: Vec<Inline>,
+}
+
+fn image_paragraph(block: &Block) -> Result<Option<(ImageParts, Vec<ImageOption>)>, MarkdownError> {
+    let Block::Paragraph(content) = block else {
+        return Ok(None);
+    };
+    let Some(Inline::Image {
+        destination,
+        title,
+        alternative,
+    }) = content.first()
+    else {
+        return Ok(None);
+    };
+    let image = ImageParts {
+        destination: destination.clone(),
+        title: title.clone(),
+        alternative: alternative.clone(),
+    };
+    if content.len() == 1 {
+        return Ok(Some((image, Vec::new())));
+    }
+    if !matches!(
+        content.get(1),
+        Some(Inline::SoftBreak) | Some(Inline::HardBreak)
+    ) {
+        return Ok(None);
+    }
+    let mut options = Vec::new();
+    let mut expect_break = false;
+    for inline in content.iter().skip(1) {
+        match inline {
+            Inline::SoftBreak | Inline::HardBreak if !expect_break => expect_break = true,
+            Inline::Text(text) if expect_break => {
+                let Some(option) = parse_image_option(text)? else {
+                    return Ok(None);
+                };
+                options.push(option);
+                expect_break = false;
+            }
+            _ => return Ok(None),
+        }
+    }
+    if options.is_empty() || expect_break {
+        return Ok(None);
+    }
+    Ok(Some((image, options)))
+}
+
+fn single_image_option(content: &[Inline]) -> Result<Option<ImageOption>, MarkdownError> {
+    let [Inline::Text(text)] = content else {
+        return Ok(None);
+    };
+    parse_image_option(text)
+}
+
+enum ImageOption {
+    Width(ImageDimension),
+    Height(ImageDimension),
+    Alignment(ImageAlignment),
+}
+
+fn parse_image_option(text: &str) -> Result<Option<ImageOption>, MarkdownError> {
+    let trimmed = text.trim();
+    let Some(inner) = trimmed
+        .strip_prefix('-')
+        .and_then(|rest| rest.strip_suffix('-'))
+    else {
+        return Ok(None);
+    };
+    let Some((key, value)) = inner.split_once(':') else {
+        return Ok(None);
+    };
+    let value = value.trim();
+    if value.is_empty() {
+        return Err(malformed(format!("the image option `{key}` has no value")));
+    }
+    match key {
+        "width" => Ok(Some(ImageOption::Width(parse_image_dimension(
+            value, "width",
+        )?))),
+        "height" => Ok(Some(ImageOption::Height(parse_image_dimension(
+            value, "height",
+        )?))),
+        "align" => Ok(Some(ImageOption::Alignment(parse_image_alignment(value)?))),
+        _ => Err(malformed(format!("unknown image option `{key}`"))),
+    }
+}
+
+fn parse_image_dimension(value: &str, field: &str) -> Result<ImageDimension, MarkdownError> {
+    let trimmed = value.trim();
+    if let Some(number) = trimmed.strip_suffix('%') {
+        let percent = parse_image_number(number, field)?;
+        return ImageDimension::from_percent(percent).ok_or_else(|| {
+            malformed(format!(
+                "the image {field} must be a percentage greater than 0 and at most 100"
+            ))
+        });
+    }
+    let (number, factor) = if let Some(number) = trimmed.strip_suffix("px") {
+        (number, 0.75)
+    } else if let Some(number) = trimmed.strip_suffix("mm") {
+        (number, 72.0 / 25.4)
+    } else if let Some(number) = trimmed.strip_suffix("cm") {
+        (number, 72.0 / 2.54)
+    } else if let Some(number) = trimmed.strip_suffix("in") {
+        (number, 72.0)
+    } else if let Some(number) = trimmed.strip_suffix("pt") {
+        (number, 1.0)
+    } else {
+        (trimmed, 0.75)
+    };
+    let number = parse_image_number(number, field)?;
+    ImageDimension::from_points(number * factor).ok_or_else(|| {
+        malformed(format!(
+            "the image {field} must be a positive length or percentage"
+        ))
+    })
+}
+
+fn parse_image_number(value: &str, field: &str) -> Result<f64, MarkdownError> {
+    let value = value.trim();
+    value
+        .parse::<f64>()
+        .map_err(|_| malformed(format!("the image {field} `{value}` is not a number")))
+}
+
+fn parse_image_alignment(value: &str) -> Result<ImageAlignment, MarkdownError> {
+    match value {
+        "left" => Ok(ImageAlignment::Left),
+        "center" => Ok(ImageAlignment::Center),
+        "right" => Ok(ImageAlignment::Right),
+        _ => Err(malformed(format!(
+            "the image alignment `{value}` must be left, center or right"
+        ))),
+    }
+}
+
+fn image_block(image: ImageParts, options: Vec<ImageOption>) -> Result<ImageBlock, MarkdownError> {
+    let mut width = None;
+    let mut height = None;
+    let mut alignment = None;
+    for option in options {
+        match option {
+            ImageOption::Width(value) => {
+                if width.replace(value).is_some() {
+                    return Err(malformed("the image declares its width more than once"));
+                }
+            }
+            ImageOption::Height(value) => {
+                if height.replace(value).is_some() {
+                    return Err(malformed("the image declares its height more than once"));
+                }
+            }
+            ImageOption::Alignment(value) => {
+                if alignment.replace(value).is_some() {
+                    return Err(malformed("the image declares its alignment more than once"));
+                }
+            }
+        }
+    }
+    let size = match (width, height) {
+        (Some(_), Some(_)) => {
+            return Err(malformed(
+                "the image declares both its width and its height",
+            ));
+        }
+        (Some(width), None) => ImageSize::Width(width),
+        (None, Some(height)) => ImageSize::Height(height),
+        (None, None) => ImageSize::Auto,
+    };
+    Ok(ImageBlock::new(
+        image.destination,
+        image.title,
+        image.alternative,
+        size,
+        alignment,
+    ))
 }
 
 /// A standalone marker paragraph is a page break or a horizontal rule. The
@@ -1029,6 +1241,116 @@ mod tests {
             })
             .expect("an image");
         assert_eq!(image, "logo");
+    }
+
+    #[test]
+    fn a_standalone_image_becomes_an_image_block() {
+        let document = parse("![Diagrama](diagrama.png)\n").expect("an image");
+        let Block::Image(image) = first_block(&document) else {
+            panic!("expected an image block");
+        };
+        assert_eq!(image.destination().as_str(), "diagrama.png");
+        assert_eq!(image.size(), ImageSize::Auto);
+        assert_eq!(image.alignment(), None);
+        assert_eq!(plain_text(image.alternative()), "Diagrama");
+    }
+
+    #[test]
+    fn image_options_attach_with_or_without_a_blank_line() {
+        for source in [
+            "![Diagrama](diagrama.png)\n-width:70%-\n-align:right-\n",
+            "![Diagrama](diagrama.png)\n\n-width:70%-\n\n-align:right-\n",
+        ] {
+            let document = parse(source).expect("an image with options");
+            let Block::Image(image) = first_block(&document) else {
+                panic!("expected an image block: {source}");
+            };
+            assert!(
+                matches!(
+                    image.size(),
+                    ImageSize::Width(ImageDimension::Percent(percent))
+                        if (percent - 70.0).abs() < 1e-9
+                ),
+                "{source}"
+            );
+            assert_eq!(image.alignment(), Some(ImageAlignment::Right), "{source}");
+            assert_eq!(document.block_count(), 1, "{source}");
+        }
+    }
+
+    #[test]
+    fn image_height_and_bare_pixels_are_converted() {
+        let document =
+            parse("![Diagrama](diagrama.png)\n-height:4cm-\n").expect("an image with a height");
+        let Block::Image(image) = first_block(&document) else {
+            panic!("expected an image block");
+        };
+        let ImageSize::Height(ImageDimension::Points(points)) = image.size() else {
+            panic!("expected a height");
+        };
+        assert!((points - 4.0 * 72.0 / 2.54).abs() < 1e-9);
+
+        let document =
+            parse("![Diagrama](diagrama.png)\n-width:512-\n").expect("an image with a pixel width");
+        let Block::Image(image) = first_block(&document) else {
+            panic!("expected an image block");
+        };
+        assert_eq!(
+            image.size(),
+            ImageSize::Width(ImageDimension::Points(512.0 * 0.75))
+        );
+    }
+
+    #[test]
+    fn an_inline_image_stays_inline() {
+        let document = parse("Texto ![Diagrama](diagrama.png) depois.\n").expect("an inline image");
+        assert!(matches!(first_block(&document), Block::Paragraph(_)));
+    }
+
+    #[test]
+    fn an_image_option_line_in_ordinary_text_stays_text() {
+        let document = parse("Antes.\n\n-width:512-\n\nDepois.\n").expect("ordinary text");
+        assert!(matches!(
+            document.blocks().get(1),
+            Some(Block::Paragraph(_))
+        ));
+    }
+
+    #[test]
+    fn invalid_image_options_are_rejected() {
+        for source in [
+            "![D](d.png)\n-width:1-\n-height:1-\n",
+            "![D](d.png)\n-crop:1-\n",
+            "![D](d.png)\n-align:middle-\n",
+            "![D](d.png)\n-width:1-\n-width:2-\n",
+            "![D](d.png)\n-width:0-\n",
+            "![D](d.png)\n-width:101%-\n",
+            "![D](d.png)\n-width:nope-\n",
+        ] {
+            assert!(parse(source).is_err(), "{source} must fail");
+        }
+    }
+
+    #[test]
+    fn image_options_attach_inside_a_list_item() {
+        let document =
+            parse("- ![Diagrama](diagrama.png)\n  -width:50%-\n").expect("a list with an image");
+        let Block::List(list) = first_block(&document) else {
+            panic!("expected a list");
+        };
+        let item = list.items().first().expect("an item");
+        assert!(matches!(item.blocks().first(), Some(Block::Image(_))));
+    }
+
+    #[test]
+    fn options_after_an_intervening_block_do_not_attach() {
+        let document = parse("![D](d.png)\n\nTexto.\n\n-width:512-\n").expect("three blocks");
+        assert_eq!(document.block_count(), 3);
+        assert!(matches!(document.blocks().first(), Some(Block::Image(_))));
+        assert!(matches!(
+            document.blocks().get(2),
+            Some(Block::Paragraph(_))
+        ));
     }
 
     #[test]

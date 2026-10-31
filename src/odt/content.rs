@@ -5,8 +5,9 @@ use std::collections::BTreeMap;
 use crate::assets::Assets;
 use crate::document::{
     Block, CodeBlock, ColumnAlignment, Destination, Document, FootnoteDefinition, FootnoteId,
-    Inline, List, ListItem, ListStart, Quote, QuoteKind, Table, TableCell, TaskState,
+    ImageBlock, Inline, List, ListItem, ListStart, Quote, QuoteKind, Table, TableCell, TaskState,
 };
+use crate::image::{self, ImageAlignment};
 use crate::template::Template;
 
 use super::picture_name;
@@ -36,6 +37,7 @@ pub fn content_xml(document: &Document, template: &Template, assets: &Assets) ->
     xml::push(&mut output, PREFIX);
     list_item_styles(&mut output, template);
     block_styles(&mut output, template);
+    image_styles(&mut output, template);
     cell_paragraph_styles(&mut output, template);
     horizontal_line_style(&mut output, template);
     xml::push(&mut output, &builder.generated);
@@ -128,6 +130,7 @@ impl<'a> Builder<'a> {
                 xml::push(&mut self.body, "</text:h>\n");
             }
             Block::Paragraph(inlines) => self.paragraph(inlines),
+            Block::Image(image) => self.image_block(image),
             Block::NumberedParagraph(paragraph) => {
                 let style = self.style_with_break(self.body_style());
                 self.open_paragraph(&style);
@@ -522,6 +525,62 @@ impl<'a> Builder<'a> {
         );
     }
 
+    fn image_block(&mut self, image: &ImageBlock) {
+        let label = plain_text(image.alternative());
+        let Some(virtual_name) = self.assets.map().image(image.destination().as_str()) else {
+            let style = self.style_with_break(self.body_style());
+            self.open_paragraph(&style);
+            self.text(&format!("[{label}]"));
+            self.close_paragraph();
+            return;
+        };
+        let file = picture_name(virtual_name);
+        let intrinsic = self
+            .assets
+            .files()
+            .get(virtual_name)
+            .map_or((300.0, 150.0), |bytes| image::intrinsic(bytes));
+        let image_style = self.template.formatting().image();
+        let padding = if image_style.background().is_some() || !image_style.border().is_empty() {
+            image_style.border().padding().points()
+        } else {
+            0.0
+        };
+        let layout = image::layout(
+            intrinsic,
+            self.text_width,
+            image.size(),
+            image_style.max_width(),
+            padding,
+        );
+        let alignment = image
+            .alignment()
+            .unwrap_or_else(|| self.template.formatting().image().alignment());
+        let style = match alignment {
+            ImageAlignment::Left => "ImageLeft",
+            ImageAlignment::Center => "ImageCenter",
+            ImageAlignment::Right => "ImageRight",
+        };
+        self.image_count += 1;
+        let name = format!("Image{}", self.image_count);
+        xml::push_fmt(
+            &mut self.body,
+            format_args!(
+                "<text:p text:style-name=\"{style}\"><draw:frame draw:name=\"{name}\" draw:style-name=\"ImageFrame\" text:anchor-type=\"as-char\" svg:width=\"{width}\" svg:height=\"{height}\">\
+                 <draw:image xlink:href=\"{href}\" xlink:type=\"simple\" xlink:show=\"embed\" xlink:actuate=\"onLoad\"/>\
+                 {description}</draw:frame></text:p>\n",
+                width = xml::centimetres_points(layout.width()),
+                height = xml::centimetres_points(layout.height()),
+                href = xml::escape_attribute(&format!("Pictures/{file}")),
+                description = if label.is_empty() {
+                    String::new()
+                } else {
+                    format!("<svg:desc>{}</svg:desc>", xml::escape_text(&label))
+                },
+            ),
+        );
+    }
+
     fn note(&mut self, id: &FootnoteId) {
         let key = id.as_str();
         if self.active.iter().any(|active| active == key) {
@@ -629,6 +688,42 @@ fn block_styles(output: &mut String, template: &Template) {
             "<style:style style:name=\"QuoteParagraph\" style:family=\"paragraph\" style:parent-style-name=\"Standard\"><style:paragraph-properties fo:text-align=\"{align}\" fo:margin-left=\"1cm\" fo:margin-right=\"1cm\"{border}{quote_background}/>{text}</style:style>\n",
             align = alignment(quote_style.alignment()),
             border = border_attributes(quote_style.border())
+        ),
+    );
+}
+
+fn image_styles(output: &mut String, template: &Template) {
+    let image = template.formatting().image();
+    let paragraph = template.formatting().paragraph();
+    let after = crate::metrics::paragraph_after(paragraph.spacing(), paragraph.leading());
+    let margin = if after > 0.0 {
+        format!(" fo:margin-bottom=\"{}\"", xml::points_value(after))
+    } else {
+        String::new()
+    };
+    for (name, align) in [
+        ("ImageLeft", "left"),
+        ("ImageCenter", "center"),
+        ("ImageRight", "right"),
+    ] {
+        xml::push_fmt(
+            output,
+            format_args!(
+                "<style:style style:name=\"{name}\" style:family=\"paragraph\" style:parent-style-name=\"Standard\"><style:paragraph-properties fo:text-align=\"{align}\" fo:line-height=\"100%\"{margin}/></style:style>\n"
+            ),
+        );
+    }
+    let border = border_attributes(image.border());
+    let padding = if image.border().padding().points() > 0.0 {
+        format!(" fo:padding=\"{}\"", xml::points(image.border().padding()))
+    } else {
+        String::new()
+    };
+    let background = background_attribute(image.background());
+    xml::push_fmt(
+        output,
+        format_args!(
+            "<style:style style:name=\"ImageFrame\" style:family=\"graphic\"><style:graphic-properties{border}{padding}{background}/></style:style>\n"
         ),
     );
 }

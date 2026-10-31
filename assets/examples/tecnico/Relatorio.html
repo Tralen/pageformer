@@ -20,7 +20,7 @@ main.pageformer {
   max-width: 100%;
   margin: 24pt auto;
   padding: 70.87pt 70.87pt 70.87pt 70.87pt;
-  background: #ffffff;
+  background: #f4f8fc;
   font-family: "Liberation Serif", "DejaVu Serif";
   font-size: 11.00pt;
   font-weight: 400;
@@ -176,6 +176,35 @@ pre.code-block {
 }
 pre.code-block { white-space: pre-wrap; overflow-wrap: anywhere; }
 pre.code-block code { font: inherit; white-space: inherit; }
+img { max-width: 100%; height: auto; }
+figure.image-block {
+  margin: 0 0 3.00pt 0;
+  margin-inline-start: 0;
+  margin-inline-end: 0;
+}
+figure.image-block.align-left {
+  text-align: left;
+}
+figure.image-block.align-center {
+  text-align: center;
+}
+figure.image-block.align-right {
+  text-align: right;
+}
+figure.image-block img {
+  display: block;
+  max-width: 100.00%;
+  height: auto;
+}
+figure.image-block .image-frame {
+  display: inline-block;
+  max-width: 100%;
+  padding: 6.00pt;
+  border-style: solid;
+  border-color: #336699;
+  border-width: 1.00pt 1.00pt 1.00pt 1.00pt;
+  background-color: #ffffff;
+}
 ul, ol {
   margin: 0 0 3.00pt 0;
   padding-inline-start: 34.02pt;
@@ -529,12 +558,13 @@ a[role="doc-backlink"] {
 }
 @media screen and (max-width: 720pt) { main.pageformer { width: 100%; padding: 24pt; } }
 @media print {
-  html, body { background: #ffffff; }
+  html, body { background: #f4f8fc; }
   main.pageformer { width: auto; max-width: none; margin: 0; padding: 0; background: transparent; }
   .page-break { break-after: page; page-break-after: always; }
   @page {
     size: 595.28pt 841.89pt;
     margin: 70.87pt 70.87pt 70.87pt 70.87pt;
+    background-color: #f4f8fc;
     @top-left {
       content: "Pageformer";
       font-family: "Liberation Serif", "DejaVu Serif";
@@ -653,6 +683,9 @@ a[role="doc-backlink"] {
 </code></pre>
 <p class="body-paragraph">Uma régua fecha esta seção.</p>
 <hr class="horizontal-rule" />
+<h2>Imagem</h2>
+<p class="body-paragraph">A imagem abaixo usa a largura, o alinhamento, a borda e o fundo definidos no template.</p>
+<figure class="image-block align-center"><span class="image-frame"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAeAAAAEOCAIAAADe+FMwAAAEoUlEQVR4nO3ZMW4aYRhFUTuiyK5csYHUqVgCfSr3LIHKtTcwVTbkyoUlNylixQGBrJiJ/2s4pwe9Al0+zVw/PD5fAdDzZfQAAA4TaIAogQaIEmiAKIEGiBJogCiBBogSaIAogQaIEmiAKIEGiBJogCiBBogSaIAogQaIEmiAKIEGiBJogCiBBohanPLh5Xo71w6AczVtVu/7oAsaIEqgAaIEGiDqpGfQf3v3QxaA8zPLKzoXNECUQANECTRAlEADRAk0QJRAA0QJNECUQANECTRAlEADRAk0QJRAA0QJNECUQANECTRAlEADRAk0QJRAA0QJNECUQANECTRAlEADRAk0QJRAA0QJNECUQANECTRAlEADRAk0QJRAA0QJNECUQANECTRAlEADRAk0QNRi9IDDluvt6An8X9NmNXrCv/GbPHvB36QLGiBKoAGioo84/vj+bTl6AnO6u59GTzjVzx9fR09gTje3T6MnHOWCBogSaIAogQaIEmiAKIEGiBJogCiBBogSaIAogQaIEmiAKIEGiBJogCiBBogSaIAogQaIEmiAKIEGiBJogCiBBogSaIAogQaIEmiAKIEGiBJogCiBBogSaIAogQaIEmiAKIEGiBJogCiBBogSaIAogQaIEmiAKIEGiBJogCiBBogSaIAogQaIEmiAKIEGiBJogCiBBogSaIAogQaIEmiAKIEGiBJogCiBBogSaIAogQaIEmiAKIEGiBJogCiBBogSaIAogQaIEmiAKIEGiBJogCiBBogSaIAogQaIEmiAKIGGF8v1dvQE2CHQ8Gq53so0HQIN+zSaCIGGA5zSFAg0HCXTjLUYPYAL9YnC94mmcmZc0ABRAg0QJdAAUQINEOUlIWNMm9XoCfuOvQz8PdWrQj6eQMNRwX8RLopAwwHSTIFn0LBPnYlwQcMraSbFBQ0v1JkagQaIEmiAKIEGiBJogCiBBogSaIAogQaIEmiAKIEGiBJogCiBBogSaIAogQaIEmiAKIEGiBJogCiBBogSaIAogQaIEmiAKIEGiBJogCiBBogSaIAogQaIEmiAKIEGiBJogCiBBogSaIAogQaIEmiAKIEGiBJogCiBBogSaIAogQaIEmiAKIEGiBJogCiBBogSaIAogQaIEmiAKIEGiBJogCiBBogSaIAogQaIEmiAKIEGiBJogCiBBogSaIAogQaIEmiAKIEGiBJogCiBBogSaIAogQaIEmiAKIEGiBJogKjF6AFvuLufRk+AHTe3T6MncClc0ABRAg0QFX3EMW1WoyfADr9JPp4LGiBKoAGiBBogSqABogQaIEqgAaIEGiBKoAGiBBogSqABogQaIEqgAaIEGiBKoAGiBBogSqABogQaIEqgAaIEGiBKoAGiBBogSqABogQaIEqgAaIEGiBKoAGiBBogSqABogQaIEqgAaIEGiBKoAGiBBogSqABogQaIGox1xct19u5vgqAKxc0QJZAA0QJNEDU9cPj8+gNABzgggaIEmiAKIEGiBJogCiBBogSaIAogQaIEmiAKIEGiBJogCiBBogSaIAogQaIEmiAKIEGiBJogCiBBogSaICoXyPGPgj3AoegAAAAAElFTkSuQmCC" alt="Diagrama de exemplo" style="width: 70.00%;" /></span></figure>
 <h2>Resultados</h2>
 <p class="body-paragraph">A paginação e a numeração são calculadas pelo motor de composição a partir do documento inteiro, de modo que o total de páginas no cabeçalho corresponde ao número final.</p>
 <p class="body-paragraph">O mesmo modelo gera os quatro formatos. O PDF usa o motor Typst como biblioteca, o ODT e o DOCX são montados por escritores internos e o TXT é uma vista do modelo para copiar como texto simples. Como o template é um só, a face, as cores, os espaçamentos e os blocos acompanham todos eles.</p>

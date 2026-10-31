@@ -3,7 +3,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use pageformer::assets::load_assets;
+use pageformer::assets::{load_assets, load_images};
 use pageformer::confidential::loader as confidential_loader;
 use pageformer::confidential::{self, ConfidentialStore};
 use pageformer::document::{Block, Destination, Document, Inline, Metadata};
@@ -155,6 +155,35 @@ fn the_contract_is_a_self_contained_semantic_document() {
     );
     assert!(normalized_text(&document).contains("Das partes"));
     assert!(normalized_text(&document).contains("Contrato de Prestação de Serviços"));
+}
+
+#[test]
+fn a_block_image_takes_its_width_alignment_and_frame() {
+    let directory = example_directory("tecnico");
+    let document = markdown::parse("![Diagrama](Diagrama.png)\n-width:70%-\n-align:right-\n")
+        .expect("the image must parse");
+    let assets = load_images(&document, &directory).expect("the image must load");
+    let template = Template::from_yaml(
+        "version: \"0.7\"\nformatting:\n  image:\n    alignment: center\n    max_width: 100%\n    background: \"#ffffff\"\n    border:\n      top: 1pt\n      right: 1pt\n      bottom: 1pt\n      left: 1pt\n      color: \"#336699\"\n      padding: 6\n",
+    )
+    .expect("the template must be valid");
+    let rendered = html::render(&document, &template, &assets);
+    let html = String::from_utf8(rendered.into_bytes()).expect("the HTML must be UTF-8");
+
+    assert!(
+        html.contains("<figure class=\"image-block align-right\">"),
+        "{html}"
+    );
+    assert!(html.contains("style=\"width: 70.00%;\""), "{html}");
+    assert!(html.contains("class=\"image-frame\""), "{html}");
+    assert!(html.contains("alt=\"Diagrama\""), "{html}");
+    assert!(html.contains("text-align: right;"), "{html}");
+    assert!(
+        html.contains("border-width: 1.00pt 1.00pt 1.00pt 1.00pt;"),
+        "{html}"
+    );
+    assert!(html.contains("background-color: #ffffff;"), "{html}");
+    assert!(html.contains("padding: 6.00pt;"), "{html}");
 }
 
 #[test]

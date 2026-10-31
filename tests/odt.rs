@@ -4,7 +4,7 @@ use std::fs;
 use std::io::{Cursor, Read};
 use std::path::Path;
 
-use pageformer::assets::Assets;
+use pageformer::assets::{Assets, load_images};
 use pageformer::confidential::loader as confidential_loader;
 use pageformer::confidential::{self, ConfidentialStore};
 use pageformer::document::{
@@ -705,6 +705,43 @@ fn table_cells_absorb_the_leading_and_do_not_inherit_paragraph_spacing() {
 
     assert!(content.contains("fo:padding-top=\"2.00pt\""), "{content}");
     assert!(content.contains("fo:margin-bottom=\"0cm\""), "{content}");
+}
+
+#[test]
+fn a_block_image_takes_its_size_alignment_and_frame() {
+    let directory = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("assets")
+        .join("examples")
+        .join("tecnico");
+    let document = markdown::parse("![Diagrama](Diagrama.png)\n-height:4cm-\n-align:right-\n")
+        .expect("the image must parse");
+    let assets = load_images(&document, &directory).expect("the image must load");
+    let template = Template::from_yaml(
+        "version: \"0.7\"\nformatting:\n  image:\n    alignment: center\n    max_width: 100%\n    background: \"#ffffff\"\n    border:\n      top: 1pt\n      right: 1pt\n      bottom: 1pt\n      left: 1pt\n      color: \"#336699\"\n      padding: 6\n",
+    )
+    .expect("the template must be valid");
+    let bytes = odt::render(&document, &template, &assets).expect("the package");
+    let mut archive = ZipArchive::new(Cursor::new(bytes)).expect("the package must be a ZIP");
+    let content = entry(&mut archive, "content.xml");
+
+    assert!(
+        content.contains("<text:p text:style-name=\"ImageRight\">"),
+        "{content}"
+    );
+    assert!(content.contains("svg:height=\"4.000cm\""), "{content}");
+    assert!(
+        content.contains("draw:style-name=\"ImageFrame\""),
+        "{content}"
+    );
+    assert!(content.contains("style:name=\"ImageFrame\""), "{content}");
+    assert!(
+        content.contains("fo:background-color=\"#ffffff\""),
+        "{content}"
+    );
+    assert!(
+        content.contains("fo:border-top=\"1.00pt solid #336699\""),
+        "{content}"
+    );
 }
 
 #[test]

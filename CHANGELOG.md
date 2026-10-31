@@ -4,6 +4,15 @@
 
 *Major updates and feature releases.*
 
+### 0.38.0
+
+- Added block images: a paragraph with only an image becomes `Block::Image`, with `-width:...-`, `-height:...-` and `-align:left|center|right-` markers on the adjacent lines. One dimension sets the other through the intrinsic ratio; values accept pixels, `px`, `mm`, `cm`, `in`, `pt` and percentages.
+- Added `formatting.image` with `alignment` (default `center`), `max_width` (default `100%`), per-side `border` with padding, and `background`. The border and fill wrap the image instead of the full text column.
+- The PDF, ODT, DOCX, HTML and EPUB backends render the image frame, alignment and size; TXT writes `[alt]`. The DOCX frame is a one-cell table, so its padding, border and fill stay around the image.
+- Added `assets/examples/tecnico/Diagrama.png` and an image section to the technical report; the example templates now use different page backgrounds for testing.
+- The document model now has `Block::Image`; `Document`, `Block`, `List`, `ListItem`, `Quote` and `FootnoteDefinition` no longer derive `Eq`, because image dimensions use floating point.
+- Regenerates every example, and the ODT examples carry the version in `meta:generator`.
+
 ### 0.37.2
 
 - Disabled the page background in the embedded default template: the key stays documented and commented, so the fallback paper remains white and the user opts in by uncommenting it.

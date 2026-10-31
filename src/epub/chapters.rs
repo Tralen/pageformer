@@ -12,7 +12,7 @@ pub(crate) enum ChapterKind {
 }
 
 /// One chapter before rendering.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub(crate) struct Chapter {
     pub kind: ChapterKind,
     pub blocks: Vec<Block>,

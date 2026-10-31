@@ -16,6 +16,7 @@ pub mod docx;
 pub mod epub;
 pub mod format;
 pub mod html;
+pub mod image;
 pub mod markdown;
 pub mod odt;
 pub mod pdf;
@@ -24,7 +25,6 @@ pub mod render;
 pub mod template;
 pub mod txt;
 
-mod image;
 mod metrics;
 mod xml;
 mod zip;

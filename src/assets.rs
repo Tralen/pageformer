@@ -168,6 +168,10 @@ fn collect_block_images<'a>(blocks: &'a [Block], destinations: &mut Vec<&'a str>
         match block {
             Block::Heading(heading) => collect_inline_images(heading.content(), destinations),
             Block::Paragraph(inlines) => collect_inline_images(inlines, destinations),
+            Block::Image(image) => {
+                destinations.push(image.destination().as_str());
+                collect_inline_images(image.alternative(), destinations);
+            }
             Block::NumberedParagraph(paragraph) => {
                 collect_inline_images(paragraph.content(), destinations);
             }

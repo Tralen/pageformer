@@ -12,6 +12,8 @@ use serde::Deserialize;
 use serde::de::value::MapAccessDeserializer;
 use serde::de::{self, Deserializer, MapAccess, Unexpected, Visitor};
 
+use crate::image::{ImageAlignment, ImageDimension};
+
 const MM_TO_POINTS: f64 = 72.0 / 25.4;
 
 /// The current schema version. A template for another version is rejected.
@@ -1308,6 +1310,58 @@ impl Default for BlockStyle {
     }
 }
 
+/// The style of a block image.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ImageStyle {
+    alignment: ImageAlignment,
+    max_width: ImageDimension,
+    border: BlockBorder,
+    background: Option<Color>,
+}
+
+impl ImageStyle {
+    pub fn new(
+        alignment: ImageAlignment,
+        max_width: ImageDimension,
+        border: BlockBorder,
+        background: Option<Color>,
+    ) -> Self {
+        Self {
+            alignment,
+            max_width,
+            border,
+            background,
+        }
+    }
+
+    pub fn alignment(&self) -> ImageAlignment {
+        self.alignment
+    }
+
+    pub fn max_width(&self) -> ImageDimension {
+        self.max_width
+    }
+
+    pub fn border(&self) -> &BlockBorder {
+        &self.border
+    }
+
+    pub fn background(&self) -> Option<Color> {
+        self.background
+    }
+}
+
+impl Default for ImageStyle {
+    fn default() -> Self {
+        Self {
+            alignment: ImageAlignment::Center,
+            max_width: ImageDimension::Percent(100.0),
+            border: BlockBorder::default(),
+            background: None,
+        }
+    }
+}
+
 /// The style of one heading level.
 #[derive(Debug, Clone, PartialEq)]
 pub struct HeadingStyle {
@@ -1431,6 +1485,7 @@ pub struct Formatting {
     horizontal_rule: RuleStyle,
     quote: BlockStyle,
     code_block: BlockStyle,
+    image: ImageStyle,
     list: ListStyle,
     table: TableStyle,
 }
@@ -1452,9 +1507,14 @@ impl Formatting {
             horizontal_rule,
             quote,
             code_block,
+            image: ImageStyle::default(),
             list,
             table,
         }
+    }
+
+    pub fn with_image(self, image: ImageStyle) -> Self {
+        Self { image, ..self }
     }
 
     /// The block quote style; undeclared keys change nothing.
@@ -1465,6 +1525,11 @@ impl Formatting {
     /// The fenced code block style; undeclared keys change nothing.
     pub fn code_block(&self) -> &BlockStyle {
         &self.code_block
+    }
+
+    /// The block image style; undeclared keys keep the defaults.
+    pub fn image(&self) -> &ImageStyle {
+        &self.image
     }
 
     pub fn paragraph(&self) -> &ParagraphStyle {
@@ -1883,8 +1948,18 @@ struct RawFormatting {
     horizontal_rule: Option<RawRule>,
     quote: Option<RawBlockStyle>,
     code_block: Option<RawBlockStyle>,
+    image: Option<RawImage>,
     list: Option<RawListStyle>,
     table: Option<RawTable>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawImage {
+    alignment: Option<ImageAlignment>,
+    max_width: Option<String>,
+    background: Option<String>,
+    border: Option<RawBorder>,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -2158,6 +2233,7 @@ fn convert_formatting(raw: RawFormatting) -> Result<Formatting, TemplateError> {
     )?;
     let quote = convert_block(raw.quote, "formatting.quote", paragraph.face())?;
     let code_block = convert_block(raw.code_block, "formatting.code_block", paragraph.face())?;
+    let image = convert_image(raw.image)?;
     let list = convert_list(raw.list, paragraph.face())?;
     let table = convert_table(raw.table)?;
     Ok(Formatting::new(
@@ -2168,7 +2244,34 @@ fn convert_formatting(raw: RawFormatting) -> Result<Formatting, TemplateError> {
         code_block,
         list,
         table,
-    ))
+    )
+    .with_image(image))
+}
+
+fn convert_image(raw: Option<RawImage>) -> Result<ImageStyle, TemplateError> {
+    let raw = raw.unwrap_or_default();
+    let alignment = raw.alignment.unwrap_or_default();
+    let max_width = match raw.max_width {
+        Some(text) => parse_image_dimension_field(&text, "formatting.image.max_width")?,
+        None => ImageDimension::Percent(100.0),
+    };
+    let border = convert_border(raw.border, "formatting.image.border")?;
+    let background = parse_optional_color(raw.background, "formatting.image.background")?;
+    Ok(ImageStyle::new(alignment, max_width, border, background))
+}
+
+fn parse_image_dimension_field(text: &str, field: &str) -> Result<ImageDimension, TemplateError> {
+    let trimmed = text.trim();
+    if let Some(number) = trimmed.strip_suffix('%') {
+        let percent = number
+            .trim()
+            .parse::<f64>()
+            .map_err(|_| value_error(field, ValueError::InvalidNumber))?;
+        return ImageDimension::from_percent(percent)
+            .ok_or_else(|| value_error(field, ValueError::InvalidNumber));
+    }
+    let points = parse_length_field(trimmed, field)?.points();
+    ImageDimension::from_points(points).ok_or_else(|| value_error(field, ValueError::Zero))
 }
 
 fn convert_list(raw: Option<RawListStyle>, base: &TextFace) -> Result<ListStyle, TemplateError> {

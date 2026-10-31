@@ -73,6 +73,14 @@ Uma régua fecha esta seção.
 
 -horizontal-
 
+## Imagem
+
+A imagem abaixo usa a largura, o alinhamento, a borda e o fundo definidos no template.
+
+![Diagrama de exemplo](Diagrama.png)
+-width:70%-
+-align:center-
+
 ## Resultados
 
 A paginação e a numeração são calculadas pelo motor de composição a partir do documento inteiro, de modo que o total de páginas no cabeçalho corresponde ao número final.

@@ -239,7 +239,7 @@ A phase is closed only when all of the following hold:
 | Area | Keys | Phase | Notes |
 |---|---|---|---|
 | Version | `version` | 0.9.0 | Two-part string; schema `0.7` is current. |
-| Page | `page.size`, `page.orientation`, `page.margins`, `page.letterhead` | 0.5.0 | Shared by every paged format. |
+| Page | `page.size`, `page.orientation`, `page.margins`, `page.background`, `page.letterhead` | 0.5.0 | Shared by every paged format; the page fill arrived in 0.37.0 and also reaches the HTML page and the EPUB body. |
 | Paragraph | `formatting.paragraph` | 0.9.0 | Font families, size, weight, style, leading, spacing, alignment, `foreground` (0.21.0), `background`, `code` and `strikethrough` (0.23.0) and the inline overrides. |
 | Inline spans | `formatting.paragraph.emphasis`, `formatting.paragraph.strong` | 0.9.0 | Inherit the paragraph face and its `foreground`; style italic and weight bold are the semantic defaults; `background` since 0.23.0. |
 | Code and strikethrough | `formatting.paragraph.code`, `formatting.paragraph.strikethrough` | 0.23.0 | Inherit the paragraph face; since 0.25.0 an undeclared key follows the paragraph instead of a renderer default. |
@@ -248,6 +248,7 @@ A phase is closed only when all of the following hold:
 | Rule | `formatting.horizontal_rule`, `formatting.heading.h1` to `h6` `rule` | 0.18.0 | Thematic break thickness, color and optional spacing, and a rule below each heading level, shared by every format; the level rule arrived in 0.19.0 and `none` in 0.20.0. `formatting.rule` was renamed to `formatting.horizontal_rule` in 0.29.0. |
 | Header and footer | `page.header`, `page.footer` | 0.10.0 | Running content in left, center and right slots; lowercase tokens only. |
 | Lists | `formatting.list` | 0.27.0 | Item face, colors and alignment, indent, marker gap, per-level bullets, numbering formats with a suffix, and loose-item spacing. |
+| Images | `formatting.image` | 0.38.0 | Block images: alignment (default center), maximum width, per-side border with padding and background; the Markdown markers set width, height and alignment. |
 | Tables | `formatting.table` | 0.10.0 | Border, border color, header fill and cell padding; moved under `formatting` in 0.27.0. |
 | EPUB | `epub.split_at` | After 1.0.0 | Defaults to first-level headings. |
 

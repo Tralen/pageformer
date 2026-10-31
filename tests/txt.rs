@@ -60,6 +60,14 @@ fn the_report_matches_its_text_golden() {
 }
 
 #[test]
+fn a_block_image_becomes_its_alternative_text() {
+    let document =
+        markdown::parse("![Diagrama](Diagrama.png)\n-width:70%-\n").expect("the image must parse");
+
+    assert_eq!(txt::text(&document), "[Diagrama]\n");
+}
+
+#[test]
 fn every_golden_is_utf8_with_lf_and_one_trailing_newline() {
     for golden in [CONTRACT_TEXT, EMBARGOS_TEXT, REPORT_TEXT] {
         assert!(golden.ends_with('\n'), "the golden must end with a newline");

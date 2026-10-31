@@ -4,7 +4,7 @@ use std::fs;
 use std::io::{Cursor, Read};
 use std::path::Path;
 
-use pageformer::assets::Assets;
+use pageformer::assets::{Assets, load_images};
 use pageformer::confidential::loader as confidential_loader;
 use pageformer::confidential::{self, ConfidentialStore};
 use pageformer::document::{Block, Destination, Document, Inline, Metadata};
@@ -206,6 +206,37 @@ formatting:
 
     assert!(styles.contains("<w:sz w:val=\"26\"/>"), "{styles}");
     assert!(styles.contains("<w:sz w:val=\"54\"/>"), "{styles}");
+}
+
+#[test]
+fn a_block_image_takes_its_size_alignment_and_frame() {
+    let directory = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("assets")
+        .join("examples")
+        .join("tecnico");
+    let document = markdown::parse("![Diagrama](Diagrama.png)\n-width:70%-\n-align:left-\n")
+        .expect("the image must parse");
+    let assets = load_images(&document, &directory).expect("the image must load");
+    let template = Template::from_yaml(
+        "version: \"0.7\"\nformatting:\n  image:\n    alignment: center\n    max_width: 100%\n    background: \"#ffffff\"\n    border:\n      top: 1pt\n      right: 1pt\n      bottom: 1pt\n      left: 1pt\n      color: \"#336699\"\n      padding: 6\n",
+    )
+    .expect("the template must be valid");
+    let bytes = docx::render(&document, &template, &assets).expect("the package");
+    let mut archive = ZipArchive::new(Cursor::new(bytes)).expect("the package must be a ZIP");
+    let content = entry(&mut archive, "word/document.xml");
+
+    assert!(content.contains("<w:tbl>"), "{content}");
+    assert!(content.contains("<w:jc w:val=\"left\"/>"), "{content}");
+    assert!(
+        content.contains("<w:shd w:val=\"clear\" w:color=\"auto\" w:fill=\"ffffff\"/>"),
+        "{content}"
+    );
+    assert!(
+        content.contains("<w:top w:val=\"single\" w:sz=\"8\" w:space=\"0\" w:color=\"336699\"/>"),
+        "{content}"
+    );
+    assert!(content.contains("<w:drawing>"), "{content}");
+    assert!(content.contains("descr=\"Diagrama\""), "{content}");
 }
 
 #[test]

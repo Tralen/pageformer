@@ -227,6 +227,8 @@ fn content_rules(template: &Template, paragraph_after: f64) -> String {
     ));
     output.push_str("pre.code-block { white-space: pre-wrap; overflow-wrap: anywhere; }\n");
     output.push_str("pre.code-block code { font: inherit; white-space: inherit; }\n");
+    output.push_str("img { max-width: 100%; height: auto; }\n");
+    output.push_str(&image_rules(template, paragraph_after));
 
     output.push_str(&list_rules(template, paragraph_after));
     output.push_str(&table_rules(template, paragraph_after));
@@ -318,6 +320,70 @@ fn block_rule(selector: &str, style: &BlockStyle, after: f64, paragraph_size: Le
     }
     declarations.push(format!("margin: 0 0 {} 0;", points(after)));
     rule(selector, &declarations)
+}
+
+fn image_rules(template: &Template, paragraph_after: f64) -> String {
+    let image = template.formatting().image();
+    let border = image.border();
+    let fill_padding = if image.background().is_some() || !border.is_empty() {
+        border.padding().points()
+    } else {
+        0.0
+    };
+    let max_width = match image.max_width() {
+        crate::image::ImageDimension::Percent(percent) => format!("{percent:.2}%"),
+        crate::image::ImageDimension::Points(points) => format!("{points:.2}pt"),
+    };
+    let mut output = String::new();
+    output.push_str(&rule(
+        "figure.image-block",
+        &[
+            format!("margin: 0 0 {} 0;", points(paragraph_after)),
+            "margin-inline-start: 0;".to_owned(),
+            "margin-inline-end: 0;".to_owned(),
+        ],
+    ));
+    for (class, align) in [
+        ("align-left", "left"),
+        ("align-center", "center"),
+        ("align-right", "right"),
+    ] {
+        output.push_str(&rule(
+            &format!("figure.image-block.{class}"),
+            &[format!("text-align: {align};")],
+        ));
+    }
+    output.push_str(&rule(
+        "figure.image-block img",
+        &[
+            "display: block;".to_owned(),
+            format!("max-width: {max_width};"),
+            "height: auto;".to_owned(),
+        ],
+    ));
+    let mut frame = vec![
+        "display: inline-block;".to_owned(),
+        "max-width: 100%;".to_owned(),
+    ];
+    if fill_padding > 0.0 {
+        frame.push(format!("padding: {};", points(fill_padding)));
+    }
+    if !border.is_empty() {
+        frame.push("border-style: solid;".to_owned());
+        frame.push(format!("border-color: {};", border.color().hex()));
+        frame.push(format!(
+            "border-width: {} {} {} {};",
+            optional_side(border.top()),
+            optional_side(border.right()),
+            optional_side(border.bottom()),
+            optional_side(border.left())
+        ));
+    }
+    if let Some(background) = image.background() {
+        frame.push(format!("background-color: {};", background.hex()));
+    }
+    output.push_str(&rule("figure.image-block .image-frame", &frame));
+    output
 }
 
 fn list_rules(template: &Template, paragraph_after: f64) -> String {

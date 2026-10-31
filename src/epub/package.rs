@@ -158,6 +158,7 @@ fn collect_definitions(blocks: &[Block], definitions: &mut Vec<Block>) {
             Block::Quote(quote) => collect_definitions(quote.blocks(), definitions),
             Block::Heading(_)
             | Block::Paragraph(_)
+            | Block::Image(_)
             | Block::NumberedParagraph(_)
             | Block::Table(_)
             | Block::CodeBlock(_)
@@ -199,6 +200,7 @@ fn first_heading(blocks: &[Block]) -> Option<String> {
                 }
             }
             Block::Paragraph(_)
+            | Block::Image(_)
             | Block::NumberedParagraph(_)
             | Block::Table(_)
             | Block::CodeBlock(_)

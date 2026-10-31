@@ -124,6 +124,14 @@ formatting:
     #   padding: 6
     border: {}
 
+  # Block images: centered by default and capped to the text width. The border
+  # padding is the inset of both the border and the background fill.
+  image:
+    alignment: center
+    max_width: 100%
+    # background: "#ffffff"
+    border: {}
+
   # Ordered and unordered lists: item face and alignment, marker indent and gap,
   # marker sets cycled by depth, loose-item spacing, and task markers.
   list:

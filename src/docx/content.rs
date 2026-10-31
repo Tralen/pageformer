@@ -5,11 +5,11 @@ use std::collections::BTreeMap;
 use crate::assets::Assets;
 use crate::document::{
     Block, CodeBlock, ColumnAlignment, Destination, Document, FootnoteDefinition, FootnoteId,
-    Inline, List, ListItem, ListStart, Quote, QuoteKind, Table, TableCell, TaskState,
+    ImageBlock, Inline, List, ListItem, ListStart, Quote, QuoteKind, Table, TableCell, TaskState,
 };
-use crate::image;
+use crate::image::{self, ImageAlignment};
 use crate::metrics;
-use crate::template::Template;
+use crate::template::{BlockBorder, Template};
 use crate::xml;
 
 use super::numbering::{Numbering, NumberingKind};
@@ -204,6 +204,7 @@ impl<'a> Builder<'a> {
                 let paragraph = self.paragraph(self.body_style(), "", &runs);
                 self.document.push_str(&paragraph);
             }
+            Block::Image(image) => self.image_block(image),
             Block::NumberedParagraph(paragraph) => {
                 let mut runs = self.run(&format!("{}. ", paragraph.number()), "");
                 runs.push_str(&self.runs(paragraph.content(), ""));
@@ -390,6 +391,95 @@ impl<'a> Builder<'a> {
             height,
             if label.is_empty() { None } else { Some(&label) },
         )
+    }
+
+    fn image_block(&mut self, image: &ImageBlock) {
+        let label = plain_text(image.alternative());
+        let Some(virtual_name) = self.assets.map().image(image.destination().as_str()) else {
+            let paragraph = self.paragraph(None, "", &self.run(&format!("[{label}]"), ""));
+            self.document.push_str(&paragraph);
+            return;
+        };
+        let Some(media) = self
+            .media
+            .iter()
+            .find(|media| media.virtual_name == virtual_name)
+        else {
+            let paragraph = self.paragraph(None, "", &self.run(&format!("[{label}]"), ""));
+            self.document.push_str(&paragraph);
+            return;
+        };
+        let intrinsic = self
+            .assets
+            .files()
+            .get(virtual_name)
+            .map_or((300.0, 150.0), |bytes| image::intrinsic(bytes));
+        let style = self.template.formatting().image();
+        let border = style.border();
+        let padding = if style.background().is_some() || !border.is_empty() {
+            border.padding().points()
+        } else {
+            0.0
+        };
+        let layout = image::layout(
+            intrinsic,
+            self.text_width,
+            image.size(),
+            style.max_width(),
+            padding,
+        );
+        let alignment = image
+            .alignment()
+            .unwrap_or_else(|| self.template.formatting().image().alignment());
+        let align = match alignment {
+            ImageAlignment::Left => "left",
+            ImageAlignment::Center => "center",
+            ImageAlignment::Right => "right",
+        };
+        self.image_count += 1;
+        let id = self.image_count;
+        let drawing = drawing_inline(
+            &media.relationship,
+            id,
+            layout.width(),
+            layout.height(),
+            if label.is_empty() { None } else { Some(&label) },
+        );
+        if style.background().is_none() && border.is_empty() && padding <= 0.0 {
+            let paragraph = format!(
+                "<w:p><w:pPr><w:spacing w:after=\"0\"/><w:jc w:val=\"{align}\"/></w:pPr>{drawing}</w:p>\n"
+            );
+            self.document.push_str(&paragraph);
+            return;
+        }
+        let width = metrics::twips(layout.width());
+        let mut table = String::from("<w:tbl><w:tblPr><w:tblW w:w=\"0\" w:type=\"auto\"/>");
+        table.push_str(&format!("<w:jc w:val=\"{align}\"/>"));
+        table.push_str(&table_borders(border));
+        if padding > 0.0 {
+            let padding = metrics::twips(padding);
+            table.push_str(&format!(
+                "<w:tblCellMar><w:top w:w=\"{padding}\" w:type=\"dxa\"/><w:left w:w=\"{padding}\" w:type=\"dxa\"/><w:bottom w:w=\"{padding}\" w:type=\"dxa\"/><w:right w:w=\"{padding}\" w:type=\"dxa\"/></w:tblCellMar>"
+            ));
+        }
+        table.push_str("</w:tblPr>");
+        table.push_str(&format!(
+            "<w:tblGrid><w:gridCol w:w=\"{width}\"/></w:tblGrid>"
+        ));
+        table.push_str("<w:tr><w:tc><w:tcPr>");
+        table.push_str(&format!("<w:tcW w:w=\"{width}\" w:type=\"dxa\"/>"));
+        if let Some(background) = style.background() {
+            table.push_str(&format!(
+                "<w:shd w:val=\"clear\" w:color=\"auto\" w:fill=\"{}\"/>",
+                background.hex().trim_start_matches('#')
+            ));
+        }
+        table.push_str("</w:tcPr>");
+        table.push_str(&format!(
+            "<w:p><w:pPr><w:spacing w:after=\"0\"/><w:jc w:val=\"{align}\"/></w:pPr>{drawing}</w:p>"
+        ));
+        table.push_str("</w:tc></w:tr></w:tbl>\n");
+        self.document.push_str(&table);
     }
 
     fn note(&mut self, id: &FootnoteId) -> String {
@@ -849,6 +939,29 @@ fn slot_runs(output: &mut String, text: Option<&str>, document: &Document) {
             xml::escape_text(rest)
         ),
     );
+}
+
+fn table_borders(border: &BlockBorder) -> String {
+    let mut output = String::from("<w:tblBorders>");
+    for (side, thickness) in [
+        ("top", border.top()),
+        ("left", border.left()),
+        ("bottom", border.bottom()),
+        ("right", border.right()),
+    ] {
+        match thickness {
+            Some(thickness) => output.push_str(&format!(
+                "<w:{side} w:val=\"single\" w:sz=\"{}\" w:space=\"0\" w:color=\"{}\"/>",
+                metrics::eighths(thickness.points()),
+                border.color().hex().trim_start_matches('#')
+            )),
+            None => output.push_str(&format!(
+                "<w:{side} w:val=\"none\" w:sz=\"0\" w:space=\"0\" w:color=\"auto\"/>"
+            )),
+        }
+    }
+    output.push_str("</w:tblBorders>");
+    output
 }
 
 fn drawing_inline(

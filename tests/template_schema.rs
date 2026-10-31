@@ -49,6 +49,15 @@ fn a_minimal_template_uses_the_documented_defaults() {
     assert_eq!(paragraph.emphasis().face().slant(), FontSlant::Italic);
     assert_eq!(paragraph.strong().face().weight(), FontWeight::BOLD);
 
+    let image = template.formatting().image();
+    assert_eq!(image.alignment(), pageformer::image::ImageAlignment::Center);
+    assert_eq!(
+        image.max_width(),
+        pageformer::image::ImageDimension::Percent(100.0)
+    );
+    assert_eq!(image.background(), None);
+    assert!(image.border().is_empty());
+
     let heading = template.formatting().heading().levels();
     assert_eq!(heading[0].face().size().points(), 18.0);
     assert_eq!(heading[0].spacing_before().points(), 18.0);
@@ -91,6 +100,15 @@ formatting:
       weight: bold
     strong:
       style: italic
+  image:
+    alignment: right
+    max_width: 60%
+    background: '#f7f7f7'
+    border:
+      top: 1pt
+      bottom: 1pt
+      color: '#123456'
+      padding: 4
   heading:
     font_families:
       - Liberation Sans
@@ -135,6 +153,20 @@ formatting:
     assert_eq!(paragraph.emphasis().face().slant(), FontSlant::Italic);
     assert_eq!(paragraph.strong().face().weight(), FontWeight::BOLD);
     assert_eq!(paragraph.strong().face().slant(), FontSlant::Italic);
+
+    let image = template.formatting().image();
+    assert_eq!(image.alignment(), pageformer::image::ImageAlignment::Right);
+    assert_eq!(
+        image.max_width(),
+        pageformer::image::ImageDimension::Percent(60.0)
+    );
+    assert_eq!(
+        image.background().map(|color| color.hex()),
+        Some("#f7f7f7".to_owned())
+    );
+    assert_eq!(image.border().top().map(Length::points), Some(1.0));
+    assert_eq!(image.border().color().hex(), "#123456");
+    assert_eq!(image.border().padding().points(), 4.0);
 
     let heading = template.formatting().heading().levels();
     assert_eq!(heading[0].face().font_families().len(), 1);
@@ -1221,6 +1253,31 @@ fn an_unknown_key_in_a_new_style_is_rejected() {
 }
 
 #[test]
+fn an_invalid_image_style_names_its_field() {
+    for (yaml, field) in [
+        (
+            "version: \"0.7\"\nformatting:\n  image:\n    max_width: 0%\n",
+            "formatting.image.max_width",
+        ),
+        (
+            "version: \"0.7\"\nformatting:\n  image:\n    max_width: 101%\n",
+            "formatting.image.max_width",
+        ),
+        (
+            "version: \"0.7\"\nformatting:\n  image:\n    max_width: nope\n",
+            "formatting.image.max_width",
+        ),
+        (
+            "version: \"0.7\"\nformatting:\n  image:\n    alignment: middle\n",
+            "formatting.image.alignment",
+        ),
+    ] {
+        let error = Template::from_yaml(yaml).expect_err("an invalid image style");
+        assert!(error.to_string().contains(field), "{yaml}: {error}");
+    }
+}
+
+#[test]
 fn the_embedded_template_matches_the_project_defaults() {
     let template = Template::embedded().expect("the embedded template must be valid");
     assert_eq!(template.schema_version(), CURRENT_SCHEMA_VERSION);
@@ -1234,6 +1291,16 @@ fn the_embedded_template_matches_the_project_defaults() {
     assert_eq!(paragraph.face().size().points(), 12.0);
     assert_eq!(paragraph.leading().points(), 7.8);
     assert_eq!(paragraph.code().size().map(Length::points), Some(10.5));
+    assert_eq!(
+        template.formatting().image().alignment(),
+        pageformer::image::ImageAlignment::Center
+    );
+    assert_eq!(
+        template.formatting().image().max_width(),
+        pageformer::image::ImageDimension::Percent(100.0)
+    );
+    assert_eq!(template.formatting().image().background(), None);
+    assert!(template.formatting().image().border().is_empty());
     assert_eq!(
         template
             .formatting()

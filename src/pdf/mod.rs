@@ -105,15 +105,16 @@ pub fn render(
     template: &Template,
     assets: &Assets,
 ) -> Result<PdfOutput, PdfError> {
-    let source = typst_source(document, template, assets.map())?;
+    let (source, mut warnings) = source::typst_source_with_assets(document, template, assets)?;
     let date = document.metadata().date().unwrap_or(FIXED_DATE);
     let world = PdfWorld::new(source, assets.files(), date)?;
     let warned = typst::compile::<PagedDocument>(&world);
-    let warnings = warned
-        .warnings
-        .iter()
-        .map(|warning| world::format_diagnostic(&world, warning))
-        .collect();
+    warnings.extend(
+        warned
+            .warnings
+            .iter()
+            .map(|warning| world::format_diagnostic(&world, warning)),
+    );
     let compiled = warned
         .output
         .map_err(|errors| PdfError::Compilation(format_diagnostics(&world, &errors)))?;

@@ -4,6 +4,12 @@
 
 *Major updates and feature releases.*
 
+### 0.37.2
+
+- Disabled the page background in the embedded default template: the key stays documented and commented, so the fallback paper remains white and the user opts in by uncommenting it.
+- Aligned the embedded-template test with the disabled default and clarified the comment in `assets/default.pageformer.yaml`.
+- Regenerates the ODT examples for the version in `meta:generator`.
+
 ### 0.37.1
 
 - The embedded default template now declares `page.background: "#fdfdfd"` with a comment, so the fallback document has the page fill enabled and the key is visible as a starting point.

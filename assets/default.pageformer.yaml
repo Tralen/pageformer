@@ -22,8 +22,8 @@ page:
     bottom: 57
     left: 71
     right: 57
-  # The page fill, under the text and the letterhead. It applies to every
-  # format; change the color or remove the key to leave the paper white.
+  # The page fill, under the text and the letterhead. It is off when omitted,
+  # which leaves the paper white; uncomment it to paint the page.
   # background: "#fdfdfd"
   # A letterhead is an image path relative to the template file. It is off when
   # omitted; the file must be png, jpg, gif, svg or webp.

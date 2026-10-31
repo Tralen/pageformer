@@ -1227,14 +1227,7 @@ fn the_embedded_template_matches_the_project_defaults() {
     assert_eq!(template.page().size(), PageSize::A4);
     assert_eq!(template.page().orientation(), Orientation::Portrait);
     assert_eq!(template.page().margins().left().points(), 71.0);
-    assert_eq!(
-        template
-            .page()
-            .background()
-            .map(|color| color.hex())
-            .as_deref(),
-        Some("#fdfdfd")
-    );
+    assert_eq!(template.page().background(), None);
 
     let paragraph = template.formatting().paragraph();
     assert_eq!(paragraph.face().font_families().len(), 3);

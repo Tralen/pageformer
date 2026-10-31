@@ -4,6 +4,11 @@
 
 *Major updates and feature releases.*
 
+### 0.41.11
+
+- Forced LF checkout for the committed HTML and TXT examples and marked the generated packages as binary in `.gitattributes`, so a Windows checkout keeps the example bytes identical to a fresh render.
+- Regenerates the ODT examples for the version in `meta:generator`.
+
 ### 0.41.10
 
 - Set `APPDATA` alongside `XDG_CONFIG_HOME` in the CLI confidential mapping tests, because Windows reads the user configuration directory from `%APPDATA%` and ignores `XDG_CONFIG_HOME`.

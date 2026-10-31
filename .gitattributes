@@ -1,1 +1,7 @@
 *.pdf binary
+*.png binary
+*.epub binary
+*.odt binary
+*.docx binary
+*.html text eol=lf
+*.txt text eol=lf

@@ -4,6 +4,12 @@
 
 *Major updates and feature releases.*
 
+### 0.41.6
+
+- Made the confidential folder tests canonicalize their expected paths, so they pass on macOS, where `/var` resolves to `/private/var`.
+- Filtered the expected `unknown font family` warnings in the PDF tests, because the templates list system fonts in preference order and a CI runner may not have every preferred family; every other warning still fails the test.
+- Regenerates the ODT examples for the version in `meta:generator`.
+
 ### 0.41.5
 
 - Added test-only GitHub Actions CI for Linux, macOS on Apple Silicon and Intel, and Windows, plus a gitleaks secret scan for the worktree and the full history.

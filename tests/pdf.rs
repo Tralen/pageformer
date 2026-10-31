@@ -45,6 +45,16 @@ fn contains(haystack: &[u8], needle: &[u8]) -> bool {
         .any(|window| window == needle)
 }
 
+/// The templates list system fonts in preference order and rely on an embedded
+/// fallback. Typst warns for each missing preference, which is expected on a
+/// machine without those fonts; every other warning is a test failure.
+fn non_font_warnings(warnings: &[String]) -> Vec<&String> {
+    warnings
+        .iter()
+        .filter(|warning| !warning.contains("unknown font family"))
+        .collect()
+}
+
 fn document_with_image(destination: &str) -> Document {
     Document::new(
         Metadata::default(),
@@ -65,7 +75,7 @@ fn the_contract_is_rendered_as_pdf_a_and_stays_deterministic() {
     let first = pdf::render(&document, &template, &assets).expect("the contract must render");
     assert!(first.bytes().starts_with(b"%PDF-"));
     assert!(
-        first.warnings().is_empty(),
+        non_font_warnings(first.warnings()).is_empty(),
         "the contract produced warnings: {:?}",
         first.warnings()
     );
@@ -100,7 +110,7 @@ fn the_embargos_fixture_is_rendered() {
     assert!(output.bytes().starts_with(b"%PDF-"));
     assert!(output.bytes().len() > 10_000);
     assert!(
-        output.warnings().is_empty(),
+        non_font_warnings(output.warnings()).is_empty(),
         "the embargos fixture produced warnings: {:?}",
         output.warnings()
     );
@@ -136,7 +146,7 @@ fn the_shared_example_template_uses_its_letterhead() {
         pdf::render(resolution.document(), template, &assets).expect("the example must render");
     assert!(output.bytes().starts_with(b"%PDF-"));
     assert!(
-        output.warnings().is_empty(),
+        non_font_warnings(output.warnings()).is_empty(),
         "the example produced warnings: {:?}",
         output.warnings()
     );
@@ -179,7 +189,7 @@ formatting:
     let first =
         pdf::render(&document, &template, &Assets::default()).expect("the document must render");
     assert!(
-        first.warnings().is_empty(),
+        non_font_warnings(first.warnings()).is_empty(),
         "the document produced warnings: {:?}",
         first.warnings()
     );
@@ -220,7 +230,7 @@ formatting:
         pdf::render(&document, &template, &Assets::default()).expect("the document must render");
     assert!(first.bytes().starts_with(b"%PDF-"));
     assert!(
-        first.warnings().is_empty(),
+        non_font_warnings(first.warnings()).is_empty(),
         "the document produced warnings: {:?}",
         first.warnings()
     );
@@ -257,7 +267,7 @@ fn the_technical_report_uses_its_own_template() {
         .expect("the report assets must load");
     let first = pdf::render(&document, template, &assets).expect("the report must render");
     assert!(
-        first.warnings().is_empty(),
+        non_font_warnings(first.warnings()).is_empty(),
         "the report produced warnings: {:?}",
         first.warnings()
     );
@@ -285,7 +295,7 @@ fn every_inline_construct_renders() {
         .expect("the image must load");
     let output = pdf::render(&document, &embedded(), &assets).expect("the document must render");
     assert!(
-        output.warnings().is_empty(),
+        non_font_warnings(output.warnings()).is_empty(),
         "the document produced warnings: {:?}",
         output.warnings()
     );
@@ -316,7 +326,7 @@ formatting:
     let output =
         pdf::render(&document, &template, &Assets::default()).expect("the document must render");
     assert!(
-        output.warnings().is_empty(),
+        non_font_warnings(output.warnings()).is_empty(),
         "the document produced warnings: {:?}",
         output.warnings()
     );

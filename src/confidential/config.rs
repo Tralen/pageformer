@@ -528,6 +528,12 @@ mod tests {
         TempDir::new().expect("a source directory")
     }
 
+    /// The configuration canonicalizes its paths, so the expected paths must be
+    /// canonical too; on macOS `/var` resolves to `/private/var`.
+    fn resolved(path: &Path) -> PathBuf {
+        fs::canonicalize(path).expect("the path must resolve")
+    }
+
     fn config(temp: &TempDir, secret: &Path, source: &Path) -> ConfidentialConfig {
         let public = temp.path().join(PUBLIC_FILE_NAME);
         write_public(&public, &[secret]);
@@ -543,13 +549,11 @@ mod tests {
         let source = project();
         let config = config(&temp, secret.path(), source.path());
 
-        assert_eq!(
-            config.file_for(source.path()),
-            Some(secret.path().join("escritorio.ini").as_path())
-        );
+        let expected = resolved(&secret.path().join("escritorio.ini"));
+        assert_eq!(config.file_for(source.path()), Some(expected.as_path()));
         assert_eq!(
             config.file_for(&source.path().join("nested")),
-            Some(secret.path().join("escritorio.ini").as_path())
+            Some(expected.as_path())
         );
     }
 
@@ -571,14 +575,10 @@ mod tests {
         let config =
             ConfidentialConfig::from_public_file(&public).expect("the configuration must load");
 
-        assert_eq!(
-            config.file_for(&nested),
-            Some(secret.path().join("inside.ini").as_path())
-        );
-        assert_eq!(
-            config.file_for(source.path()),
-            Some(secret.path().join("outside.ini").as_path())
-        );
+        let inside = resolved(&secret.path().join("inside.ini"));
+        let outside = resolved(&secret.path().join("outside.ini"));
+        assert_eq!(config.file_for(&nested), Some(inside.as_path()));
+        assert_eq!(config.file_for(source.path()), Some(outside.as_path()));
     }
 
     #[test]
@@ -602,14 +602,10 @@ mod tests {
         let config =
             ConfidentialConfig::from_public_file(&public).expect("the configuration must load");
 
-        assert_eq!(
-            config.file_for(&nested),
-            Some(secret.path().join("escritório particular.ini").as_path())
-        );
-        assert_eq!(
-            config.file_for(source.path()),
-            Some(secret.path().join("escritorio.ini").as_path())
-        );
+        let particular = resolved(&secret.path().join("escritório particular.ini"));
+        let escritorio = resolved(&secret.path().join("escritorio.ini"));
+        assert_eq!(config.file_for(&nested), Some(particular.as_path()));
+        assert_eq!(config.file_for(source.path()), Some(escritorio.as_path()));
     }
 
     #[test]

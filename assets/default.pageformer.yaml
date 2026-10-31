@@ -24,7 +24,7 @@ page:
     right: 57
   # The page fill, under the text and the letterhead. It applies to every
   # format; change the color or remove the key to leave the paper white.
-  background: "#fdfdfd"
+  # background: "#fdfdfd"
   # A letterhead is an image path relative to the template file. It is off when
   # omitted; the file must be png, jpg, gif, svg or webp.
   # letterhead: images/letterhead.png

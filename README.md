@@ -136,5 +136,6 @@ All three PDFs pass veraPDF as PDF/A-2b. The ODT and DOCX packages open in Libre
 - [`docs/template.md`](docs/template.md): the YAML schema, the resolution rules and every style key.
 - [`docs/confidential.md`](docs/confidential.md): the confidential values file and the two-level folder mapping.
 - [`docs/verification.md`](docs/verification.md): the test commands, the external validators and the example regeneration.
+- [`docs/releasing.md`](docs/releasing.md): the manual GitHub release process, the tag convention and the candidate archive.
 - [`docs/pageweaver.md`](docs/pageweaver.md): the boundary with the separate WYSIWYG editor.
 - [`docs/roadmap.md`](docs/roadmap.md): what is done and what remains before 1.0.0.

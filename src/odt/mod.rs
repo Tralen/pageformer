@@ -1,6 +1,6 @@
 //! ODT backend: an OpenDocument text package with the template's semantic styles.
 //!
-//! The package is a stored ZIP written by [`crate::zip`], so two runs with the
+//! The package is a stored ZIP written by `crate::zip`, so two runs with the
 //! same input produce identical bytes. The parts are `mimetype` first, then the
 //! manifest, `content.xml`, `styles.xml`, `meta.xml` and the pictures.
 

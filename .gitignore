@@ -10,3 +10,13 @@ COMPLIANCE.md
 target/
 SKETCH.md
 .ruff_cache
+
+# Secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+secrets/

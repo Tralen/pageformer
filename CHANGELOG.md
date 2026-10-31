@@ -4,6 +4,14 @@
 
 *Major updates and feature releases.*
 
+### 0.41.5
+
+- Added test-only GitHub Actions CI for Linux, macOS on Apple Silicon and Intel, and Windows, plus a gitleaks secret scan for the worktree and the full history.
+- Added `docs/releasing.md` with the manual GitHub release process, the `v<version>` tag convention, the signed-tag check, the source archive and the checksum verification.
+- Added the GitHub repository metadata to `Cargo.toml` and secret-file patterns to `.gitignore`.
+- Fixed the two private intra-doc links in the DOCX and ODT module docs, so `cargo doc` is warning-free.
+- Regenerates the ODT examples for the version in `meta:generator`.
+
 ### 0.41.4
 
 - Revised the documentation as one set: the README now walks through the pipeline, the formats, the Markdown markers, the confidential fields and the publisher window, and includes a screenshot of `pageformer-publisher`.

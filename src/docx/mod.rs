@@ -1,6 +1,6 @@
 //! DOCX backend: an Office Open XML package with the template's styles.
 //!
-//! The package is a stored ZIP written by [`crate::zip`], with fixed
+//! The package is a stored ZIP written by `crate::zip`, with fixed
 //! relationship ids, numbering ids and property dates, so two runs with the
 //! same input produce identical bytes.
 

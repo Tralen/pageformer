@@ -171,7 +171,7 @@ impl Builder<'_> {
         let blocks = item.blocks();
         let mut output = String::new();
         if let Some((Block::Paragraph(inlines), rest)) = blocks.split_first() {
-            output.push_str("<p>");
+            output.push_str("<p class=\"list-paragraph\">");
             if let Some(separator) = &separator {
                 output.push_str(separator);
             }
@@ -761,6 +761,11 @@ mod tests {
 
         assert!(content.main.contains("list-depth-0"), "{}", content.main);
         assert!(content.main.contains("list-depth-1"), "{}", content.main);
+        assert!(
+            content.main.contains("<p class=\"list-paragraph\">um</p>"),
+            "{}",
+            content.main
+        );
     }
 
     #[test]

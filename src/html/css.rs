@@ -296,9 +296,15 @@ fn list_rules(template: &Template, paragraph_after: f64) -> String {
         ],
     ));
 
-    let mut item = partial_declarations(list.text());
+    let mut item = partial_text_declarations(list.text());
     item.push(format!("text-align: {};", alignment(list.alignment())));
     output.push_str(&rule("li", &item));
+    if let Some(background) = list.text().background() {
+        output.push_str(&rule(
+            ".list-paragraph",
+            &[format!("background-color: {};", background.hex())],
+        ));
+    }
     output.push_str(&rule("li > p", &["margin: 0;".to_owned()]));
     output.push_str(&rule("li > ul, li > ol", &["margin-bottom: 0;".to_owned()]));
     if let Some(spacing) = list.spacing().filter(|spacing| spacing.points() > 0.0) {
@@ -385,6 +391,7 @@ fn table_rules(template: &Template, paragraph_after: f64) -> String {
             "vertical-align: top;".to_owned(),
         ],
     ));
+    output.push_str("th:empty::after, td:empty::after { content: \"\\00a0\"; }\n");
     output.push_str(&rule(
         "th",
         &[
@@ -620,6 +627,14 @@ fn face_declarations(face: &TextFace) -> Vec<String> {
 }
 
 fn partial_declarations(style: &PartialTextStyle) -> Vec<String> {
+    let mut declarations = partial_text_declarations(style);
+    if let Some(background) = style.background() {
+        declarations.push(format!("background-color: {};", background.hex()));
+    }
+    declarations
+}
+
+fn partial_text_declarations(style: &PartialTextStyle) -> Vec<String> {
     let mut declarations = Vec::new();
     if let Some(families) = style.font_families() {
         declarations.push(format!("font-family: {};", font_families(families)));
@@ -635,9 +650,6 @@ fn partial_declarations(style: &PartialTextStyle) -> Vec<String> {
     }
     if let Some(foreground) = style.foreground() {
         declarations.push(format!("color: {};", foreground.hex()));
-    }
-    if let Some(background) = style.background() {
-        declarations.push(format!("background-color: {};", background.hex()));
     }
     declarations
 }
@@ -727,6 +739,7 @@ mod tests {
              \x20   background: \"#fdfdfd\"\n\
              \x20   spacing: 24\n\
              \x20 list:\n\
+             \x20   background: \"#f5f7fa\"\n\
              \x20   bullet:\n\
              \x20     - \"•\"\n\
              \x20   numbering:\n\
@@ -759,6 +772,11 @@ mod tests {
             css.contains("ul.task-list, ol.task-list {\n  list-style: none;\n}"),
             "{css}"
         );
+        assert!(
+            css.contains(".list-paragraph {\n  background-color: #f5f7fa;\n}"),
+            "{css}"
+        );
+        assert!(css.contains("th:empty::after, td:empty::after"), "{css}");
     }
 
     #[test]

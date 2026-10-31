@@ -450,6 +450,7 @@ th, td {
   text-align: left;
   vertical-align: top;
 }
+th:empty::after, td:empty::after { content: "\00a0"; }
 th {
   font-weight: inherit;
   text-align: inherit;

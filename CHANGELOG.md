@@ -4,6 +4,12 @@
 
 *Major updates and feature releases.*
 
+### 0.35.1
+
+- Fixed empty HTML table cells collapsing: `th:empty::after` and `td:empty::after` add a non-breaking line box, so a signature grid keeps the row height of the other formats.
+- Fixed the HTML list fill: the background now belongs to the first paragraph of each item, not to the whole `li`, so a nested list is not painted by its parent and the band follows the item indentation. The task marker stays inside the filled paragraph.
+- Regenerates the HTML and ODT examples for the version in `meta:generator`.
+
 ### 0.35.0
 
 - Added the self-contained HTML backend and `--format html`: one semantic HTML5 file with embedded CSS, data-URI images and no network request.

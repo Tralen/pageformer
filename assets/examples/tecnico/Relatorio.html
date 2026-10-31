@@ -187,8 +187,10 @@ li {
   font-weight: 400;
   font-style: normal;
   color: #334455;
-  background-color: #f5f7fa;
   text-align: left;
+}
+.list-paragraph {
+  background-color: #f5f7fa;
 }
 li > p {
   margin: 0;
@@ -479,6 +481,7 @@ th, td {
   text-align: left;
   vertical-align: top;
 }
+th:empty::after, td:empty::after { content: "\00a0"; }
 th {
   font-weight: inherit;
   text-align: inherit;
@@ -582,28 +585,28 @@ a[role="doc-backlink"] {
 <p class="body-paragraph">O texto aceita <em class="emphasis">ênfase</em>, <strong class="strong">negrito</strong>, <s class="strikethrough">riscado</s> e <code class="inline-code">código em linha</code>, além de <a href="https://example.com">links</a> e notas de rodapé.<sup><a href="#fn-1" id="fnref-1" role="doc-noteref">1</a></sup></p>
 <h2>Listas</h2>
 <ul class="list-depth-0">
-<li><p>Item simples;</p></li>
-<li><p>Item com <strong class="strong">negrito</strong> e <code class="inline-code">código</code>;</p>
+<li><p class="list-paragraph">Item simples;</p></li>
+<li><p class="list-paragraph">Item com <strong class="strong">negrito</strong> e <code class="inline-code">código</code>;</p>
 <ul class="list-depth-1">
-<li><p>Subitem com marcador de segundo nível;</p>
+<li><p class="list-paragraph">Subitem com marcador de segundo nível;</p>
 <ul class="list-depth-2">
-<li><p>Sub-subitem com marcador de terceiro nível;</p></li>
+<li><p class="list-paragraph">Sub-subitem com marcador de terceiro nível;</p></li>
 </ul></li>
 </ul></li>
-<li><p>Item com <a href="https://example.com">site de exemplo</a>.</p></li>
+<li><p class="list-paragraph">Item com <a href="https://example.com">site de exemplo</a>.</p></li>
 </ul>
 <ol class="list-depth-0">
-<li><p>Primeiro passo;</p>
+<li><p class="list-paragraph">Primeiro passo;</p>
 <ol class="list-depth-1">
-<li><p>Passo interno com numeração alfabética;</p></li>
-<li><p>Outro passo interno;</p></li>
+<li><p class="list-paragraph">Passo interno com numeração alfabética;</p></li>
+<li><p class="list-paragraph">Outro passo interno;</p></li>
 </ol></li>
-<li><p>Segundo passo;</p></li>
-<li><p>Terceiro passo.</p></li>
+<li><p class="list-paragraph">Segundo passo;</p></li>
+<li><p class="list-paragraph">Terceiro passo.</p></li>
 </ol>
 <ul class="list-depth-0 task-list">
-<li><p><span class="task-done">[x]</span> Tarefa concluída;</p></li>
-<li><p><span class="task-todo">[ ]</span> Tarefa pendente.</p></li>
+<li><p class="list-paragraph"><span class="task-done">[x]</span> Tarefa concluída;</p></li>
+<li><p class="list-paragraph"><span class="task-todo">[ ]</span> Tarefa pendente.</p></li>
 </ul>
 <p class="body-paragraph">A tabela abaixo usa a borda, o preenchimento do cabeçalho e a cor definidos no template.</p>
 <table>

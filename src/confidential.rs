@@ -4,6 +4,7 @@
 //! never appears in `Debug`, `Display`, errors or diagnostics, and the resolved
 //! document is the only place where the text is expanded.
 
+pub mod config;
 pub mod loader;
 
 use std::collections::BTreeMap;

@@ -60,6 +60,17 @@ fn make_private(path: &Path) {
 #[cfg(not(unix))]
 fn make_private(_path: &Path) {}
 
+#[cfg(unix)]
+fn make_private_directory(path: &Path) {
+    use std::os::unix::fs::PermissionsExt;
+
+    fs::set_permissions(path, fs::Permissions::from_mode(0o700))
+        .expect("the directory permissions must change");
+}
+
+#[cfg(not(unix))]
+fn make_private_directory(_path: &Path) {}
+
 fn run_with_environment(arguments: &[&OsStr], variables: &[(&str, &str)]) -> Output {
     let mut command = Command::new(binary());
     command.args(arguments);
@@ -90,6 +101,92 @@ fn example_confidential_file() -> (TempDir, PathBuf) {
         include_str!("../assets/examples/confidencial/embargos.ini"),
     );
     (directory, path)
+}
+
+fn write_confidential_config(source: &Path, source_name: &str, values: &str) -> (TempDir, TempDir) {
+    let config_home = TempDir::new().expect("a configuration home");
+    let config_directory = config_home.path().join("pageformer");
+    fs::create_dir(&config_directory).expect("the configuration directory");
+    let secret = TempDir::new().expect("a confidential directory");
+    make_private_directory(secret.path());
+    write_private(&secret.path().join(format!("{source_name}.ini")), values);
+    write_private(
+        &secret.path().join("confidential.yaml"),
+        &format!(
+            "version: 1\nfiles:\n  {source_name}: \"{}\"\n",
+            source.display()
+        ),
+    );
+    fs::write(
+        config_directory.join("config.yaml"),
+        format!(
+            "version: 1\nconfidential_directories:\n  - \"{}\"\n",
+            secret.path().display()
+        ),
+    )
+    .expect("the public configuration");
+    (config_home, secret)
+}
+
+#[test]
+fn a_confidential_folder_mapping_supplies_the_ini() {
+    let source = TempDir::new().expect("a temporary source");
+    fs::write(
+        source.path().join("Doc.md"),
+        "# Documento\n\nNome: {NOME}.\n",
+    )
+    .expect("the document must be written");
+    let (config_home, _secret) =
+        write_confidential_config(source.path(), "escritorio", "NOME = Fulano de Tal\n");
+    let output = TempDir::new().expect("a temporary output");
+    let config_home = config_home.path().to_str().expect("a UTF-8 path");
+    let result = run_with_environment(
+        &[
+            OsStr::new("--format"),
+            OsStr::new("txt"),
+            OsStr::new("--color=never"),
+            OsStr::new("--output"),
+            output.path().as_os_str(),
+            source.path().join("Doc.md").as_os_str(),
+        ],
+        &[("XDG_CONFIG_HOME", config_home)],
+    );
+    assert!(result.status.success(), "{}", stderr(&result));
+    let text = fs::read_to_string(output.path().join("Doc.txt")).expect("the text must exist");
+    assert!(text.contains("Nome: Fulano de Tal."), "{text}");
+    assert!(!stdout(&result).contains("Fulano"), "{}", stdout(&result));
+}
+
+#[test]
+fn an_explicit_confidential_file_wins_over_the_folder_mapping() {
+    let source = TempDir::new().expect("a temporary source");
+    fs::write(
+        source.path().join("Doc.md"),
+        "# Documento\n\nNome: {NOME}.\n",
+    )
+    .expect("the document must be written");
+    let (config_home, secret) =
+        write_confidential_config(source.path(), "escritorio", "NOME = Fulano de Tal\n");
+    let explicit = secret.path().join("explicit.ini");
+    write_private(&explicit, "NOME = Explicit\n");
+    let output = TempDir::new().expect("a temporary output");
+    let config_home = config_home.path().to_str().expect("a UTF-8 path");
+    let result = run_with_environment(
+        &[
+            OsStr::new("--format"),
+            OsStr::new("txt"),
+            OsStr::new("--color=never"),
+            OsStr::new("--confidential-file"),
+            explicit.as_os_str(),
+            OsStr::new("--output"),
+            output.path().as_os_str(),
+            source.path().join("Doc.md").as_os_str(),
+        ],
+        &[("XDG_CONFIG_HOME", config_home)],
+    );
+    assert!(result.status.success(), "{}", stderr(&result));
+    let text = fs::read_to_string(output.path().join("Doc.txt")).expect("the text must exist");
+    assert!(text.contains("Nome: Explicit."), "{text}");
 }
 
 #[test]

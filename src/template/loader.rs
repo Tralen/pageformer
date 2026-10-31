@@ -18,7 +18,7 @@ pub const LOCAL_FILE_NAME: &str = ".pageformer.yaml";
 pub const GLOBAL_FILE_NAME: &str = "pageformer.yaml";
 
 /// The directory name used under the user configuration directory.
-pub const GLOBAL_DIRECTORY_NAME: &str = "pageformer";
+pub const GLOBAL_DIRECTORY_NAME: &str = crate::config::DIRECTORY_NAME;
 
 /// A template together with the place it came from.
 #[derive(Debug, Clone, PartialEq)]
@@ -173,27 +173,7 @@ pub fn resolve(
 
 /// The global template path in the user configuration directory.
 pub fn global_template_path() -> Option<PathBuf> {
-    user_config_directory().map(|directory| directory.join(GLOBAL_FILE_NAME))
-}
-
-/// The only function in this module that reads the environment.
-fn user_config_directory() -> Option<PathBuf> {
-    #[cfg(windows)]
-    {
-        let base = std::env::var_os("APPDATA").map(PathBuf::from)?;
-        Some(base.join(GLOBAL_DIRECTORY_NAME))
-    }
-    #[cfg(not(windows))]
-    {
-        if let Some(base) = std::env::var_os("XDG_CONFIG_HOME")
-            .map(PathBuf::from)
-            .filter(|path| path.is_absolute())
-        {
-            return Some(base.join(GLOBAL_DIRECTORY_NAME));
-        }
-        let home = std::env::var_os("HOME").map(PathBuf::from)?;
-        Some(home.join(".config").join(GLOBAL_DIRECTORY_NAME))
-    }
+    crate::config::user_config_directory().map(|directory| directory.join(GLOBAL_FILE_NAME))
 }
 
 #[cfg(test)]

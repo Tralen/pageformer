@@ -11,6 +11,7 @@
 
 pub mod assets;
 pub mod confidential;
+mod config;
 pub mod document;
 pub mod docx;
 pub mod epub;

@@ -4,6 +4,15 @@
 
 *Major updates and feature releases.*
 
+### 0.40.0
+
+- Added the user-level confidential folder mapping. The public `config.yaml` lists confidential directories; each directory owns a `confidential.yaml` with a `files` map from an INI stem to its absolute source folder, so the INI is implicit and the template never knows it.
+- The mapping resolves by the longest source-folder prefix. An explicit `--confidential-file` or the publisher field wins. The public configuration is read only from the user configuration directory, never from the project.
+- The confidential directory must be `700`, and its map and INIs must be `600` on Unix. Missing directories, missing INIs, invalid names, relative paths, duplicate folders, unknown keys and unsupported versions are errors.
+- `pageformer-publisher` uses the mapping when its confidential field is empty, and now reads the confidential environment variables when no file is selected.
+- Documented the two-level configuration in `docs/confidential.md` and added CLI tests with a temporary `XDG_CONFIG_HOME`.
+- Regenerates the ODT examples for the version in `meta:generator`.
+
 ### 0.39.0
 
 - Added a title row to `pageformer-publisher`: `Pageformer Publisher` on the left in a larger face and the crate version as `v0.39.0` on the right in the small face.

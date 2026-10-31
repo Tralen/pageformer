@@ -12,6 +12,7 @@ use std::str::FromStr;
 use anyhow::{Context, Result};
 use clap::{Arg, ArgAction, Command};
 
+use pageformer::confidential::config::ConfidentialConfig;
 use pageformer::confidential::{self, ConfidentialStore};
 use pageformer::format::Format;
 use pageformer::pipeline::{self, DocumentJob, Source};
@@ -125,7 +126,25 @@ fn main() -> ExitCode {
         roots
     };
     let root_refs = roots.iter().map(PathBuf::as_path).collect::<Vec<_>>();
-    let store = match confidential::loader::load(confidential_file.as_deref(), &root_refs) {
+    let config = if confidential_file.is_none() {
+        match ConfidentialConfig::load_default() {
+            Ok(config) => Some(config),
+            Err(error) => {
+                eprintln!("  {} {error}", label(stderr_painter, Style::Error, "error"));
+                return ExitCode::FAILURE;
+            }
+        }
+    } else {
+        None
+    };
+    let base_store = match confidential::loader::load(
+        if config.is_some() {
+            None
+        } else {
+            confidential_file.as_deref()
+        },
+        &root_refs,
+    ) {
         Ok(store) => store,
         Err(error) => {
             eprintln!("  {} {error}", label(stderr_painter, Style::Error, "error"));
@@ -160,23 +179,47 @@ fn main() -> ExitCode {
         }
     };
 
+    let mut stores: BTreeMap<Option<PathBuf>, Result<ConfidentialStore, String>> = BTreeMap::new();
+    stores.insert(None, Ok(base_store.clone()));
     let results = jobs
         .iter()
         .map(|job| {
-            (
-                job,
-                process(
-                    job,
-                    mode,
-                    format,
-                    explicit.as_deref(),
-                    global.as_deref(),
-                    &store,
-                ),
-            )
+            let store_result = if confidential_file.is_some() {
+                Ok(base_store.clone())
+            } else {
+                let file = config
+                    .as_ref()
+                    .and_then(|config| config.file_for(job.input.root()))
+                    .map(Path::to_path_buf);
+                stores
+                    .entry(file.clone())
+                    .or_insert_with(|| match file {
+                        Some(path) => confidential::loader::load(Some(&path), &root_refs)
+                            .map_err(|error| error.to_string()),
+                        None => Ok(base_store.clone()),
+                    })
+                    .clone()
+            };
+            match store_result {
+                Ok(store) => {
+                    let result = process(
+                        job,
+                        mode,
+                        format,
+                        explicit.as_deref(),
+                        global.as_deref(),
+                        &store,
+                    );
+                    (job, store, result)
+                }
+                Err(message) => (job, base_store.clone(), Err(anyhow::anyhow!(message))),
+            }
         })
         .collect::<Vec<_>>();
-    let process_failures = results.iter().filter(|(_, result)| result.is_err()).count();
+    let process_failures = results
+        .iter()
+        .filter(|(_, _, result)| result.is_err())
+        .count();
     let succeeded = results.len().saturating_sub(process_failures);
     let failed = discovery_failures + plan_errors.len() + process_failures;
 
@@ -184,19 +227,19 @@ fn main() -> ExitCode {
     for notice in &notices {
         match notice {
             Notice::Warning(warning) => {
-                print_warning(stderr_painter, &warning.path, &warning.message, &store);
+                print_warning(stderr_painter, &warning.path, &warning.message, &base_store);
             }
             Notice::Error { path, message } => {
-                print_failure(stderr_painter, path, message, &store);
+                print_failure(stderr_painter, path, message, &base_store);
             }
         }
         printed = true;
     }
     for error in &plan_errors {
-        print_failure(stderr_painter, &error.input, &error.message, &store);
+        print_failure(stderr_painter, &error.input, &error.message, &base_store);
         printed = true;
     }
-    for (job, result) in &results {
+    for (job, store, result) in &results {
         if printed {
             println!();
         }
@@ -207,7 +250,7 @@ fn main() -> ExitCode {
                     stderr_painter,
                     job.input.path(),
                     outcome,
-                    &store,
+                    store,
                 );
             }
             Err(error) => {
@@ -215,7 +258,7 @@ fn main() -> ExitCode {
                     stderr_painter,
                     job.input.path(),
                     &format!("{error:#}"),
-                    &store,
+                    store,
                 );
             }
         }

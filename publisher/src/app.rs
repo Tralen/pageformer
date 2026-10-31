@@ -7,6 +7,7 @@ use std::thread;
 use std::time::Duration;
 
 use eframe::egui;
+use pageformer::confidential::config::ConfidentialConfig;
 use pageformer::confidential::{self, ConfidentialStore};
 use pageformer::format::Format;
 use pageformer::pipeline::{self, DocumentJob, Source};
@@ -632,9 +633,9 @@ impl Publisher {
             let confidential_row = path_row(
                 ui,
                 "Confidential:",
-                "INI file with the confidential {NAME} values. Keep it outside the source tree, with mode 600.",
+                "INI file with the confidential {NAME} values. Leave it empty to use the user-level folder mapping. Keep it outside the source tree, with mode 600.",
                 &mut self.session.confidential_file,
-                "INI file with the confidential {NAME} values. Keep it outside the source tree, with mode 600.",
+                "INI file with the confidential {NAME} values. Leave it empty to use the user-level folder mapping. Keep it outside the source tree, with mode 600.",
                 "Choose the confidential INI file with the platform dialog.",
             );
             if confidential_row.chosen {
@@ -902,13 +903,15 @@ fn load_store(
     confidential_file: Option<PathBuf>,
     source_root: &Path,
 ) -> Result<ConfidentialStore, String> {
-    match confidential_file {
-        Some(path) => {
-            let roots = [source_root];
-            confidential::loader::load(Some(&path), &roots).map_err(|error| error.to_string())
-        }
-        None => Ok(ConfidentialStore::default()),
-    }
+    let file = match confidential_file {
+        Some(path) => Some(path),
+        None => ConfidentialConfig::load_default()
+            .map_err(|error| error.to_string())?
+            .file_for(source_root)
+            .map(Path::to_path_buf),
+    };
+    let roots = [source_root];
+    confidential::loader::load(file.as_deref(), &roots).map_err(|error| error.to_string())
 }
 
 fn run_export(request: ExportRequest) -> Result<WorkerOutcome, String> {

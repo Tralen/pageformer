@@ -637,6 +637,11 @@ impl Publisher {
         ui.add_space(8.0);
         let configuration = egui::CollapsingHeader::new("Configuration").show(ui, |ui| {
             let template_hint = self.template_label.clone();
+            let output_hint = if self.output_error.is_none() {
+                self.session.automatic_summary()
+            } else {
+                None
+            };
             let template_buttons = [
                 RowButton {
                     label: "Choose",
@@ -657,6 +662,33 @@ impl Publisher {
                     enabled: self.template_path.is_some(),
                 },
             ];
+            let output_buttons = [
+                RowButton {
+                    label: "Choose",
+                    tooltip: "Choose an output folder override.",
+                    width: CHOOSE_BUTTON_WIDTH,
+                    enabled: true,
+                },
+                RowButton {
+                    label: "Use default",
+                    tooltip: "Clear the override and use the automatic directory shown as the hint.",
+                    width: DEFAULT_BUTTON_WIDTH,
+                    enabled: explicit_path(&self.session.output_override).is_some(),
+                },
+            ];
+            let confidential_buttons = [RowButton {
+                label: "Choose",
+                tooltip: "Choose the confidential INI file.",
+                width: CHOOSE_BUTTON_WIDTH,
+                enabled: true,
+            }];
+            let spacing = ui.spacing().item_spacing.x;
+            let action_width = button_group_width(&template_buttons, spacing)
+                .max(button_group_width(&output_buttons, spacing))
+                .max(button_group_width(&confidential_buttons, spacing));
+            let field_width =
+                configuration_field_width(ui.available_width(), action_width, spacing);
+
             let template_row = path_row(
                 ui,
                 "Template:",
@@ -664,6 +696,7 @@ impl Publisher {
                 &mut self.session.template_file,
                 template_hint.as_deref(),
                 "Explicit YAML template. Leave it empty to use the resolved template shown as the hint.",
+                field_width,
                 &template_buttons,
             );
             match template_row.clicked {
@@ -696,25 +729,6 @@ impl Publisher {
                 );
             }
 
-            let output_hint = if self.output_error.is_none() {
-                self.session.automatic_summary()
-            } else {
-                None
-            };
-            let output_buttons = [
-                RowButton {
-                    label: "Choose",
-                    tooltip: "Choose an output folder override.",
-                    width: CHOOSE_BUTTON_WIDTH,
-                    enabled: true,
-                },
-                RowButton {
-                    label: "Use default",
-                    tooltip: "Clear the override and use the automatic directory shown as the hint.",
-                    width: DEFAULT_BUTTON_WIDTH,
-                    enabled: explicit_path(&self.session.output_override).is_some(),
-                },
-            ];
             let output_row = path_row(
                 ui,
                 "Output:",
@@ -722,6 +736,7 @@ impl Publisher {
                 &mut self.session.output_override,
                 output_hint.as_deref(),
                 "Leave it empty for the automatic directory; type or choose a folder to override it. Documents with confidential fields need a folder outside the source tree.",
+                field_width,
                 &output_buttons,
             );
             match output_row.clicked {
@@ -745,12 +760,6 @@ impl Publisher {
                 );
             }
 
-            let confidential_buttons = [RowButton {
-                label: "Choose",
-                tooltip: "Choose the confidential INI file.",
-                width: CHOOSE_BUTTON_WIDTH,
-                enabled: true,
-            }];
             let confidential_row = path_row(
                 ui,
                 "Confidential:",
@@ -758,6 +767,7 @@ impl Publisher {
                 &mut self.session.confidential_file,
                 None,
                 "INI file with the confidential {NAME} values. Leave it empty to use the user-level folder mapping. Keep it outside the source tree, with mode 600.",
+                field_width,
                 &confidential_buttons,
             );
             match confidential_row.clicked {
@@ -994,8 +1004,9 @@ const FOLDER_BUTTON_WIDTH: f32 = 58.0;
 /// The width of the output Use default button.
 const DEFAULT_BUTTON_WIDTH: f32 = 90.0;
 
-/// Lays out a label, a text field and fixed-width action buttons, so every
-/// path row in a section aligns.
+/// Lays out a label, a text field and fixed-width action buttons. The caller
+/// passes a common field width, so the action column starts at the same place
+/// in every row.
 fn path_row(
     ui: &mut egui::Ui,
     label: &str,
@@ -1003,19 +1014,20 @@ fn path_row(
     value: &mut String,
     hint: Option<&str>,
     field_tooltip: &str,
+    field_width: f32,
     buttons: &[RowButton<'_>],
 ) -> PathRow {
-    let spacing = ui.spacing().item_spacing.x;
     let height = ui.spacing().interact_size.y;
-    let button_total: f32 = buttons.iter().map(|button| button.width).sum();
-    let gap_count = f32::from(u16::try_from(buttons.len().saturating_add(1)).unwrap_or(u16::MAX));
-    let field_width =
-        (ui.available_width() - ROW_LABEL_WIDTH - button_total - spacing * gap_count).max(80.0);
     let mut report = PathRow::default();
     ui.horizontal(|ui| {
-        let label_response = with_tooltip(ui.label(label), label_tooltip);
-        let label_padding = (ROW_LABEL_WIDTH - label_response.rect.width() - spacing).max(0.0);
-        ui.add_space(label_padding);
+        let _ = ui.allocate_ui_with_layout(
+            egui::vec2(ROW_LABEL_WIDTH, height),
+            egui::Layout::left_to_right(egui::Align::Center),
+            |ui| {
+                ui.set_width(ROW_LABEL_WIDTH);
+                with_tooltip(ui.label(label), label_tooltip);
+            },
+        );
         let mut field = egui::TextEdit::singleline(value).desired_width(field_width);
         if let Some(hint) = hint {
             field = field.hint_text(hint);
@@ -1035,6 +1047,20 @@ fn path_row(
         }
     });
     report
+}
+
+/// The width of a group of buttons, including the spacing between them.
+fn button_group_width(buttons: &[RowButton<'_>], spacing: f32) -> f32 {
+    let total: f32 = buttons.iter().map(|button| button.width).sum();
+    let gaps = f32::from(u16::try_from(buttons.len().saturating_sub(1)).unwrap_or(u16::MAX));
+    total + spacing * gaps
+}
+
+/// The common field width for the Configuration rows. The action column is as
+/// wide as the widest button group, so every Choose button starts on the same
+/// vertical line.
+fn configuration_field_width(available: f32, action_width: f32, spacing: f32) -> f32 {
+    (available - ROW_LABEL_WIDTH - action_width - spacing * 2.0).max(80.0)
 }
 
 /// An explicit path from a text field; blank means automatic resolution.
@@ -1334,6 +1360,68 @@ mod tests {
             session.automatic_summary(),
             Some("out (source folder)".to_owned())
         );
+    }
+
+    #[test]
+    fn the_configuration_rows_share_the_choose_column() {
+        let spacing = 8.0;
+        let template = [
+            RowButton {
+                label: "Choose",
+                tooltip: "",
+                width: CHOOSE_BUTTON_WIDTH,
+                enabled: true,
+            },
+            RowButton {
+                label: "Edit",
+                tooltip: "",
+                width: EDIT_BUTTON_WIDTH,
+                enabled: true,
+            },
+            RowButton {
+                label: "Folder",
+                tooltip: "",
+                width: FOLDER_BUTTON_WIDTH,
+                enabled: true,
+            },
+        ];
+        let output = [
+            RowButton {
+                label: "Choose",
+                tooltip: "",
+                width: CHOOSE_BUTTON_WIDTH,
+                enabled: true,
+            },
+            RowButton {
+                label: "Use default",
+                tooltip: "",
+                width: DEFAULT_BUTTON_WIDTH,
+                enabled: true,
+            },
+        ];
+        let confidential = [RowButton {
+            label: "Choose",
+            tooltip: "",
+            width: CHOOSE_BUTTON_WIDTH,
+            enabled: true,
+        }];
+
+        let action_width = button_group_width(&template, spacing)
+            .max(button_group_width(&output, spacing))
+            .max(button_group_width(&confidential, spacing));
+        let field_width = configuration_field_width(748.0, action_width, spacing);
+        let choose_column = ROW_LABEL_WIDTH + spacing + field_width + spacing;
+
+        assert_eq!(action_width, 200.0);
+        assert_eq!(choose_column, 548.0);
+        assert!(button_group_width(&template, spacing) <= action_width);
+        assert!(button_group_width(&output, spacing) <= action_width);
+        assert!(button_group_width(&confidential, spacing) <= action_width);
+    }
+
+    #[test]
+    fn a_narrow_configuration_keeps_a_minimum_field_width() {
+        assert_eq!(configuration_field_width(200.0, 200.0, 8.0), 80.0);
     }
 
     #[test]

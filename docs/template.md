@@ -52,7 +52,7 @@ The command creates the configuration directory, writes the exact embedded YAML 
 
 Paths written in the template, such as the letterhead image, resolve relative to the template file, never to the working directory.
 
-To use the same settings in another project, copy the template to the document directory as `.pageformer.yaml`, pass it with `--template`, or choose it under Advanced in `pageformer-publisher`.
+To use the same settings in another project, copy the template to the document directory as `.pageformer.yaml`, pass it with `--template`, or choose it under Configuration in `pageformer-publisher`.
 
 | File | Location | Created by | Read automatically | Role |
 |---|---|---|---|---|

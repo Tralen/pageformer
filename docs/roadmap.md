@@ -64,7 +64,7 @@ The compatibility promise after 1.0.0 is intentionally simple: an additive optio
 
 ## The 1.1.0 release
 
-1.1.0 adds the user-level output defaults: `default_output` in the public `config.yaml` and optional `outputs` per INI in `confidential.yaml`, with the precedence `--output`, per-INI output, default output and the source folder. The publisher resolves and displays the same output, treats the Advanced field as an override and offers Use default; its title follows the active light or dark theme. It keeps the template unaware of output paths. The feature is prepared and tested; publish it with the normal tag workflow.
+1.1.0 adds the user-level output defaults: `default_output` in the public `config.yaml` and optional `outputs` per INI in `confidential.yaml`, with the precedence `--output`, per-INI output, default output and the source folder. The publisher resolves and displays the same output as a placeholder in the empty Configuration field, treats a value as an override and offers Use default; its title follows the active light or dark theme. It keeps the template unaware of output paths. The feature is prepared and tested; publish it with the normal tag workflow.
 
 ## Binary packages
 

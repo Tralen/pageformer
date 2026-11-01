@@ -110,6 +110,6 @@ The INI format is one `NAME = value` per line, with `#` or `;` starting a commen
 
 ## GUI and Pageweaver
 
-`pageformer-publisher` resolves the mapping when its Advanced confidential field is empty. The explicit field remains the override. The same resolution is used by the TXT copy action. The publisher also resolves the automatic output with the same precedence and shows its directory and origin; its Advanced output field is an empty-by-default override, and Use default clears it. An explicit confidential field bypasses the per-INI output, as in the command line.
+`pageformer-publisher` resolves the mapping when its Configuration confidential field is empty. The explicit field remains the override. The same resolution is used by the TXT copy action. The publisher also resolves the automatic output with the same precedence and shows its directory and origin as a placeholder in the empty Configuration output field; Use default clears a manual override. An explicit confidential field bypasses the per-INI output, as in the command line.
 
 Pageweaver exports through the same pipeline, so it should call the same resolver. The preview must never display a confidential value; the resolution belongs to the export step.

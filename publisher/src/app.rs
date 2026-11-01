@@ -225,7 +225,7 @@ impl Session {
         }
     }
 
-    /// The automatic output and its origin, for the Advanced hint. The
+    /// The automatic output and its origin, for the Configuration hint. The
     /// automatic value is what an empty override uses.
     fn automatic_summary(&self) -> Option<String> {
         let directory = self
@@ -294,8 +294,9 @@ impl Session {
 /// The eframe application.
 pub struct Publisher {
     session: Session,
-    template_label: String,
+    template_label: Option<String>,
     template_path: Option<PathBuf>,
+    template_error: Option<String>,
     message: Option<String>,
     output_error: Option<String>,
     receiver: Option<Receiver<Result<WorkerOutcome, String>>>,
@@ -309,8 +310,9 @@ impl Publisher {
         install_fonts(&context.egui_ctx);
         Self {
             session: Session::new(),
-            template_label: "not selected".to_owned(),
+            template_label: None,
             template_path: None,
+            template_error: None,
             message: None,
             output_error: None,
             receiver: None,
@@ -363,13 +365,15 @@ impl Publisher {
 
     fn refresh_template(&mut self) {
         let Some(input) = self.session.input.clone() else {
-            self.template_label = "not selected".to_owned();
+            self.template_label = None;
             self.template_path = None;
+            self.template_error = None;
             return;
         };
         let Some(source_root) = self.session.source_root() else {
-            self.template_label = "not selected".to_owned();
+            self.template_label = None;
             self.template_path = None;
+            self.template_error = None;
             return;
         };
         let job = DocumentJob::new(Source::File(input), source_root)
@@ -377,12 +381,14 @@ impl Publisher {
             .with_global_template(loader::global_template_path());
         match pipeline::resolve_template(&job) {
             Ok(resolved) => {
-                self.template_label = resolved.origin().to_string();
+                self.template_label = Some(resolved.origin().to_string());
                 self.template_path = resolved.origin().path().map(Path::to_path_buf);
+                self.template_error = None;
             }
             Err(error) => {
-                self.template_label = format!("error: {error}");
+                self.template_label = None;
                 self.template_path = None;
+                self.template_error = Some(error.to_string());
             }
         }
     }
@@ -484,54 +490,6 @@ impl Publisher {
             },
         );
         ui.add_space(10.0);
-
-        let mut edit_template = false;
-        let mut open_template_folder = None;
-        egui::Sides::new()
-            .shrink_left()
-            .truncate()
-            .show(
-                ui,
-                |ui| {
-                    with_tooltip(
-                        ui.label("Template:"),
-                        "The template in use: the explicit file from Advanced, or the nearest local file, then the global file, then the embedded fallback.",
-                    );
-                    with_tooltip(
-                        ui.add(egui::Label::new(
-                            egui::RichText::new(self.template_label.as_str()).small(),
-                        )),
-                        self.template_label.as_str(),
-                    );
-                },
-                |ui| {
-                    if let Some(template_path) = self.template_path.as_deref() {
-                        edit_template = with_tooltip(
-                            ui.small_button("Edit"),
-                            "Open the template in the default editor.",
-                        )
-                        .clicked();
-                        if let Some(folder) = template_path.parent() {
-                            let folder = folder.to_path_buf();
-                            let open_folder = with_tooltip(
-                                ui.small_button("Folder"),
-                                "Open the folder that contains the template.",
-                            );
-                            if open_folder.clicked() {
-                                open_template_folder = Some(folder);
-                            }
-                        }
-                    }
-                },
-            );
-        if edit_template && let Some(path) = self.template_path.clone() {
-            self.open(&path);
-        }
-        if let Some(folder) = open_template_folder {
-            self.open(&folder);
-        }
-
-        ui.add_space(8.0);
 
         let button_width = BUTTON_WIDTH;
         let gap = 12.0;
@@ -677,48 +635,105 @@ impl Publisher {
         }
 
         ui.add_space(8.0);
-        let advanced = egui::CollapsingHeader::new("Advanced").show(ui, |ui| {
+        let configuration = egui::CollapsingHeader::new("Configuration").show(ui, |ui| {
+            let template_hint = self.template_label.clone();
+            let template_buttons = [
+                RowButton {
+                    label: "Choose",
+                    tooltip: "Choose the template YAML file.",
+                    width: CHOOSE_BUTTON_WIDTH,
+                    enabled: true,
+                },
+                RowButton {
+                    label: "Edit",
+                    tooltip: "Open the resolved template in the default editor.",
+                    width: EDIT_BUTTON_WIDTH,
+                    enabled: self.template_path.is_some(),
+                },
+                RowButton {
+                    label: "Folder",
+                    tooltip: "Open the folder that contains the resolved template.",
+                    width: FOLDER_BUTTON_WIDTH,
+                    enabled: self.template_path.is_some(),
+                },
+            ];
             let template_row = path_row(
                 ui,
                 "Template:",
-                "Explicit YAML template to use instead of resolving one; leave it empty for automatic resolution.",
+                "The template in use when this field is empty: the nearest local file, then the global file, then the embedded fallback.",
                 &mut self.session.template_file,
-                "Explicit YAML template. Leave it empty to use the nearest local file, then the global file, then the embedded fallback.",
-                "Choose the template YAML file.",
+                template_hint.as_deref(),
+                "Explicit YAML template. Leave it empty to use the resolved template shown as the hint.",
+                &template_buttons,
             );
-            if template_row.chosen {
-                self.choose_template();
-            } else if template_row.lost_focus {
-                self.refresh_template();
+            match template_row.clicked {
+                Some(0) => self.choose_template(),
+                Some(1) => {
+                    if let Some(path) = self.template_path.clone() {
+                        self.open(&path);
+                    }
+                }
+                Some(2) => {
+                    let folder = self
+                        .template_path
+                        .as_deref()
+                        .and_then(Path::parent)
+                        .map(Path::to_path_buf);
+                    if let Some(folder) = folder {
+                        self.open(&folder);
+                    }
+                }
+                _ if template_row.lost_focus => self.refresh_template(),
+                _ => {}
             }
+            if let Some(error) = &self.template_error {
+                with_tooltip(
+                    ui.colored_label(
+                        egui::Color32::from_rgb(0xb0, 0x2a, 0x2a),
+                        format!("Template: {error}"),
+                    ),
+                    "The template could not be resolved; choose a valid YAML file.",
+                );
+            }
+
+            let output_hint = if self.output_error.is_none() {
+                self.session.automatic_summary()
+            } else {
+                None
+            };
+            let output_buttons = [
+                RowButton {
+                    label: "Choose",
+                    tooltip: "Choose an output folder override.",
+                    width: CHOOSE_BUTTON_WIDTH,
+                    enabled: true,
+                },
+                RowButton {
+                    label: "Use default",
+                    tooltip: "Clear the override and use the automatic directory shown as the hint.",
+                    width: DEFAULT_BUTTON_WIDTH,
+                    enabled: explicit_path(&self.session.output_override).is_some(),
+                },
+            ];
             let output_row = path_row(
                 ui,
                 "Output:",
                 "Leave it empty to use the confidential mapping, the user default, or the source folder. A value is a manual override. Documents with confidential fields need a folder outside the source tree.",
                 &mut self.session.output_override,
+                output_hint.as_deref(),
                 "Leave it empty for the automatic directory; type or choose a folder to override it. Documents with confidential fields need a folder outside the source tree.",
-                "Choose an output folder override.",
+                &output_buttons,
             );
-            if output_row.chosen {
-                self.choose_output();
-            } else if output_row.lost_focus && self.session.output_override.trim().is_empty() {
-                self.refresh_output();
-            }
-            if self.output_error.is_none()
-                && let Some(summary) = self.session.automatic_summary()
-            {
-                ui.horizontal(|ui| {
-                    with_tooltip(
-                        ui.label(egui::RichText::new(format!("Default: {summary}")).small()),
-                        "The directory used when the Output field is empty.",
-                    );
-                    if explicit_path(&self.session.output_override).is_some()
-                        && ui.small_button("Use default").clicked()
-                    {
-                        self.session.output_override.clear();
-                        self.refresh_output();
-                    }
-                });
+            match output_row.clicked {
+                Some(0) => self.choose_output(),
+                Some(1) => {
+                    self.session.output_override.clear();
+                    self.refresh_output();
+                }
+                _ if output_row.lost_focus && self.session.output_override.trim().is_empty() => {
+                    self.refresh_output();
+                }
+                _ => {}
             }
             if let Some(error) = &self.output_error {
                 with_tooltip(
@@ -729,23 +744,31 @@ impl Publisher {
                     "The automatic output could not be resolved. Choose a folder to override it.",
                 );
             }
+
+            let confidential_buttons = [RowButton {
+                label: "Choose",
+                tooltip: "Choose the confidential INI file.",
+                width: CHOOSE_BUTTON_WIDTH,
+                enabled: true,
+            }];
             let confidential_row = path_row(
                 ui,
                 "Confidential:",
                 "INI file with the confidential {NAME} values. Leave it empty to use the user-level folder mapping. Keep it outside the source tree, with mode 600.",
                 &mut self.session.confidential_file,
+                None,
                 "INI file with the confidential {NAME} values. Leave it empty to use the user-level folder mapping. Keep it outside the source tree, with mode 600.",
-                "Choose the confidential INI file.",
+                &confidential_buttons,
             );
-            if confidential_row.chosen {
-                self.choose_confidential();
-            } else if confidential_row.lost_focus {
-                self.refresh_output();
+            match confidential_row.clicked {
+                Some(0) => self.choose_confidential(),
+                _ if confidential_row.lost_focus => self.refresh_output(),
+                _ => {}
             }
         });
         with_tooltip(
-            advanced.header_response,
-            "Template override, output folder and confidential values.",
+            configuration.header_response,
+            "Optional template, output folder and confidential values. Leave them empty to use the automatic choices.",
         );
 
         ui.add_space(8.0);
@@ -949,35 +972,67 @@ fn install_fonts(context: &egui::Context) {
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 struct PathRow {
     lost_focus: bool,
-    chosen: bool,
+    clicked: Option<usize>,
 }
 
-/// Lays out a label, a text field and a Choose button with a fixed label and
-/// button width, so every path row in a section aligns.
+/// A fixed-width action button in a path row.
+struct RowButton<'a> {
+    label: &'a str,
+    tooltip: &'a str,
+    width: f32,
+    enabled: bool,
+}
+
+/// The fixed label column of a path row.
+const ROW_LABEL_WIDTH: f32 = 100.0;
+/// The width of a Choose button.
+const CHOOSE_BUTTON_WIDTH: f32 = 78.0;
+/// The width of the template Edit button.
+const EDIT_BUTTON_WIDTH: f32 = 48.0;
+/// The width of the template Folder button.
+const FOLDER_BUTTON_WIDTH: f32 = 58.0;
+/// The width of the output Use default button.
+const DEFAULT_BUTTON_WIDTH: f32 = 90.0;
+
+/// Lays out a label, a text field and fixed-width action buttons, so every
+/// path row in a section aligns.
 fn path_row(
     ui: &mut egui::Ui,
     label: &str,
     label_tooltip: &str,
     value: &mut String,
+    hint: Option<&str>,
     field_tooltip: &str,
-    choose_tooltip: &str,
+    buttons: &[RowButton<'_>],
 ) -> PathRow {
-    let label_width = 100.0;
-    let choose_width = 78.0;
     let spacing = ui.spacing().item_spacing.x;
     let height = ui.spacing().interact_size.y;
-    let field_width = (ui.available_width() - label_width - choose_width - spacing).max(80.0);
+    let button_total: f32 = buttons.iter().map(|button| button.width).sum();
+    let gap_count = f32::from(u16::try_from(buttons.len().saturating_add(1)).unwrap_or(u16::MAX));
+    let field_width =
+        (ui.available_width() - ROW_LABEL_WIDTH - button_total - spacing * gap_count).max(80.0);
     let mut report = PathRow::default();
     ui.horizontal(|ui| {
         let label_response = with_tooltip(ui.label(label), label_tooltip);
-        let label_padding = (label_width - label_response.rect.width() - spacing).max(0.0);
+        let label_padding = (ROW_LABEL_WIDTH - label_response.rect.width() - spacing).max(0.0);
         ui.add_space(label_padding);
-        let field = ui.add(egui::TextEdit::singleline(value).desired_width(field_width));
+        let mut field = egui::TextEdit::singleline(value).desired_width(field_width);
+        if let Some(hint) = hint {
+            field = field.hint_text(hint);
+        }
+        let field = ui.add(field);
         report.lost_focus = field.lost_focus();
         with_tooltip(field, field_tooltip);
-        let choose = ui.add_sized([choose_width, height], egui::Button::new("Choose"));
-        let choose = with_tooltip(choose, choose_tooltip);
-        report.chosen = choose.clicked();
+        for (index, button) in buttons.iter().enumerate() {
+            let response = ui.add_enabled(
+                button.enabled,
+                egui::Button::new(button.label).min_size(egui::vec2(button.width, height)),
+            );
+            let response = with_tooltip(response, button.tooltip);
+            if response.clicked() {
+                report.clicked = Some(index);
+            }
+        }
     });
     report
 }

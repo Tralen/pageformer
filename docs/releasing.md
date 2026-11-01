@@ -21,6 +21,21 @@ A release must change the library or an executable. Documentation, CI and toolin
 
 The `0.41.4` to `0.41.11` commits were documentation, tooling and test portability work. They were folded into `1.0.0` instead of being tagged separately. The same rule applies to future changes of that kind.
 
+A packaging release is the exception: when the artifact must be reproducible from the tag, the tag has to contain the packaging script, the icon and the version embedded in the binary and in the ODT metadata. `1.0.1` is that case; the engine behavior did not change.
+
+## Releases and assets
+
+A GitHub release is a tag plus a title, notes and assets. The tag fixes the source, while the assets are files attached to the release and can be added or replaced without a new tag:
+
+```sh
+gh release upload v<version> dist/pageformer_<version>_<architecture>.deb --clobber
+gh release upload v<version> dist/SHA256SUMS --clobber
+```
+
+Use that path when the package must be rebuilt from the same tag, for example after a transient builder problem, and update `SHA256SUMS` in the same operation. Do not use it to attach a package built from a commit that is not in the tag: the release would then carry a binary that its source archive cannot reproduce.
+
+A new patch tag is the honest choice when the packaging script, the icon or the documentation that produces the artifact must live in the tag itself. That is why `1.0.1` exists: `packaging/build-deb.sh` and the icon entered after `v1.0.0`, and the version embedded in the binary and in the ODT metadata changed. The engine behavior did not change.
+
 ## Candidate checklist
 
 Work from a clean tree and from the canonical history. Do not tag a HEAD behind `operador`.

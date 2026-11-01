@@ -625,11 +625,14 @@ impl Publisher {
 
         if let Some(input) = &self.session.input {
             ui.add_space(4.0);
+            let text = elide_prefixed(
+                ui,
+                "Selected: ",
+                &input.display().to_string(),
+                ui.available_width(),
+            );
             with_tooltip(
-                ui.colored_label(
-                    egui::Color32::from_rgb(0xa7, 0xc7, 0xe7),
-                    format!("Selected: {}", input.display()),
-                ),
+                ui.colored_label(egui::Color32::from_rgb(0xa7, 0xc7, 0xe7), text),
                 "The Markdown file to export.",
             );
         }
@@ -832,11 +835,14 @@ impl Publisher {
                 });
             }
             State::Succeeded { output, warnings } => {
+                let text = elide_prefixed(
+                    ui,
+                    "Wrote ",
+                    &output.display().to_string(),
+                    ui.available_width(),
+                );
                 with_tooltip(
-                    ui.colored_label(
-                        egui::Color32::from_rgb(0x2e, 0x7d, 0x32),
-                        format!("Wrote {}", output.display()),
-                    ),
+                    ui.colored_label(egui::Color32::from_rgb(0x2e, 0x7d, 0x32), text),
                     "The generated file.",
                 );
                 ui.horizontal(|ui| {
@@ -1030,7 +1036,8 @@ fn path_row(
         );
         let mut field = egui::TextEdit::singleline(value).desired_width(field_width);
         if let Some(hint) = hint {
-            field = field.hint_text(hint);
+            let hint = elide_left(ui, hint, (field_width - 32.0).max(0.0));
+            field = field.hint_text(hint.as_str());
         }
         let field = ui.add(field);
         report.lost_focus = field.lost_focus();
@@ -1061,6 +1068,45 @@ fn button_group_width(buttons: &[RowButton<'_>], spacing: f32) -> f32 {
 /// vertical line.
 fn configuration_field_width(available: f32, action_width: f32, spacing: f32) -> f32 {
     (available - ROW_LABEL_WIDTH - action_width - spacing * 2.0).max(80.0)
+}
+
+/// Removes characters from the left until the measured text fits, keeping the
+/// end. The hidden prefix becomes an ellipsis.
+fn elide_left_with(text: &str, max_width: f32, measure: impl Fn(&str) -> f32) -> String {
+    if measure(text) <= max_width {
+        return text.to_owned();
+    }
+    for (index, _) in text.char_indices().skip(1) {
+        let candidate = format!("…{}", &text[index..]);
+        if measure(&candidate) <= max_width {
+            return candidate;
+        }
+    }
+    "…".to_owned()
+}
+
+/// The width of a text in the body font.
+fn text_width(ui: &egui::Ui, text: &str) -> f32 {
+    let font_id = egui::TextStyle::Body.resolve(ui.style());
+    let color = ui.visuals().text_color();
+    ui.painter()
+        .layout_no_wrap(text.to_owned(), font_id, color)
+        .size()
+        .x
+}
+
+/// Elides a text from the left so its end stays visible.
+fn elide_left(ui: &egui::Ui, text: &str, max_width: f32) -> String {
+    elide_left_with(text, max_width.max(0.0), |candidate| {
+        text_width(ui, candidate)
+    })
+}
+
+/// Elides the value after a fixed prefix, keeping the prefix and the end of the
+/// value visible.
+fn elide_prefixed(ui: &egui::Ui, prefix: &str, value: &str, max_width: f32) -> String {
+    let available = (max_width - text_width(ui, prefix)).max(0.0);
+    format!("{prefix}{}", elide_left(ui, value, available))
 }
 
 /// An explicit path from a text field; blank means automatic resolution.
@@ -1173,6 +1219,10 @@ mod tests {
         let mut session = Session::new();
         assert!(session.accept_path(PathBuf::from(input)));
         session
+    }
+
+    fn character_width(text: &str) -> f32 {
+        f32::from(u16::try_from(text.chars().count()).unwrap_or(u16::MAX))
     }
 
     #[test]
@@ -1422,6 +1472,27 @@ mod tests {
     #[test]
     fn a_narrow_configuration_keeps_a_minimum_field_width() {
         assert_eq!(configuration_field_width(200.0, 200.0, 8.0), 80.0);
+    }
+
+    #[test]
+    fn a_short_path_is_not_elided() {
+        assert_eq!(
+            elide_left_with("short.md", 8.0, character_width),
+            "short.md"
+        );
+    }
+
+    #[test]
+    fn a_long_path_keeps_its_end() {
+        let elided = elide_left_with("/home/user/project/Report.md", 18.0, character_width);
+
+        assert_eq!(elided, "…project/Report.md");
+        assert!(character_width(&elided) <= 18.0);
+    }
+
+    #[test]
+    fn a_path_with_no_room_becomes_an_ellipsis() {
+        assert_eq!(elide_left_with("abcdef", 1.0, character_width), "…");
     }
 
     #[test]

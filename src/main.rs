@@ -5,6 +5,7 @@
 mod cli;
 
 use std::collections::BTreeMap;
+use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::str::FromStr;
@@ -16,7 +17,7 @@ use pageformer::confidential::config::{UserConfig, resolve_output};
 use pageformer::confidential::{self, ConfidentialStore};
 use pageformer::format::Format;
 use pageformer::pipeline::{self, DocumentJob, Source};
-use pageformer::template::loader;
+use pageformer::template::{Template, loader};
 
 use self::cli::{ColorChoice, InputFile, Painter, Stream, Style};
 
@@ -66,6 +67,10 @@ fn main() -> ExitCode {
         .unwrap_or(ColorChoice::Auto);
     let stdout_painter = Painter::new(color.support(Stream::Stdout));
     let stderr_painter = Painter::new(color.support(Stream::Stderr));
+
+    if matches.get_flag("write-default-template") {
+        return write_default_template(stdout_painter, stderr_painter);
+    }
 
     let Some(inputs) = matches.get_many::<String>("input") else {
         eprintln!(
@@ -305,7 +310,7 @@ fn command() -> Command {
                 .value_name("INPUT")
                 .help("Markdown file or directory to process")
                 .num_args(1..)
-                .required(true)
+                .required_unless_present("write-default-template")
                 .value_parser(clap::value_parser!(String)),
         )
         .arg(
@@ -354,6 +359,67 @@ fn command() -> Command {
                 .help("Read confidential fields from an INI-style `NAME = value` file outside the source tree")
                 .value_parser(clap::value_parser!(String)),
         )
+        .arg(
+            Arg::new("write-default-template")
+                .long("write-default-template")
+                .action(ArgAction::SetTrue)
+                .help("Write the embedded template to the global template path and exit")
+                .conflicts_with_all([
+                    "input",
+                    "template",
+                    "output",
+                    "check",
+                    "confidential-file",
+                ]),
+        )
+}
+
+/// Writes the embedded template to the global template path without
+/// overwriting an existing file.
+fn write_default_template(stdout: Painter, stderr: Painter) -> ExitCode {
+    let Some(path) = loader::global_template_path() else {
+        eprintln!(
+            "  {} cannot determine the user configuration directory",
+            label(stderr, Style::Error, "error")
+        );
+        return ExitCode::FAILURE;
+    };
+    if path.exists() {
+        println!(
+            "  {} {}; edit it instead of overwriting it",
+            label(stdout, Style::Info, "exists"),
+            stdout.path(&path)
+        );
+        return ExitCode::SUCCESS;
+    }
+    if let Some(parent) = path.parent()
+        && let Err(source) = fs::create_dir_all(parent)
+    {
+        eprintln!(
+            "  {} cannot create {}: {source}",
+            label(stderr, Style::Error, "error"),
+            parent.display()
+        );
+        return ExitCode::FAILURE;
+    }
+    match fs::write(&path, Template::embedded_yaml()) {
+        Ok(()) => {
+            println!(
+                "  {} {}",
+                label(stdout, Style::Success, "wrote"),
+                stdout.path(&path)
+            );
+            ExitCode::SUCCESS
+        }
+        Err(source) => {
+            eprintln!(
+                "  {} cannot write {}: {source}",
+                label(stderr, Style::Error, "error"),
+                path.display()
+            );
+            ExitCode::FAILURE
+        }
+    }
 }
 
 fn process(
@@ -495,6 +561,22 @@ mod tests {
             error.kind(),
             clap::error::ErrorKind::MissingRequiredArgument
         );
+    }
+
+    #[test]
+    fn the_default_template_flag_needs_no_input() {
+        let matches = command()
+            .try_get_matches_from(["pageformer", "--write-default-template"])
+            .expect("valid arguments");
+        assert!(matches.get_flag("write-default-template"));
+    }
+
+    #[test]
+    fn the_default_template_flag_rejects_an_input() {
+        let error = command()
+            .try_get_matches_from(["pageformer", "--write-default-template", "a.md"])
+            .expect_err("the input conflicts with the flag");
+        assert_eq!(error.kind(), clap::error::ErrorKind::ArgumentConflict);
     }
 
     #[test]

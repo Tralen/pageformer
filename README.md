@@ -60,6 +60,14 @@ Validate the Markdown and the template without writing anything:
 cargo run -- --check assets/examples/technical/Report.md
 ```
 
+Create the global template from the embedded copy, so it can be edited:
+
+```sh
+cargo run -- --write-default-template
+```
+
+The command writes `~/.config/pageformer/pageformer.yaml` (or the platform equivalent) and never overwrites an existing file. The Debian package also installs the reference at `/usr/share/doc/pageformer/default.pageformer.yaml`.
+
 A confidential document needs its values file and an output directory outside the source tree:
 
 ```sh

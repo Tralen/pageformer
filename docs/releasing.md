@@ -125,7 +125,7 @@ packaging/build-deb.sh
 
 Build the package from the same signed tag as the source archive, so the package and the archive describe the same code. A packaging change that lands after a tag rides with the next release instead of rebuilding an old one.
 
-The optional argument selects the architecture, which defaults to `dpkg --print-architecture`. The script needs `cargo` and `dpkg-deb`, runs the release build for both workspace binaries and writes `dist/pageformer_<version>_<architecture>.deb`. It installs `pageformer`, `pageformer-publisher`, the desktop entry, the SVG icon and its 256 PNG fallback, the two manual pages, the README, the change log and the license.
+The optional argument selects the architecture, which defaults to `dpkg --print-architecture`. The script needs `cargo` and `dpkg-deb`, runs the release build for both workspace binaries and writes `dist/pageformer_<version>_<architecture>.deb`. It installs `pageformer`, `pageformer-publisher`, the desktop entry, the SVG icon and its 256 PNG fallback, the two manual pages, the README, the change log, the license and the reference `default.pageformer.yaml`.
 
 The script remaps the Rust build paths, so the binary never carries the builder's home directory, and it derives `SOURCE_DATE_EPOCH` from the last commit. Two runs from the same checkout and toolchain produce a byte-identical package.
 

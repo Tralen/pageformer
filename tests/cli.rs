@@ -6,6 +6,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 use std::sync::OnceLock;
 
+use pageformer::template::Template;
 use tempfile::TempDir;
 
 fn binary() -> &'static str {
@@ -207,6 +208,29 @@ fn a_confidential_folder_mapping_supplies_the_ini() {
     let text = fs::read_to_string(output.path().join("Doc.txt")).expect("the text must exist");
     assert!(text.contains("Nome: Fulano de Tal."), "{text}");
     assert!(!stdout(&result).contains("Fulano"), "{}", stdout(&result));
+}
+
+#[test]
+fn the_default_template_is_written_without_overwriting() {
+    let home = TempDir::new().expect("a configuration home");
+    let home_path = home.path().to_str().expect("a UTF-8 path");
+    let variables = [("XDG_CONFIG_HOME", home_path), ("APPDATA", home_path)];
+
+    let result = run_with_environment(&[OsStr::new("--write-default-template")], &variables);
+    assert!(result.status.success(), "{}", stderr(&result));
+    let path = home.path().join("pageformer").join("pageformer.yaml");
+    assert_eq!(
+        fs::read_to_string(&path).expect("the template must exist"),
+        Template::embedded_yaml()
+    );
+
+    fs::write(&path, "sentinel").expect("the sentinel must be written");
+    let result = run_with_environment(&[OsStr::new("--write-default-template")], &variables);
+    assert!(result.status.success(), "{}", stderr(&result));
+    assert_eq!(
+        fs::read_to_string(&path).expect("the template must exist"),
+        "sentinel"
+    );
 }
 
 #[test]

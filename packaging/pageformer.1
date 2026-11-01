@@ -1,10 +1,13 @@
-.TH PAGEFORMER 1 "2026-10-31" "Pageformer 1.0.0" "User Commands"
+.TH PAGEFORMER 1 "2026-10-31" "Pageformer 1.1.0" "User Commands"
 .SH NAME
 pageformer \- generate documents from Markdown and a YAML template
 .SH SYNOPSIS
 .B pageformer
 .RI [ options ]
 .IR input ...
+.br
+.B pageformer
+.B \-\-write\-default\-template
 .SH DESCRIPTION
 .B pageformer
 reads each Markdown file or directory and writes one output per input in the
@@ -47,10 +50,14 @@ The default is
 Color the terminal output:
 .BR auto ", " always " or " never .
 .TP
-.BR \-\-confidential-file " " FILE
+.BR \-\-confidential\-file " " FILE
 Read confidential fields from an INI-style
 .B "NAME = value"
 file outside the source tree.
+.TP
+.B \-\-write\-default\-template
+Write the embedded template to the user template path and exit. An existing
+file is not overwritten. This option takes no input.
 .TP
 .BR \-h ", " \-\-help
 Print help.
@@ -66,7 +73,11 @@ The local template, resolved from the source directory upward.
 The user template, used when no local template exists. The platform
 configuration root replaces
 .I ~/.config
-where the system defines one.
+where the system defines one. Create it with
+.BR pageformer\ \-\-write\-default\-template .
+.PP
+.I /usr/share/doc/pageformer/default.pageformer.yaml
+The reference template installed by the Debian package.
 .SH EXIT STATUS
 Zero when every input succeeds, and one when any input fails. A failure in one
 input does not stop the rest of the batch.

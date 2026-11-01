@@ -81,6 +81,8 @@ install -D -m 644 README.md "$staging/usr/share/doc/$package/README.md"
 install -D -m 644 CHANGELOG.md "$staging/usr/share/doc/$package/CHANGELOG.md"
 install -D -m 644 LICENSE "$staging/usr/share/doc/$package/LICENSE"
 install -D -m 644 LICENSE "$staging/usr/share/doc/$package/copyright"
+install -D -m 644 assets/default.pageformer.yaml \
+    "$staging/usr/share/doc/$package/default.pageformer.yaml"
 gzip -9 -n -c CHANGELOG.md > "$staging/usr/share/doc/$package/changelog.gz"
 chmod 644 "$staging/usr/share/doc/$package/changelog.gz"
 install -D -m 644 packaging/pageformer.1 "$staging/usr/share/man/man1/pageformer.1"

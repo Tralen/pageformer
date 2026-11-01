@@ -14,6 +14,8 @@ Without a local template, the global template in the user configuration director
 
 Without either, the fallback embedded in the binary is used. It is the same file as `assets/default.pageformer.yaml`.
 
+To create the global template from the embedded copy, run `pageformer --write-default-template`. It creates the configuration directory, writes the exact embedded YAML and refuses to overwrite an existing template. The Debian package also installs the reference at `/usr/share/doc/pageformer/default.pageformer.yaml`.
+
 Paths written in the template, such as the letterhead image, resolve relative to the template file, never to the working directory.
 
 To use the same settings in another project, copy the template to the document directory as `.pageformer.yaml`, pass it with `--template`, or choose it under Advanced in `pageformer-publisher`.

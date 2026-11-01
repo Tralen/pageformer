@@ -684,7 +684,7 @@ impl Publisher {
                 "Explicit YAML template to use instead of resolving one; leave it empty for automatic resolution.",
                 &mut self.session.template_file,
                 "Explicit YAML template. Leave it empty to use the nearest local file, then the global file, then the embedded fallback.",
-                "Choose the template YAML file with the platform dialog.",
+                "Choose the template YAML file.",
             );
             if template_row.chosen {
                 self.choose_template();
@@ -697,7 +697,7 @@ impl Publisher {
                 "Leave it empty to use the confidential mapping, the user default, or the source folder. A value is a manual override. Documents with confidential fields need a folder outside the source tree.",
                 &mut self.session.output_override,
                 "Leave it empty for the automatic directory; type or choose a folder to override it. Documents with confidential fields need a folder outside the source tree.",
-                "Choose an output folder override with the platform dialog.",
+                "Choose an output folder override.",
             );
             if output_row.chosen {
                 self.choose_output();
@@ -735,7 +735,7 @@ impl Publisher {
                 "INI file with the confidential {NAME} values. Leave it empty to use the user-level folder mapping. Keep it outside the source tree, with mode 600.",
                 &mut self.session.confidential_file,
                 "INI file with the confidential {NAME} values. Leave it empty to use the user-level folder mapping. Keep it outside the source tree, with mode 600.",
-                "Choose the confidential INI file with the platform dialog.",
+                "Choose the confidential INI file.",
             );
             if confidential_row.chosen {
                 self.choose_confidential();

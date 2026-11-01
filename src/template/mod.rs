@@ -89,9 +89,14 @@ impl Template {
         Self::from_raw(raw)
     }
 
+    /// The YAML of the template embedded in the binary.
+    pub fn embedded_yaml() -> &'static str {
+        include_str!("../../assets/default.pageformer.yaml")
+    }
+
     /// Parses the template embedded in the binary.
     pub fn embedded() -> Result<Self, TemplateError> {
-        Self::from_yaml(include_str!("../../assets/default.pageformer.yaml"))
+        Self::from_yaml(Self::embedded_yaml())
     }
 
     fn from_raw(raw: RawTemplate) -> Result<Self, TemplateError> {

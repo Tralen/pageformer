@@ -11,6 +11,8 @@
 - Reads the public configuration for `default_output` even when `--confidential-file` is used, while the folder mapping stays bypassed.
 - Resolves the publisher output with the same precedence, shows the automatic directory and its origin, and treats the Advanced field as an override with Use default.
 - Derives the publisher title color from the active light or dark theme instead of a fixed light gray.
+- Adds `pageformer --write-default-template`, which writes the embedded template to the user configuration directory without overwriting an existing file, and ships the reference template in the Debian package.
+- Trims the platform-dialog wording from the publisher Choose tooltips.
 - Automates the Debian package on release: `.github/workflows/deb.yml` checks out the tag, verifies the version and `lintian`, builds the `.deb`, rewrites `SHA256SUMS` with the source archive and the package, and attaches both to the release; a manual dispatch rebuilds a chosen tag.
 - Regenerates the ODT examples for `meta:generator` 1.1.0.
 

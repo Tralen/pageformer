@@ -649,19 +649,19 @@ impl Publisher {
                 RowButton {
                     label: "Choose",
                     tooltip: "Choose the template YAML file.",
-                    width: CHOOSE_BUTTON_WIDTH,
+                    width: configuration_button_width(ui, "Choose"),
                     enabled: true,
                 },
                 RowButton {
                     label: "Edit",
                     tooltip: "Open the resolved template in the default editor.",
-                    width: EDIT_BUTTON_WIDTH,
+                    width: configuration_button_width(ui, "Edit"),
                     enabled: self.template_path.is_some(),
                 },
                 RowButton {
                     label: "Folder",
                     tooltip: "Open the folder that contains the resolved template.",
-                    width: FOLDER_BUTTON_WIDTH,
+                    width: configuration_button_width(ui, "Folder"),
                     enabled: self.template_path.is_some(),
                 },
             ];
@@ -669,28 +669,33 @@ impl Publisher {
                 RowButton {
                     label: "Choose",
                     tooltip: "Choose an output folder override.",
-                    width: CHOOSE_BUTTON_WIDTH,
+                    width: configuration_button_width(ui, "Choose"),
                     enabled: true,
                 },
                 RowButton {
                     label: "Use default",
                     tooltip: "Clear the override and use the automatic directory shown as the hint.",
-                    width: DEFAULT_BUTTON_WIDTH,
+                    width: configuration_button_width(ui, "Use default"),
                     enabled: explicit_path(&self.session.output_override).is_some(),
                 },
             ];
             let confidential_buttons = [RowButton {
                 label: "Choose",
                 tooltip: "Choose the confidential INI file.",
-                width: CHOOSE_BUTTON_WIDTH,
+                width: configuration_button_width(ui, "Choose"),
                 enabled: true,
             }];
+            let label_width = configuration_label_width(ui);
             let spacing = ui.spacing().item_spacing.x;
             let action_width = button_group_width(&template_buttons, spacing)
                 .max(button_group_width(&output_buttons, spacing))
                 .max(button_group_width(&confidential_buttons, spacing));
-            let field_width =
-                configuration_field_width(ui.available_width(), action_width, spacing);
+            let field_width = configuration_field_width(
+                ui.available_width(),
+                label_width,
+                action_width,
+                spacing,
+            );
 
             let template_row = path_row(
                 ui,
@@ -699,6 +704,7 @@ impl Publisher {
                 &mut self.session.template_file,
                 template_hint.as_deref(),
                 "Explicit YAML template. Leave it empty to use the resolved template shown as the hint.",
+                label_width,
                 field_width,
                 &template_buttons,
             );
@@ -739,6 +745,7 @@ impl Publisher {
                 &mut self.session.output_override,
                 output_hint.as_deref(),
                 "Leave it empty for the automatic directory; type or choose a folder to override it. Documents with confidential fields need a folder outside the source tree.",
+                label_width,
                 field_width,
                 &output_buttons,
             );
@@ -770,6 +777,7 @@ impl Publisher {
                 &mut self.session.confidential_file,
                 None,
                 "INI file with the confidential {NAME} values. Leave it empty to use the user-level folder mapping. Keep it outside the source tree, with mode 600.",
+                label_width,
                 field_width,
                 &confidential_buttons,
             );
@@ -999,20 +1007,13 @@ struct RowButton<'a> {
     enabled: bool,
 }
 
-/// The fixed label column of a path row.
-const ROW_LABEL_WIDTH: f32 = 100.0;
-/// The width of a Choose button.
-const CHOOSE_BUTTON_WIDTH: f32 = 78.0;
-/// The width of the template Edit button.
-const EDIT_BUTTON_WIDTH: f32 = 48.0;
-/// The width of the template Folder button.
-const FOLDER_BUTTON_WIDTH: f32 = 58.0;
-/// The width of the output Use default button.
-const DEFAULT_BUTTON_WIDTH: f32 = 90.0;
+/// The horizontal padding on each side of a Configuration button.
+const BUTTON_SIDE_PADDING: f32 = 10.0;
+/// The extra space after the widest Configuration label.
+const LABEL_GAP: f32 = 4.0;
 
 /// Lays out a label, a text field and fixed-width action buttons. The caller
-/// passes a common field width, so the action column starts at the same place
-/// in every row.
+/// passes a common label and field width, so every row aligns.
 fn path_row(
     ui: &mut egui::Ui,
     label: &str,
@@ -1020,6 +1021,7 @@ fn path_row(
     value: &mut String,
     hint: Option<&str>,
     field_tooltip: &str,
+    label_width: f32,
     field_width: f32,
     buttons: &[RowButton<'_>],
 ) -> PathRow {
@@ -1027,16 +1029,16 @@ fn path_row(
     let mut report = PathRow::default();
     ui.horizontal(|ui| {
         let _ = ui.allocate_ui_with_layout(
-            egui::vec2(ROW_LABEL_WIDTH, height),
+            egui::vec2(label_width, height),
             egui::Layout::left_to_right(egui::Align::Center),
             |ui| {
-                ui.set_width(ROW_LABEL_WIDTH);
+                ui.set_width(label_width);
                 with_tooltip(ui.label(label), label_tooltip);
             },
         );
         let mut field = egui::TextEdit::singleline(value).desired_width(field_width);
         if let Some(hint) = hint {
-            let hint = elide_left(ui, hint, (field_width - 32.0).max(0.0));
+            let hint = elide_left(ui, hint, (field_width - 20.0).max(0.0));
             field = field.hint_text(hint.as_str());
         }
         let field = ui.add(field);
@@ -1066,8 +1068,27 @@ fn button_group_width(buttons: &[RowButton<'_>], spacing: f32) -> f32 {
 /// The common field width for the Configuration rows. The action column is as
 /// wide as the widest button group, so every Choose button starts on the same
 /// vertical line.
-fn configuration_field_width(available: f32, action_width: f32, spacing: f32) -> f32 {
-    (available - ROW_LABEL_WIDTH - action_width - spacing * 2.0).max(80.0)
+fn configuration_field_width(
+    available: f32,
+    label_width: f32,
+    action_width: f32,
+    spacing: f32,
+) -> f32 {
+    (available - label_width - action_width - spacing * 2.0).max(80.0)
+}
+
+/// The width of the widest Configuration label plus a small gap.
+fn configuration_label_width(ui: &egui::Ui) -> f32 {
+    ["Template:", "Output:", "Confidential:"]
+        .into_iter()
+        .map(|label| text_width(ui, label))
+        .fold(0.0, f32::max)
+        + LABEL_GAP
+}
+
+/// The width of a Configuration button with equal side padding.
+fn configuration_button_width(ui: &egui::Ui, label: &str) -> f32 {
+    text_width_for(ui, label, egui::TextStyle::Button) + BUTTON_SIDE_PADDING * 2.0
 }
 
 /// Removes characters from the left until the measured text fits, keeping the
@@ -1087,7 +1108,12 @@ fn elide_left_with(text: &str, max_width: f32, measure: impl Fn(&str) -> f32) ->
 
 /// The width of a text in the body font.
 fn text_width(ui: &egui::Ui, text: &str) -> f32 {
-    let font_id = egui::TextStyle::Body.resolve(ui.style());
+    text_width_for(ui, text, egui::TextStyle::Body)
+}
+
+/// The width of a text in a given style.
+fn text_width_for(ui: &egui::Ui, text: &str, style: egui::TextStyle) -> f32 {
+    let font_id = style.resolve(ui.style());
     let color = ui.visuals().text_color();
     ui.painter()
         .layout_no_wrap(text.to_owned(), font_id, color)
@@ -1415,23 +1441,24 @@ mod tests {
     #[test]
     fn the_configuration_rows_share_the_choose_column() {
         let spacing = 8.0;
+        let label_width = 90.0;
         let template = [
             RowButton {
                 label: "Choose",
                 tooltip: "",
-                width: CHOOSE_BUTTON_WIDTH,
+                width: 68.0,
                 enabled: true,
             },
             RowButton {
                 label: "Edit",
                 tooltip: "",
-                width: EDIT_BUTTON_WIDTH,
+                width: 43.0,
                 enabled: true,
             },
             RowButton {
                 label: "Folder",
                 tooltip: "",
-                width: FOLDER_BUTTON_WIDTH,
+                width: 58.0,
                 enabled: true,
             },
         ];
@@ -1439,31 +1466,31 @@ mod tests {
             RowButton {
                 label: "Choose",
                 tooltip: "",
-                width: CHOOSE_BUTTON_WIDTH,
+                width: 68.0,
                 enabled: true,
             },
             RowButton {
                 label: "Use default",
                 tooltip: "",
-                width: DEFAULT_BUTTON_WIDTH,
+                width: 90.0,
                 enabled: true,
             },
         ];
         let confidential = [RowButton {
             label: "Choose",
             tooltip: "",
-            width: CHOOSE_BUTTON_WIDTH,
+            width: 68.0,
             enabled: true,
         }];
 
         let action_width = button_group_width(&template, spacing)
             .max(button_group_width(&output, spacing))
             .max(button_group_width(&confidential, spacing));
-        let field_width = configuration_field_width(748.0, action_width, spacing);
-        let choose_column = ROW_LABEL_WIDTH + spacing + field_width + spacing;
+        let field_width = configuration_field_width(748.0, label_width, action_width, spacing);
+        let choose_column = label_width + spacing + field_width + spacing;
 
-        assert_eq!(action_width, 200.0);
-        assert_eq!(choose_column, 548.0);
+        assert_eq!(action_width, 185.0);
+        assert_eq!(choose_column + action_width, 748.0);
         assert!(button_group_width(&template, spacing) <= action_width);
         assert!(button_group_width(&output, spacing) <= action_width);
         assert!(button_group_width(&confidential, spacing) <= action_width);
@@ -1471,7 +1498,7 @@ mod tests {
 
     #[test]
     fn a_narrow_configuration_keeps_a_minimum_field_width() {
-        assert_eq!(configuration_field_width(200.0, 200.0, 8.0), 80.0);
+        assert_eq!(configuration_field_width(200.0, 90.0, 185.0, 8.0), 80.0);
     }
 
     #[test]

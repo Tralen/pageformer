@@ -14,6 +14,7 @@
 - Simplifies the publisher configuration: the Advanced section is now Configuration, the resolved template moved from the top row into the template row with Choose, Edit and Folder together, and the template and output fields show the automatic value as a placeholder instead of separate lines.
 - Aligns the Configuration Choose buttons in a single column under the widest action group, so the template, output and confidential fields end at the same place and every Choose starts at the same x; refreshes the publisher screenshot.
 - Elides long publisher paths from the left in the Configuration hints and the Selected and Wrote lines, keeping the final file name and the output origin visible.
+- Tightens the publisher Configuration layout: the label column follows the widest label, the action buttons measure their text plus equal side padding, and the hint elision reserves only the field inner margin, so more of each path is visible; refreshes the publisher screenshot.
 - Adds `pageformer --write-default-template`, which writes the embedded template to the user configuration directory without overwriting an existing file, and ships the reference template in the Debian package.
 - Trims the platform-dialog wording from the publisher Choose tooltips.
 - Automates the Debian package on release: `.github/workflows/deb.yml` checks out the tag, verifies the version and `lintian`, builds the `.deb`, rewrites `SHA256SUMS` with the source archive and the package, and attaches both to the release; a manual dispatch rebuilds a chosen tag.

@@ -6,7 +6,7 @@
 
 ### Unreleased
 
-- Automates the Debian package on release: `.github/workflows/deb.yml` checks out the tag, verifies the version and `lintian`, builds the `.deb`, rewrites `SHA256SUMS` with the source archive and the package, and attaches both to the release.
+- Automates the Debian package on release: `.github/workflows/deb.yml` checks out the tag, verifies the version and `lintian`, builds the `.deb`, rewrites `SHA256SUMS` with the source archive and the package, and attaches both to the release; a manual dispatch rebuilds a chosen tag.
 
 ### 1.0.1
 

@@ -148,6 +148,12 @@ dpkg-deb -x dist/pageformer_<version>_<architecture>.deb /tmp/pageformer-deb
 
 `.github/workflows/deb.yml` runs when a release is published. It checks out the tag, verifies that `v<version>` matches both `Cargo.toml` and the built `pageformer --version`, builds the package, runs `lintian`, downloads the release source archive, rewrites `SHA256SUMS` with the archive and the package, uploads both with `--clobber`, and downloads the release again to verify the checksum. The workflow has `contents: write` only for the release, and the test workflows stay read-only.
 
+The workflow also has a manual trigger for rebuilding an existing release:
+
+```sh
+gh workflow run deb.yml -f tag=v<version>
+```
+
 The manual commands above remain for a local rebuild; the upload below is the fallback when the workflow cannot run.
 
 Create the checksum file with the source archive and the package together, and verify it before publishing:

@@ -3,28 +3,34 @@ name: Debian package
 on:
   release:
     types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to rebuild
+        required: true
+        type: string
 
 permissions:
   contents: write
 
 concurrency:
-  group: deb-${{ github.event.release.tag_name }}
+  group: deb-${{ github.event.release.tag_name || inputs.tag }}
   cancel-in-progress: false
 
 jobs:
   deb:
     name: Build and attach the .deb
-    if: startsWith(github.event.release.tag_name, 'v')
+    if: startsWith(github.event.release.tag_name || inputs.tag, 'v')
     # The package declares libc6 >= 2.35, so build on the matching runner.
     runs-on: ubuntu-22.04
     timeout-minutes: 45
     env:
       GH_TOKEN: ${{ github.token }}
-      TAG: ${{ github.event.release.tag_name }}
+      TAG: ${{ github.event.release.tag_name || inputs.tag }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.event.release.tag_name }}
+          ref: ${{ github.event.release.tag_name || inputs.tag }}
           fetch-depth: 0
 
       - uses: dtolnay/rust-toolchain@stable # The ref name selects the toolchain.

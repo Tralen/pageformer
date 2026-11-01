@@ -203,6 +203,66 @@ fn absolute_output(text: &str) -> Result<PathBuf, ConfigError> {
     normalize_absolute(&path).ok_or(ConfigError::NotAbsolute { path })
 }
 
+/// Where the resolved output directory came from.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum OutputOrigin {
+    Explicit,
+    Ini,
+    Default,
+    Source,
+}
+
+/// The output directory chosen for a source root and where it came from.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ResolvedOutput {
+    directory: Option<PathBuf>,
+    origin: OutputOrigin,
+}
+
+impl ResolvedOutput {
+    /// The directory, or `None` when the output stays beside the source.
+    pub fn directory(&self) -> Option<&Path> {
+        self.directory.as_deref()
+    }
+
+    pub fn origin(&self) -> OutputOrigin {
+        self.origin
+    }
+}
+
+/// Resolves the output directory with the shared precedence: explicit,
+/// per-INI output, user default and finally the source folder.
+pub fn resolve_output(
+    source_root: &Path,
+    explicit: Option<&Path>,
+    user: &UserConfig,
+    confidential: Option<&ConfidentialConfig>,
+) -> ResolvedOutput {
+    if let Some(directory) = explicit {
+        return ResolvedOutput {
+            directory: Some(directory.to_owned()),
+            origin: OutputOrigin::Explicit,
+        };
+    }
+    if let Some(directory) = confidential.and_then(|config| config.output_for(source_root)) {
+        return ResolvedOutput {
+            directory: Some(directory.to_owned()),
+            origin: OutputOrigin::Ini,
+        };
+    }
+    if let Some(directory) = user.default_output() {
+        return ResolvedOutput {
+            directory: Some(directory.to_owned()),
+            origin: OutputOrigin::Default,
+        };
+    }
+    ResolvedOutput {
+        directory: None,
+        origin: OutputOrigin::Source,
+    }
+}
+
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct PublicFile {
@@ -782,6 +842,57 @@ mod tests {
                 .expect("an empty mapping")
                 .is_empty()
         );
+    }
+
+    #[test]
+    fn the_output_precedence_is_explicit_ini_default_source() {
+        let temp = TempDir::new().expect("a configuration directory");
+        let secret = secret_directory();
+        let source = project();
+        let ini_output = project();
+        let default_output = project();
+        let explicit = project();
+        let public = temp.path().join(PUBLIC_FILE_NAME);
+        write_public_with(&public, &[secret.path()], Some(default_output.path()));
+        write_secret_with(
+            secret.path(),
+            &[("escritorio", source.path())],
+            &[("escritorio", ini_output.path())],
+        );
+        write_ini(secret.path(), "escritorio");
+        let user =
+            UserConfig::from_public_file(&public).expect("the public configuration must load");
+        let confidential = user
+            .confidential_config()
+            .expect("the confidential mapping must load");
+
+        let choice = resolve_output(
+            source.path(),
+            Some(explicit.path()),
+            &user,
+            Some(&confidential),
+        );
+        assert_eq!(choice.origin(), OutputOrigin::Explicit);
+        assert_eq!(choice.directory(), Some(explicit.path()));
+
+        let choice = resolve_output(source.path(), None, &user, Some(&confidential));
+        assert_eq!(choice.origin(), OutputOrigin::Ini);
+        assert_eq!(
+            choice.directory(),
+            Some(resolved(ini_output.path()).as_path())
+        );
+
+        let choice = resolve_output(source.path(), None, &user, None);
+        assert_eq!(choice.origin(), OutputOrigin::Default);
+        assert_eq!(
+            choice.directory(),
+            Some(resolved(default_output.path()).as_path())
+        );
+
+        let empty = UserConfig::default();
+        let choice = resolve_output(source.path(), None, &empty, None);
+        assert_eq!(choice.origin(), OutputOrigin::Source);
+        assert_eq!(choice.directory(), None);
     }
 
     #[test]

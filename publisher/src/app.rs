@@ -7,7 +7,9 @@ use std::thread;
 use std::time::Duration;
 
 use eframe::egui;
-use pageformer::confidential::config::ConfidentialConfig;
+use pageformer::confidential::config::{
+    ConfidentialConfig, OutputOrigin, ResolvedOutput, UserConfig, resolve_output,
+};
 use pageformer::confidential::{self, ConfidentialStore};
 use pageformer::format::Format;
 use pageformer::pipeline::{self, DocumentJob, Source};
@@ -134,9 +136,14 @@ const COPY_BUTTON_WIDTH: f32 = 48.0;
 const COPY_FILL: egui::Color32 = egui::Color32::from_rgb(0x45, 0x45, 0x45);
 /// The title shown at the top of the window.
 const TITLE: &str = "Pageformer Publisher";
-/// The title color: a light gray that separates the title from the body text
-/// without the glare of pure white.
-const TITLE_COLOR: egui::Color32 = egui::Color32::from_gray(200);
+
+/// The title color, derived from the active theme so it never relies on a
+/// background being dark or light.
+fn title_color(visuals: &egui::Visuals) -> egui::Color32 {
+    visuals
+        .strong_text_color()
+        .lerp_to_gamma(visuals.window_fill, 0.12)
+}
 
 /// The version shown at the top right of the window.
 fn version_label() -> String {
@@ -146,7 +153,9 @@ fn version_label() -> String {
 /// The pure converter state: the input, the paths and the visible state.
 struct Session {
     input: Option<PathBuf>,
-    output_directory: String,
+    output_override: String,
+    automatic_output: Option<PathBuf>,
+    automatic_origin: OutputOrigin,
     confidential_file: String,
     template_file: String,
     state: State,
@@ -156,7 +165,9 @@ impl Session {
     fn new() -> Self {
         Self {
             input: None,
-            output_directory: String::new(),
+            output_override: String::new(),
+            automatic_output: None,
+            automatic_origin: OutputOrigin::Source,
             confidential_file: String::new(),
             template_file: String::new(),
             state: State::Idle,
@@ -170,7 +181,9 @@ impl Session {
     /// Accepts a Markdown file or a confidential INI file.
     fn accept_path(&mut self, path: PathBuf) -> bool {
         if is_markdown_file(&path) {
-            self.output_directory = source_directory(&path).display().to_string();
+            self.output_override.clear();
+            self.automatic_output = None;
+            self.automatic_origin = OutputOrigin::Source;
             self.input = Some(path);
             true
         } else if is_confidential_file(&path) {
@@ -185,19 +198,45 @@ impl Session {
         self.input.as_ref().map(|input| source_directory(input))
     }
 
+    /// Stores the automatic output resolved from the user configuration.
+    fn set_output_resolution(&mut self, resolved: &ResolvedOutput) {
+        self.automatic_output = resolved.directory().map(Path::to_path_buf);
+        self.automatic_origin = resolved.origin();
+    }
+
+    /// Forgets the automatic output, falling back to the source folder.
+    fn clear_output_resolution(&mut self) {
+        self.automatic_output = None;
+        self.automatic_origin = OutputOrigin::Source;
+    }
+
+    /// The explicit override, or the automatic directory, or `None` for beside
+    /// the source.
+    fn output_directory(&self) -> Option<PathBuf> {
+        explicit_path(&self.output_override).or_else(|| self.automatic_output.clone())
+    }
+
     fn output_path(&self, format: Format) -> Option<PathBuf> {
         let input = self.input.as_ref()?;
         let name = input.file_name()?;
-        let directory = self.output_directory.trim();
-        if directory.is_empty() {
-            Some(input.with_extension(format.extension()))
-        } else {
-            Some(
-                Path::new(directory)
-                    .join(name)
-                    .with_extension(format.extension()),
-            )
+        match self.output_directory() {
+            Some(directory) => Some(directory.join(name).with_extension(format.extension())),
+            None => Some(input.with_extension(format.extension())),
         }
+    }
+
+    /// The automatic output and its origin, for the Advanced hint. The
+    /// automatic value is what an empty override uses.
+    fn automatic_summary(&self) -> Option<String> {
+        let directory = self
+            .automatic_output
+            .clone()
+            .or_else(|| self.source_root())?;
+        Some(format!(
+            "{} ({})",
+            directory.display(),
+            output_origin_label(self.automatic_origin)
+        ))
     }
 
     fn begin(&mut self, format: Format) -> Option<ExportRequest> {
@@ -258,6 +297,7 @@ pub struct Publisher {
     template_label: String,
     template_path: Option<PathBuf>,
     message: Option<String>,
+    output_error: Option<String>,
     receiver: Option<Receiver<Result<WorkerOutcome, String>>>,
 }
 
@@ -272,6 +312,7 @@ impl Publisher {
             template_label: "not selected".to_owned(),
             template_path: None,
             message: None,
+            output_error: None,
             receiver: None,
         }
     }
@@ -284,7 +325,40 @@ impl Publisher {
         if is_markdown_file(&path) {
             self.refresh_template();
         }
+        self.refresh_output();
         self.message = None;
+    }
+
+    /// Resolves the automatic output from the user configuration. The explicit
+    /// override in the field wins later, in the session.
+    fn refresh_output(&mut self) {
+        self.output_error = None;
+        let Some(source_root) = self.session.source_root() else {
+            self.session.clear_output_resolution();
+            return;
+        };
+        let user = match UserConfig::load_default() {
+            Ok(user) => user,
+            Err(error) => {
+                self.session.clear_output_resolution();
+                self.output_error = Some(error.to_string());
+                return;
+            }
+        };
+        let confidential = if self.session.confidential_file.trim().is_empty() {
+            match user.confidential_config() {
+                Ok(config) => Some(config),
+                Err(error) => {
+                    self.session.clear_output_resolution();
+                    self.output_error = Some(error.to_string());
+                    return;
+                }
+            }
+        } else {
+            None
+        };
+        let resolved = resolve_output(&source_root, None, &user, confidential.as_ref());
+        self.session.set_output_resolution(&resolved);
     }
 
     fn refresh_template(&mut self) {
@@ -314,6 +388,7 @@ impl Publisher {
     }
 
     fn start(&mut self, format: Format) {
+        self.refresh_output();
         let Some(request) = self.session.begin(format) else {
             return;
         };
@@ -383,12 +458,13 @@ impl Publisher {
     fn choose_confidential(&mut self) {
         if let Some(path) = open::choose_file("Choose a confidential INI file", "INI", &["ini"]) {
             self.session.confidential_file = path.display().to_string();
+            self.refresh_output();
         }
     }
 
     fn choose_output(&mut self) {
         if let Some(path) = open::choose_folder("Choose the output folder") {
-            self.session.output_directory = path.display().to_string();
+            self.session.output_override = path.display().to_string();
         }
     }
 
@@ -400,7 +476,7 @@ impl Publisher {
                     egui::RichText::new(TITLE)
                         .size(20.0)
                         .strong()
-                        .color(TITLE_COLOR),
+                        .color(title_color(ui.visuals())),
                 );
             },
             |ui| {
@@ -618,13 +694,40 @@ impl Publisher {
             let output_row = path_row(
                 ui,
                 "Output:",
-                "Folder for the generated file. It starts as the Markdown folder; documents with confidential fields need a folder outside the source tree.",
-                &mut self.session.output_directory,
-                "Folder for the generated file. It starts as the Markdown folder; documents with confidential fields need a folder outside the source tree.",
-                "Choose the output folder with the platform dialog.",
+                "Leave it empty to use the confidential mapping, the user default, or the source folder. A value is a manual override. Documents with confidential fields need a folder outside the source tree.",
+                &mut self.session.output_override,
+                "Leave it empty for the automatic directory; type or choose a folder to override it. Documents with confidential fields need a folder outside the source tree.",
+                "Choose an output folder override with the platform dialog.",
             );
             if output_row.chosen {
                 self.choose_output();
+            } else if output_row.lost_focus && self.session.output_override.trim().is_empty() {
+                self.refresh_output();
+            }
+            if self.output_error.is_none()
+                && let Some(summary) = self.session.automatic_summary()
+            {
+                ui.horizontal(|ui| {
+                    with_tooltip(
+                        ui.label(egui::RichText::new(format!("Default: {summary}")).small()),
+                        "The directory used when the Output field is empty.",
+                    );
+                    if explicit_path(&self.session.output_override).is_some()
+                        && ui.small_button("Use default").clicked()
+                    {
+                        self.session.output_override.clear();
+                        self.refresh_output();
+                    }
+                });
+            }
+            if let Some(error) = &self.output_error {
+                with_tooltip(
+                    ui.colored_label(
+                        egui::Color32::from_rgb(0xb0, 0x2a, 0x2a),
+                        format!("Output configuration: {error}"),
+                    ),
+                    "The automatic output could not be resolved. Choose a folder to override it.",
+                );
             }
             let confidential_row = path_row(
                 ui,
@@ -636,6 +739,8 @@ impl Publisher {
             );
             if confidential_row.chosen {
                 self.choose_confidential();
+            } else if confidential_row.lost_focus {
+                self.refresh_output();
             }
         });
         with_tooltip(
@@ -883,6 +988,16 @@ fn explicit_path(value: &str) -> Option<PathBuf> {
     (!trimmed.is_empty()).then(|| PathBuf::from(trimmed))
 }
 
+fn output_origin_label(origin: OutputOrigin) -> &'static str {
+    match origin {
+        OutputOrigin::Explicit => "manual",
+        OutputOrigin::Ini => "confidential mapping",
+        OutputOrigin::Default => "user default",
+        OutputOrigin::Source => "source folder",
+        _ => "configured",
+    }
+}
+
 /// A source path is the parent of the input, or the current directory when the
 /// input has no parent component.
 fn source_directory(path: &Path) -> PathBuf {
@@ -985,16 +1100,22 @@ mod tests {
 
         assert!(session.can_export());
         assert_eq!(session.input, Some(PathBuf::from("docs/A.md")));
-        assert_eq!(session.output_directory, "docs");
+        assert!(session.output_override.is_empty());
+        assert_eq!(session.automatic_origin, OutputOrigin::Source);
     }
 
     #[test]
-    fn the_output_directory_follows_a_new_markdown_selection() {
+    fn a_new_markdown_selection_clears_the_output_choice() {
         let mut session = session_with_input("docs/A.md");
+        session.output_override = "out".to_owned();
+        session.automatic_output = Some(PathBuf::from("automatic"));
+        session.automatic_origin = OutputOrigin::Default;
 
         assert!(session.accept_path(PathBuf::from("other/B.md")));
 
-        assert_eq!(session.output_directory, "other");
+        assert!(session.output_override.is_empty());
+        assert_eq!(session.automatic_output, None);
+        assert_eq!(session.automatic_origin, OutputOrigin::Source);
     }
 
     #[test]
@@ -1002,7 +1123,7 @@ mod tests {
         let session = session_with_input("A.md");
 
         assert_eq!(session.source_root(), Some(PathBuf::from(".")));
-        assert_eq!(session.output_directory, ".");
+        assert!(session.output_override.is_empty());
     }
 
     #[test]
@@ -1111,8 +1232,7 @@ mod tests {
 
     #[test]
     fn the_output_stays_beside_the_source_without_a_directory() {
-        let mut session = session_with_input("docs/A.md");
-        session.output_directory.clear();
+        let session = session_with_input("docs/A.md");
 
         assert_eq!(
             session.output_path(Format::Pdf),
@@ -1121,13 +1241,43 @@ mod tests {
     }
 
     #[test]
-    fn the_output_directory_receives_the_file_name() {
+    fn an_automatic_output_is_used_when_the_override_is_empty() {
         let mut session = session_with_input("docs/A.md");
-        session.output_directory = "out".to_owned();
+        session.automatic_output = Some(PathBuf::from("out"));
+        session.automatic_origin = OutputOrigin::Ini;
 
         assert_eq!(
             session.output_path(Format::Odt),
             Some(PathBuf::from("out/A.odt"))
+        );
+        assert_eq!(
+            session.automatic_summary(),
+            Some("out (confidential mapping)".to_owned())
+        );
+    }
+
+    #[test]
+    fn an_override_wins_over_the_automatic_output() {
+        let mut session = session_with_input("docs/A.md");
+        session.automatic_output = Some(PathBuf::from("automatic"));
+        session.automatic_origin = OutputOrigin::Default;
+        session.output_override = "manual".to_owned();
+
+        assert_eq!(
+            session.output_path(Format::Odt),
+            Some(PathBuf::from("manual/A.odt"))
+        );
+    }
+
+    #[test]
+    fn the_automatic_summary_names_the_origin() {
+        let mut session = session_with_input("docs/A.md");
+        session.automatic_output = Some(PathBuf::from("out"));
+        session.automatic_origin = OutputOrigin::Source;
+
+        assert_eq!(
+            session.automatic_summary(),
+            Some("out (source folder)".to_owned())
         );
     }
 
@@ -1179,5 +1329,33 @@ mod tests {
         let session = session_with_input("docs/A.md");
 
         assert_eq!(session.source_root(), Some(PathBuf::from("docs")));
+    }
+
+    #[test]
+    fn the_title_color_has_contrast_in_both_themes() {
+        let dark = egui::Visuals::dark();
+        let light = egui::Visuals::light();
+
+        assert!(contrast_ratio(title_color(&dark), dark.window_fill) >= 3.0);
+        assert!(contrast_ratio(title_color(&light), light.window_fill) >= 3.0);
+        assert_ne!(title_color(&dark), title_color(&light));
+    }
+
+    fn contrast_ratio(left: egui::Color32, right: egui::Color32) -> f32 {
+        let left = luminance(left);
+        let right = luminance(right);
+        (left.max(right) + 0.05) / (left.min(right) + 0.05)
+    }
+
+    fn luminance(color: egui::Color32) -> f32 {
+        fn channel(value: u8) -> f32 {
+            let value = f32::from(value) / 255.0;
+            if value <= 0.03928 {
+                value / 12.92
+            } else {
+                ((value + 0.055) / 1.055).powf(2.4)
+            }
+        }
+        0.2126 * channel(color.r()) + 0.7152 * channel(color.g()) + 0.0722 * channel(color.b())
     }
 }

@@ -9,6 +9,8 @@
 - Adds `default_output` to the public `config.yaml` and an optional `outputs` map to `confidential.yaml`.
 - Resolves the output per input with the precedence `--output`, per-INI output, `default_output`, then the source folder; a per-INI output must be outside its mapped source folder.
 - Reads the public configuration for `default_output` even when `--confidential-file` is used, while the folder mapping stays bypassed.
+- Resolves the publisher output with the same precedence, shows the automatic directory and its origin, and treats the Advanced field as an override with Use default.
+- Derives the publisher title color from the active light or dark theme instead of a fixed light gray.
 - Automates the Debian package on release: `.github/workflows/deb.yml` checks out the tag, verifies the version and `lintian`, builds the `.deb`, rewrites `SHA256SUMS` with the source archive and the package, and attaches both to the release; a manual dispatch rebuilds a chosen tag.
 - Regenerates the ODT examples for `meta:generator` 1.1.0.
 

@@ -12,7 +12,7 @@ use std::str::FromStr;
 use anyhow::{Context, Result};
 use clap::{Arg, ArgAction, Command};
 
-use pageformer::confidential::config::UserConfig;
+use pageformer::confidential::config::{UserConfig, resolve_output};
 use pageformer::confidential::{self, ConfidentialStore};
 use pageformer::format::Format;
 use pageformer::pipeline::{self, DocumentJob, Source};
@@ -133,7 +133,6 @@ fn main() -> ExitCode {
             return ExitCode::FAILURE;
         }
     };
-    let default_output = user_config.default_output().map(Path::to_path_buf);
     let config = if confidential_file.is_none() {
         match user_config.confidential_config() {
             Ok(config) => Some(config),
@@ -165,15 +164,14 @@ fn main() -> ExitCode {
             let (planned, errors) = cli::plan_outputs_with(
                 files,
                 |input| {
-                    output_directory
-                        .clone()
-                        .or_else(|| {
-                            config
-                                .as_ref()
-                                .and_then(|config| config.output_for(input.root()))
-                                .map(Path::to_path_buf)
-                        })
-                        .or_else(|| default_output.clone())
+                    resolve_output(
+                        input.root(),
+                        output_directory.as_deref(),
+                        &user_config,
+                        config.as_ref(),
+                    )
+                    .directory()
+                    .map(Path::to_path_buf)
                 },
                 format,
             );

@@ -193,7 +193,7 @@ The window itself is the only manual part of the suite:
 cargo run -p pageformer-publisher
 ```
 
-Drop a Markdown file or click the drop box, choose a format, export and open the output. Confirm that a missing or invalid template produces a visible message instead of a crash, and that the window stays responsive while a render runs. The layout and behavior are described in [`pageweaver.md`](pageweaver.md), and the README shows the window.
+Drop a Markdown file or click the drop box, choose a format, export and open the output. Confirm that a missing or invalid template produces a visible message instead of a crash, and that the window stays responsive while a render runs. With a `default_output` or a per-INI output configured, confirm that the window shows the resolved directory and its origin; choose a folder and confirm it overrides the automatic value; use Use default and confirm the automatic value returns. The unit tests cover the automatic resolution, the override, the origin label and the title contrast in both themes. The layout and behavior are described in [`pageweaver.md`](pageweaver.md), and the README shows the window.
 
 ## Confidential configuration
 

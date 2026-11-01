@@ -119,7 +119,7 @@ cargo run -p pageformer-publisher
 
 ![The Pageformer Publisher window](assets/publisher.png)
 
-The window is deliberately small: drop a Markdown file (or click the box to choose one), pick a format, and open the result. The Advanced section holds an optional template override, the output folder and the confidential INI file. Every label and control has a tooltip. The window calls the same pipeline as the command line and never parses, resolves or writes by itself. See [`docs/pageweaver.md`](docs/pageweaver.md) for the boundary with the editor.
+The window is deliberately small: drop a Markdown file (or click the box to choose one), pick a format, and open the result. The Advanced section holds an optional template override, an output override and the confidential INI file. The output field is empty by default and the window shows the resolved directory and its origin, using the same precedence as the command line; choosing a folder overrides it and Use default clears it. Every label and control has a tooltip. The window calls the same pipeline as the command line and never parses, resolves or writes by itself. See [`docs/pageweaver.md`](docs/pageweaver.md) for the boundary with the editor.
 
 ## Examples
 

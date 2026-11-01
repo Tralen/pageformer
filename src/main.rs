@@ -12,7 +12,7 @@ use std::str::FromStr;
 use anyhow::{Context, Result};
 use clap::{Arg, ArgAction, Command};
 
-use pageformer::confidential::config::ConfidentialConfig;
+use pageformer::confidential::config::UserConfig;
 use pageformer::confidential::{self, ConfidentialStore};
 use pageformer::format::Format;
 use pageformer::pipeline::{self, DocumentJob, Source};
@@ -126,8 +126,16 @@ fn main() -> ExitCode {
         roots
     };
     let root_refs = roots.iter().map(PathBuf::as_path).collect::<Vec<_>>();
+    let user_config = match UserConfig::load_default() {
+        Ok(config) => config,
+        Err(error) => {
+            eprintln!("  {} {error}", label(stderr_painter, Style::Error, "error"));
+            return ExitCode::FAILURE;
+        }
+    };
+    let default_output = user_config.default_output().map(Path::to_path_buf);
     let config = if confidential_file.is_none() {
-        match ConfidentialConfig::load_default() {
+        match user_config.confidential_config() {
             Ok(config) => Some(config),
             Err(error) => {
                 eprintln!("  {} {error}", label(stderr_painter, Style::Error, "error"));
@@ -154,7 +162,21 @@ fn main() -> ExitCode {
 
     let (jobs, plan_errors) = match mode {
         Mode::Render => {
-            let (planned, errors) = cli::plan_outputs(files, output_directory.as_deref(), format);
+            let (planned, errors) = cli::plan_outputs_with(
+                files,
+                |input| {
+                    output_directory
+                        .clone()
+                        .or_else(|| {
+                            config
+                                .as_ref()
+                                .and_then(|config| config.output_for(input.root()))
+                                .map(Path::to_path_buf)
+                        })
+                        .or_else(|| default_output.clone())
+                },
+                format,
+            );
             let jobs = planned
                 .into_iter()
                 .map(|planned| {

@@ -4,6 +4,7 @@ use std::ffi::OsStr;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
+use std::sync::OnceLock;
 
 use tempfile::TempDir;
 
@@ -25,8 +26,22 @@ fn default_template() -> PathBuf {
         .join("default.pageformer.yaml")
 }
 
+fn clean_config_home() -> &'static Path {
+    static CONFIG_HOME: OnceLock<TempDir> = OnceLock::new();
+    CONFIG_HOME
+        .get_or_init(|| TempDir::new().expect("a clean configuration home"))
+        .path()
+}
+
+fn command() -> Command {
+    let mut command = Command::new(binary());
+    command.env("XDG_CONFIG_HOME", clean_config_home());
+    command.env("APPDATA", clean_config_home());
+    command
+}
+
 fn run(arguments: &[&OsStr]) -> Output {
-    Command::new(binary())
+    command()
         .args(arguments)
         .output()
         .expect("the binary must run")
@@ -76,7 +91,7 @@ fn make_private_directory(path: &Path) {
 fn make_private_directory(_path: &Path) {}
 
 fn run_with_environment(arguments: &[&OsStr], variables: &[(&str, &str)]) -> Output {
-    let mut command = Command::new(binary());
+    let mut command = command();
     command.args(arguments);
     for (key, value) in variables {
         command.env(key, value);
@@ -108,29 +123,61 @@ fn example_confidential_file() -> (TempDir, PathBuf) {
 }
 
 fn write_confidential_config(source: &Path, source_name: &str, values: &str) -> (TempDir, TempDir) {
+    write_confidential_config_with(source, source_name, values, None, None)
+}
+
+fn write_confidential_config_with(
+    source: &Path,
+    source_name: &str,
+    values: &str,
+    default_output: Option<&Path>,
+    ini_output: Option<&Path>,
+) -> (TempDir, TempDir) {
     let config_home = TempDir::new().expect("a configuration home");
     let config_directory = config_home.path().join("pageformer");
     fs::create_dir(&config_directory).expect("the configuration directory");
     let secret = TempDir::new().expect("a confidential directory");
     make_private_directory(secret.path());
     write_private(&secret.path().join(format!("{source_name}.ini")), values);
-    write_private(
-        &secret.path().join("confidential.yaml"),
-        &format!(
-            "version: 1\nfiles:\n  {}: {}\n",
-            yaml_string(source_name),
-            yaml_string(&source.display().to_string())
-        ),
+    let mut confidential = format!(
+        "version: 1\nfiles:\n  {}: {}\n",
+        yaml_string(source_name),
+        yaml_string(&source.display().to_string())
     );
+    if let Some(output) = ini_output {
+        confidential.push_str(&format!(
+            "outputs:\n  {}: {}\n",
+            yaml_string(source_name),
+            yaml_string(&output.display().to_string())
+        ));
+    }
+    write_private(&secret.path().join("confidential.yaml"), &confidential);
+    let mut public = String::from("version: 1\n");
+    if let Some(output) = default_output {
+        public.push_str(&format!(
+            "default_output: {}\n",
+            yaml_string(&output.display().to_string())
+        ));
+    }
+    public.push_str(&format!(
+        "confidential_directories:\n  - {}\n",
+        yaml_string(&secret.path().display().to_string())
+    ));
+    fs::write(config_directory.join("config.yaml"), public).expect("the public configuration");
+    (config_home, secret)
+}
+
+fn write_default_output_config(config_home: &Path, default_output: &Path) {
+    let config_directory = config_home.join("pageformer");
+    fs::create_dir_all(&config_directory).expect("the configuration directory");
     fs::write(
         config_directory.join("config.yaml"),
         format!(
-            "version: 1\nconfidential_directories:\n  - {}\n",
-            yaml_string(&secret.path().display().to_string())
+            "version: 1\ndefault_output: {}\n",
+            yaml_string(&default_output.display().to_string())
         ),
     )
     .expect("the public configuration");
-    (config_home, secret)
 }
 
 #[test]
@@ -192,6 +239,187 @@ fn an_explicit_confidential_file_wins_over_the_folder_mapping() {
     assert!(result.status.success(), "{}", stderr(&result));
     let text = fs::read_to_string(output.path().join("Doc.txt")).expect("the text must exist");
     assert!(text.contains("Nome: Explicit."), "{text}");
+}
+
+#[test]
+fn a_default_output_from_the_user_configuration_is_used() {
+    let source = TempDir::new().expect("a temporary source");
+    write_markdown(&source.path().join("Doc.md"), "Documento");
+    let output = TempDir::new().expect("a temporary output");
+    let config_home = TempDir::new().expect("a configuration home");
+    write_default_output_config(config_home.path(), output.path());
+
+    let config_home = config_home.path().to_str().expect("a UTF-8 path");
+    let result = run_with_environment(
+        &[
+            OsStr::new("--format"),
+            OsStr::new("txt"),
+            OsStr::new("--color=never"),
+            source.path().join("Doc.md").as_os_str(),
+        ],
+        &[("XDG_CONFIG_HOME", config_home), ("APPDATA", config_home)],
+    );
+
+    assert!(result.status.success(), "{}", stderr(&result));
+    assert!(output.path().join("Doc.txt").is_file());
+    assert!(!source.path().join("Doc.txt").exists());
+}
+
+#[test]
+fn an_ini_output_wins_over_the_default_output() {
+    let source = TempDir::new().expect("a temporary source");
+    fs::write(
+        source.path().join("Doc.md"),
+        "# Documento\n\nNome: {NOME}.\n",
+    )
+    .expect("the document must be written");
+    let default_output = TempDir::new().expect("a default output");
+    let ini_output = TempDir::new().expect("an INI output");
+    let (config_home, _secret) = write_confidential_config_with(
+        source.path(),
+        "escritorio",
+        "NOME = Fulano de Tal\n",
+        Some(default_output.path()),
+        Some(ini_output.path()),
+    );
+
+    let config_home = config_home.path().to_str().expect("a UTF-8 path");
+    let result = run_with_environment(
+        &[
+            OsStr::new("--format"),
+            OsStr::new("txt"),
+            OsStr::new("--color=never"),
+            source.path().join("Doc.md").as_os_str(),
+        ],
+        &[("XDG_CONFIG_HOME", config_home), ("APPDATA", config_home)],
+    );
+
+    assert!(result.status.success(), "{}", stderr(&result));
+    let text =
+        fs::read_to_string(ini_output.path().join("Doc.txt")).expect("the INI output must exist");
+    assert!(text.contains("Fulano de Tal"), "{text}");
+    assert!(!default_output.path().join("Doc.txt").exists());
+    assert!(!source.path().join("Doc.txt").exists());
+}
+
+#[test]
+fn the_command_line_output_wins_over_both_configurations() {
+    let source = TempDir::new().expect("a temporary source");
+    fs::write(
+        source.path().join("Doc.md"),
+        "# Documento\n\nNome: {NOME}.\n",
+    )
+    .expect("the document must be written");
+    let default_output = TempDir::new().expect("a default output");
+    let ini_output = TempDir::new().expect("an INI output");
+    let explicit_output = TempDir::new().expect("an explicit output");
+    let (config_home, _secret) = write_confidential_config_with(
+        source.path(),
+        "escritorio",
+        "NOME = Fulano de Tal\n",
+        Some(default_output.path()),
+        Some(ini_output.path()),
+    );
+
+    let config_home = config_home.path().to_str().expect("a UTF-8 path");
+    let result = run_with_environment(
+        &[
+            OsStr::new("--format"),
+            OsStr::new("txt"),
+            OsStr::new("--color=never"),
+            OsStr::new("--output"),
+            explicit_output.path().as_os_str(),
+            source.path().join("Doc.md").as_os_str(),
+        ],
+        &[("XDG_CONFIG_HOME", config_home), ("APPDATA", config_home)],
+    );
+
+    assert!(result.status.success(), "{}", stderr(&result));
+    assert!(explicit_output.path().join("Doc.txt").is_file());
+    assert!(!ini_output.path().join("Doc.txt").exists());
+    assert!(!default_output.path().join("Doc.txt").exists());
+}
+
+#[test]
+fn an_explicit_confidential_file_still_uses_the_default_output() {
+    let (project, source, values) = confidential_project();
+    let output = project.path().join("output");
+    let config_home = TempDir::new().expect("a configuration home");
+    write_default_output_config(config_home.path(), &output);
+
+    let config_home = config_home.path().to_str().expect("a UTF-8 path");
+    let result = run_with_environment(
+        &[
+            OsStr::new("--format"),
+            OsStr::new("txt"),
+            OsStr::new("--color=never"),
+            OsStr::new("--confidential-file"),
+            values.as_os_str(),
+            source.path().join("Doc.md").as_os_str(),
+        ],
+        &[("XDG_CONFIG_HOME", config_home), ("APPDATA", config_home)],
+    );
+
+    assert!(result.status.success(), "{}", stderr(&result));
+    assert!(output.join("Doc.txt").is_file());
+}
+
+#[test]
+fn a_default_output_inside_the_source_is_rejected_for_a_confidential_document() {
+    let (project, source, values) = confidential_project();
+    let config_home = TempDir::new().expect("a configuration home");
+    write_default_output_config(config_home.path(), &source.path().join("out"));
+
+    let _project = project;
+    let config_home = config_home.path().to_str().expect("a UTF-8 path");
+    let result = run_with_environment(
+        &[
+            OsStr::new("--color=never"),
+            OsStr::new("--confidential-file"),
+            values.as_os_str(),
+            source.path().join("Doc.md").as_os_str(),
+        ],
+        &[("XDG_CONFIG_HOME", config_home), ("APPDATA", config_home)],
+    );
+
+    assert!(!result.status.success());
+    assert!(
+        stderr(&result).contains("must be written outside its source tree"),
+        "{}",
+        stderr(&result)
+    );
+}
+
+#[test]
+fn an_ini_output_inside_its_source_is_rejected() {
+    let source = TempDir::new().expect("a temporary source");
+    write_markdown(&source.path().join("Doc.md"), "Documento");
+    let inside = source.path().join("out");
+    let (config_home, _secret) = write_confidential_config_with(
+        source.path(),
+        "escritorio",
+        "NOME = Fulano de Tal\n",
+        None,
+        Some(inside.as_path()),
+    );
+
+    let config_home = config_home.path().to_str().expect("a UTF-8 path");
+    let result = run_with_environment(
+        &[
+            OsStr::new("--format"),
+            OsStr::new("txt"),
+            OsStr::new("--color=never"),
+            source.path().join("Doc.md").as_os_str(),
+        ],
+        &[("XDG_CONFIG_HOME", config_home), ("APPDATA", config_home)],
+    );
+
+    assert!(!result.status.success());
+    assert!(
+        stderr(&result).contains("must be outside the source folder"),
+        "{}",
+        stderr(&result)
+    );
 }
 
 #[test]

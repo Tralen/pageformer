@@ -1,9 +1,10 @@
-//! The user-level map from source folders to confidential INI files.
+//! The public user configuration and the confidential map.
 //!
-//! The public `config.yaml` only lists confidential directories. Each directory
-//! owns a `confidential.yaml` that names its INI files and the source folders
-//! they serve. Keeping the mapping inside the confidential directory keeps the
-//! project names out of the general configuration.
+//! The public `config.yaml` holds the default output directory and lists the
+//! confidential directories. Each directory owns a `confidential.yaml` that
+//! names its INI files, the source folders they serve and optional outputs.
+//! Keeping the mapping inside the confidential directory keeps the project
+//! names out of the general configuration.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
@@ -24,20 +25,23 @@ pub const SECRET_FILE_NAME: &str = "confidential.yaml";
 /// The version accepted by both configuration files.
 pub const CONFIG_VERSION: u32 = 1;
 
-/// One source folder and the INI file that serves it.
+/// One source folder, the INI file that serves it and an optional output.
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct Entry {
     source: PathBuf,
     ini: PathBuf,
+    output: Option<PathBuf>,
 }
 
-/// The resolved folder-to-INI map.
+/// The public user configuration: the default output and the confidential
+/// directories.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct ConfidentialConfig {
-    entries: Vec<Entry>,
+pub struct UserConfig {
+    default_output: Option<PathBuf>,
+    confidential_directories: Vec<PathBuf>,
 }
 
-impl ConfidentialConfig {
+impl UserConfig {
     /// Loads the public configuration from the user configuration directory.
     ///
     /// A missing file is an empty configuration, not an error.
@@ -71,15 +75,64 @@ impl ConfidentialConfig {
             });
         }
 
-        let mut directories = BTreeSet::new();
+        let default_output = match file.default_output {
+            Some(text) => Some(absolute_output(&text)?),
+            None => None,
+        };
+        Ok(Self {
+            default_output,
+            confidential_directories: file
+                .confidential_directories
+                .into_iter()
+                .map(PathBuf::from)
+                .collect(),
+        })
+    }
+
+    /// The output directory used when the command line and the INI mapping do
+    /// not choose one.
+    pub fn default_output(&self) -> Option<&Path> {
+        self.default_output.as_deref()
+    }
+
+    /// Builds the resolved folder-to-INI map.
+    pub fn confidential_config(&self) -> Result<ConfidentialConfig, ConfigError> {
+        ConfidentialConfig::from_directories(&self.confidential_directories)
+    }
+}
+
+/// The resolved folder-to-INI map.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ConfidentialConfig {
+    entries: Vec<Entry>,
+}
+
+impl ConfidentialConfig {
+    /// Loads the confidential map from the user configuration directory.
+    ///
+    /// A missing public file is an empty configuration, not an error.
+    pub fn load_default() -> Result<Self, ConfigError> {
+        UserConfig::load_default()?.confidential_config()
+    }
+
+    /// Loads a confidential map from an explicit public configuration path.
+    pub fn from_public_file(path: &Path) -> Result<Self, ConfigError> {
+        UserConfig::from_public_file(path)?.confidential_config()
+    }
+
+    fn from_directories(directories: &[PathBuf]) -> Result<Self, ConfigError> {
+        let mut seen = BTreeSet::new();
         let mut entries = Vec::new();
-        for directory in file.confidential_directories {
-            let path = PathBuf::from(&directory);
-            if !path.is_absolute() {
-                return Err(ConfigError::NotAbsolute { path });
+        for directory in directories {
+            if !directory.is_absolute() {
+                return Err(ConfigError::NotAbsolute {
+                    path: directory.clone(),
+                });
             }
-            let normalized = normalize_absolute(&path)
-                .ok_or_else(|| ConfigError::NotAbsolute { path: path.clone() })?;
+            let normalized =
+                normalize_absolute(directory).ok_or_else(|| ConfigError::NotAbsolute {
+                    path: directory.clone(),
+                })?;
             let metadata =
                 fs::metadata(&normalized).map_err(|source| ConfigError::DirectoryRead {
                     path: normalized.clone(),
@@ -89,7 +142,7 @@ impl ConfidentialConfig {
                 return Err(ConfigError::NotDirectory { path: normalized });
             }
             check_directory_permissions(&normalized, &metadata)?;
-            if !directories.insert(normalized.clone()) {
+            if !seen.insert(normalized.clone()) {
                 return Err(ConfigError::DuplicateDirectory { path: normalized });
             }
             entries.extend(load_secret_directory(&normalized)?);
@@ -119,22 +172,43 @@ impl ConfidentialConfig {
 
     /// The INI file for a source folder, using the longest matching prefix.
     pub fn file_for(&self, source_root: &Path) -> Option<&Path> {
-        let root = normalize_absolute(source_root)?;
-        self.entries
-            .iter()
-            .find(|entry| root.starts_with(&entry.source))
-            .map(|entry| entry.ini.as_path())
+        self.entry_for(source_root).map(|entry| entry.ini.as_path())
+    }
+
+    /// The output directory mapped to a source folder, using the longest
+    /// matching prefix. A more specific entry without an output hides a broader
+    /// entry's output.
+    pub fn output_for(&self, source_root: &Path) -> Option<&Path> {
+        self.entry_for(source_root)
+            .and_then(|entry| entry.output.as_deref())
     }
 
     pub fn is_empty(&self) -> bool {
         self.entries.is_empty()
     }
+
+    fn entry_for(&self, source_root: &Path) -> Option<&Entry> {
+        let root = normalize_absolute(source_root)?;
+        self.entries
+            .iter()
+            .find(|entry| root.starts_with(&entry.source))
+    }
+}
+
+fn absolute_output(text: &str) -> Result<PathBuf, ConfigError> {
+    let path = PathBuf::from(text);
+    if !path.is_absolute() {
+        return Err(ConfigError::NotAbsolute { path });
+    }
+    normalize_absolute(&path).ok_or(ConfigError::NotAbsolute { path })
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct PublicFile {
     version: u32,
+    #[serde(default)]
+    default_output: Option<String>,
     #[serde(default)]
     confidential_directories: Vec<String>,
 }
@@ -145,6 +219,8 @@ struct SecretFile {
     version: u32,
     #[serde(default)]
     files: BTreeMap<String, String>,
+    #[serde(default)]
+    outputs: BTreeMap<String, String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -225,8 +301,9 @@ fn load_secret_directory(directory: &Path) -> Result<Vec<Entry>, ConfigError> {
         });
     }
 
-    let mut entries = Vec::with_capacity(file.files.len());
-    for (name, folder) in file.files {
+    let SecretFile { files, outputs, .. } = file;
+    let mut entries = Vec::with_capacity(files.len());
+    for (name, folder) in files {
         let name = IniName::parse(&name)
             .ok_or_else(|| ConfigError::InvalidIniName { name: name.clone() })?;
         let folder = PathBuf::from(folder);
@@ -260,7 +337,46 @@ fn load_secret_directory(directory: &Path) -> Result<Vec<Entry>, ConfigError> {
             return Err(ConfigError::NotFile { path: ini });
         }
         check_file_permissions(&ini, &metadata)?;
-        entries.push(Entry { source, ini });
+        entries.push(Entry {
+            source,
+            ini,
+            output: None,
+        });
+    }
+
+    let mut seen_outputs = BTreeSet::new();
+    for (name, output) in outputs {
+        let name = IniName::parse(&name)
+            .ok_or_else(|| ConfigError::InvalidIniName { name: name.clone() })?;
+        let ini_name = name.file_name();
+        if !seen_outputs.insert(ini_name.to_owned()) {
+            return Err(ConfigError::DuplicateOutput {
+                name: ini_name.to_owned(),
+            });
+        }
+        let output = absolute_output(&output)?;
+        let mut matched = false;
+        for entry in entries.iter_mut().filter(|entry| {
+            entry
+                .ini
+                .file_name()
+                .and_then(|file_name| file_name.to_str())
+                == Some(ini_name)
+        }) {
+            if super::is_within(&entry.source, &output) {
+                return Err(ConfigError::OutputInsideSource {
+                    output,
+                    source: entry.source.clone(),
+                });
+            }
+            entry.output = Some(output.clone());
+            matched = true;
+        }
+        if !matched {
+            return Err(ConfigError::UnknownOutput {
+                name: ini_name.to_owned(),
+            });
+        }
     }
     Ok(entries)
 }
@@ -303,6 +419,7 @@ fn check_directory_permissions(_path: &Path, _metadata: &fs::Metadata) -> Result
 
 /// Why the confidential configuration could not be loaded.
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum ConfigError {
     PublicRead {
         path: PathBuf,
@@ -359,6 +476,16 @@ pub enum ConfigError {
     },
     DuplicateFolder {
         folder: PathBuf,
+    },
+    UnknownOutput {
+        name: String,
+    },
+    DuplicateOutput {
+        name: String,
+    },
+    OutputInsideSource {
+        output: PathBuf,
+        source: PathBuf,
     },
 }
 
@@ -445,6 +572,20 @@ impl fmt::Display for ConfigError {
                 "the source folder {} is mapped by more than one confidential file",
                 folder.display()
             ),
+            Self::UnknownOutput { name } => write!(
+                formatter,
+                "the confidential output for `{name}` has no matching entry in files"
+            ),
+            Self::DuplicateOutput { name } => write!(
+                formatter,
+                "the confidential output for `{name}` is listed more than once"
+            ),
+            Self::OutputInsideSource { output, source } => write!(
+                formatter,
+                "the confidential output {} must be outside the source folder {}",
+                output.display(),
+                source.display()
+            ),
         }
     }
 }
@@ -466,7 +607,10 @@ impl std::error::Error for ConfigError {
             | Self::DirectoryPermissions { .. }
             | Self::InvalidIniName { .. }
             | Self::DuplicateDirectory { .. }
-            | Self::DuplicateFolder { .. } => None,
+            | Self::DuplicateFolder { .. }
+            | Self::UnknownOutput { .. }
+            | Self::DuplicateOutput { .. }
+            | Self::OutputInsideSource { .. } => None,
         }
     }
 }
@@ -487,17 +631,34 @@ mod tests {
     }
 
     fn write_public(path: &Path, directories: &[&Path]) {
-        let mut text = String::from("version: 1\nconfidential_directories:\n");
-        for directory in directories {
+        write_public_with(path, directories, None);
+    }
+
+    fn write_public_with(path: &Path, directories: &[&Path], default_output: Option<&Path>) {
+        let mut text = String::from("version: 1\n");
+        if let Some(output) = default_output {
             text.push_str(&format!(
-                "  - {}\n",
-                yaml_string(&directory.display().to_string())
+                "default_output: {}\n",
+                yaml_string(&output.display().to_string())
             ));
+        }
+        if !directories.is_empty() {
+            text.push_str("confidential_directories:\n");
+            for directory in directories {
+                text.push_str(&format!(
+                    "  - {}\n",
+                    yaml_string(&directory.display().to_string())
+                ));
+            }
         }
         fs::write(path, text).expect("the public configuration must be written");
     }
 
     fn write_secret(directory: &Path, files: &[(&str, &Path)]) {
+        write_secret_with(directory, files, &[]);
+    }
+
+    fn write_secret_with(directory: &Path, files: &[(&str, &Path)], outputs: &[(&str, &Path)]) {
         let mut text = String::from("version: 1\nfiles:\n");
         for (name, folder) in files {
             text.push_str(&format!(
@@ -505,6 +666,16 @@ mod tests {
                 yaml_string(name),
                 yaml_string(&folder.display().to_string())
             ));
+        }
+        if !outputs.is_empty() {
+            text.push_str("outputs:\n");
+            for (name, output) in outputs {
+                text.push_str(&format!(
+                    "  {}: {}\n",
+                    yaml_string(name),
+                    yaml_string(&output.display().to_string())
+                ));
+            }
         }
         let path = directory.join(SECRET_FILE_NAME);
         fs::write(&path, text).expect("the secret map must be written");
@@ -590,6 +761,206 @@ mod tests {
         let outside = resolved(&secret.path().join("outside.ini"));
         assert_eq!(config.file_for(&nested), Some(inside.as_path()));
         assert_eq!(config.file_for(source.path()), Some(outside.as_path()));
+    }
+
+    #[test]
+    fn a_default_output_is_loaded() {
+        let temp = TempDir::new().expect("a configuration directory");
+        let output = project();
+        let public = temp.path().join(PUBLIC_FILE_NAME);
+        write_public_with(&public, &[], Some(output.path()));
+        let config =
+            UserConfig::from_public_file(&public).expect("the public configuration must load");
+
+        assert_eq!(
+            config.default_output(),
+            Some(resolved(output.path()).as_path())
+        );
+        assert!(
+            config
+                .confidential_config()
+                .expect("an empty mapping")
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn a_relative_default_output_is_rejected() {
+        let temp = TempDir::new().expect("a configuration directory");
+        let public = temp.path().join(PUBLIC_FILE_NAME);
+        fs::write(&public, "version: 1\ndefault_output: \"relative/out\"\n")
+            .expect("the public configuration must be written");
+        let error =
+            UserConfig::from_public_file(&public).expect_err("the relative output must fail");
+
+        assert!(matches!(error, ConfigError::NotAbsolute { .. }), "{error}");
+    }
+
+    #[test]
+    fn an_output_is_resolved_for_its_ini() {
+        let temp = TempDir::new().expect("a configuration directory");
+        let secret = secret_directory();
+        let source = project();
+        let output = project();
+        let public = temp.path().join(PUBLIC_FILE_NAME);
+        write_public(&public, &[secret.path()]);
+        write_secret_with(
+            secret.path(),
+            &[("escritorio", source.path())],
+            &[("escritorio", output.path())],
+        );
+        write_ini(secret.path(), "escritorio");
+        let config =
+            ConfidentialConfig::from_public_file(&public).expect("the configuration must load");
+
+        let expected = resolved(output.path());
+        assert_eq!(config.output_for(source.path()), Some(expected.as_path()));
+        assert_eq!(
+            config.output_for(&source.path().join("nested")),
+            Some(expected.as_path())
+        );
+    }
+
+    #[test]
+    fn a_specific_entry_without_an_output_hides_the_broader_output() {
+        let temp = TempDir::new().expect("a configuration directory");
+        let secret = secret_directory();
+        let source = project();
+        let nested = source.path().join("nested");
+        fs::create_dir(&nested).expect("the nested folder must exist");
+        let output = project();
+        let public = temp.path().join(PUBLIC_FILE_NAME);
+        write_public(&public, &[secret.path()]);
+        write_secret_with(
+            secret.path(),
+            &[("outside", source.path()), ("inside", &nested)],
+            &[("outside", output.path())],
+        );
+        write_ini(secret.path(), "outside");
+        write_ini(secret.path(), "inside");
+        let config =
+            ConfidentialConfig::from_public_file(&public).expect("the configuration must load");
+
+        assert_eq!(config.output_for(&nested), None);
+        assert_eq!(
+            config.output_for(source.path()),
+            Some(resolved(output.path()).as_path())
+        );
+    }
+
+    #[test]
+    fn an_output_inside_its_source_is_rejected() {
+        let temp = TempDir::new().expect("a configuration directory");
+        let secret = secret_directory();
+        let source = project();
+        let inside = source.path().join("out");
+        let public = temp.path().join(PUBLIC_FILE_NAME);
+        write_public(&public, &[secret.path()]);
+        write_secret_with(
+            secret.path(),
+            &[("escritorio", source.path())],
+            &[("escritorio", inside.as_path())],
+        );
+        write_ini(secret.path(), "escritorio");
+        let error = ConfidentialConfig::from_public_file(&public)
+            .expect_err("an output inside the source must fail");
+
+        assert!(
+            matches!(error, ConfigError::OutputInsideSource { .. }),
+            "{error}"
+        );
+    }
+
+    #[test]
+    fn an_output_without_a_matching_ini_is_rejected() {
+        let temp = TempDir::new().expect("a configuration directory");
+        let secret = secret_directory();
+        let source = project();
+        let output = project();
+        let public = temp.path().join(PUBLIC_FILE_NAME);
+        write_public(&public, &[secret.path()]);
+        write_secret_with(
+            secret.path(),
+            &[("escritorio", source.path())],
+            &[("missing", output.path())],
+        );
+        write_ini(secret.path(), "escritorio");
+        let error = ConfidentialConfig::from_public_file(&public)
+            .expect_err("an output without an INI must fail");
+
+        assert!(
+            matches!(error, ConfigError::UnknownOutput { .. }),
+            "{error}"
+        );
+    }
+
+    #[test]
+    fn a_relative_ini_output_is_rejected() {
+        let temp = TempDir::new().expect("a configuration directory");
+        let secret = secret_directory();
+        let source = project();
+        let public = temp.path().join(PUBLIC_FILE_NAME);
+        write_public(&public, &[secret.path()]);
+        write_secret_with(
+            secret.path(),
+            &[("escritorio", source.path())],
+            &[("escritorio", Path::new("relative/out"))],
+        );
+        write_ini(secret.path(), "escritorio");
+        let error = ConfidentialConfig::from_public_file(&public)
+            .expect_err("the relative output must fail");
+
+        assert!(matches!(error, ConfigError::NotAbsolute { .. }), "{error}");
+    }
+
+    #[test]
+    fn an_output_key_with_a_path_separator_is_rejected() {
+        let temp = TempDir::new().expect("a configuration directory");
+        let secret = secret_directory();
+        let source = project();
+        let output = project();
+        let public = temp.path().join(PUBLIC_FILE_NAME);
+        write_public(&public, &[secret.path()]);
+        write_secret_with(
+            secret.path(),
+            &[("escritorio", source.path())],
+            &[("dir/out", output.path())],
+        );
+        write_ini(secret.path(), "escritorio");
+        let error = ConfidentialConfig::from_public_file(&public)
+            .expect_err("an invalid output key must fail");
+
+        assert!(
+            matches!(error, ConfigError::InvalidIniName { .. }),
+            "{error}"
+        );
+    }
+
+    #[test]
+    fn a_duplicate_output_key_is_rejected() {
+        let temp = TempDir::new().expect("a configuration directory");
+        let secret = secret_directory();
+        let source = project();
+        let first = project();
+        let second = project();
+        let public = temp.path().join(PUBLIC_FILE_NAME);
+        write_public(&public, &[secret.path()]);
+        write_secret_with(
+            secret.path(),
+            &[("escritorio", source.path())],
+            &[
+                ("escritorio", first.path()),
+                ("escritorio.ini", second.path()),
+            ],
+        );
+        write_ini(secret.path(), "escritorio");
+        let error = ConfidentialConfig::from_public_file(&public)
+            .expect_err("a duplicate output key must fail");
+
+        assert!(
+            matches!(error, ConfigError::DuplicateOutput { .. }),
+            "{error}"
+        );
     }
 
     #[test]

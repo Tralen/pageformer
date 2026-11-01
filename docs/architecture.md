@@ -55,8 +55,8 @@ The inline model covers text, code spans, emphasis, strong, strikethrough with s
 - `src/pipeline.rs` is the effectful edge. `DocumentJob` and `Source` describe the work, `resolve_template`, `check`, `render` and `export` execute it, and `ExportError` carries the domain failures.
 - `src/assets.rs` resolves the letterhead and the local images once, so every backend receives the same bytes without reading files itself.
 - `src/template/` holds the versioned YAML schema and the loader that resolves which template applies.
-- `src/confidential.rs`, `src/confidential/loader.rs` and `src/confidential/config.rs` implement the placeholder model, the values file and the user-level folder mapping.
-- `src/config.rs` resolves the user configuration directory used by the global template and the confidential mapping.
+- `src/confidential.rs`, `src/confidential/loader.rs` and `src/confidential/config.rs` implement the placeholder model, the values file, the default output and the user-level folder mapping.
+- `src/config.rs` resolves the user configuration directory used by the global template and the public user configuration.
 - `src/format.rs` defines the output formats, and `src/cli.rs` holds input discovery, output planning and terminal styling for the binary.
 - `src/pdf/` is the PDF backend: `source.rs` generates Typst source and `world.rs` serves the fonts and assets to Typst.
 - `src/txt.rs` is the plain-text backend. It needs no assets and cannot fail.
@@ -91,7 +91,7 @@ The full resolution rules and the schema are in [`template.md`](template.md).
 
 ## Output
 
-Without confidential fields, the output is written next to the Markdown source, with the same name and the extension of the chosen format. `--output` selects another directory, and the program creates it when missing. Writes are atomic: the bytes go to a temporary file in the destination directory and are renamed into place.
+The output directory is resolved per input: `--output`, then the `outputs` entry for the confidential INI selected by the source root, then `default_output` from the public user configuration, and finally the Markdown source directory. `--output` and the configuration values are directories; the program creates them when missing. Writes are atomic: the bytes go to a temporary file in the destination directory and are renamed into place. A per-INI output must be outside its mapped source folder, and a confidential document is still rejected when its resolved output is inside the source tree.
 
 An input may be a file or a directory. A directory is walked recursively in path order; only `.md` files are read, hidden directories and `target/` are skipped, and directory symlinks are not followed. A file reached from more than one input is processed once, under the first input that found it. With `--output`, a directory input mirrors its relative tree under the destination, while a direct file is written flat. Two inputs that would write the same output are an error, never a silent overwrite.
 

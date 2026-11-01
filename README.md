@@ -70,7 +70,7 @@ cargo run -- --confidential-file assets/examples/confidencial/embargos.ini --out
 
 The command accepts a file or a directory. A directory is walked recursively in path order, and only `.md` files are read. Hidden directories and `target/` are skipped, and directory symlinks are not followed, so a cycle cannot hang the run.
 
-Without `--output`, each file is written next to its source with the extension of the chosen format. With `--output`, a directory input mirrors its relative tree under the destination, while a direct file is written flat. A file reached from more than one input is processed once, and two inputs that would write the same output are an error instead of a silent overwrite.
+The output is resolved per file. `--output` wins and sends everything to that directory. Without it, a confidential folder mapping can select a per-INI output in `confidential.yaml`, then the user-level `default_output` in `config.yaml` applies, and the last fallback is the source folder with the extension of the chosen format. A directory input mirrors its relative tree under the destination, while a direct file is written flat. A file reached from more than one input is processed once, and two inputs that would write the same output are an error instead of a silent overwrite. The configuration and the precedence are in [`docs/confidential.md`](docs/confidential.md).
 
 `--check` parses the Markdown and validates the template without writing. A failure in one file does not stop the rest of the batch, and the exit code is `1` when any input fails.
 

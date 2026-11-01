@@ -85,17 +85,18 @@ impl PlanError {
     }
 }
 
-/// Plans output paths and rejects collisions before rendering starts.
-pub fn plan_outputs(
+/// Plans output paths with a directory resolved for each input, and rejects
+/// collisions before rendering starts.
+pub fn plan_outputs_with(
     files: Vec<InputFile>,
-    directory: Option<&Path>,
+    output_for: impl Fn(&InputFile) -> Option<PathBuf>,
     format: Format,
 ) -> (Vec<PlannedInput>, Vec<PlanError>) {
     let mut planned = Vec::new();
     let mut errors = Vec::new();
     let mut seen: BTreeMap<PathBuf, PathBuf> = BTreeMap::new();
     for input in files {
-        match input.output_path(directory, format) {
+        match input.output_path(output_for(&input).as_deref(), format) {
             Ok(output) => match seen.get(&output) {
                 Some(first) => errors.push(PlanError::new(
                     input.path().to_path_buf(),
@@ -587,12 +588,37 @@ mod tests {
             InputFile::new(PathBuf::from("two/A.md"), PathBuf::from("two")),
         ];
 
-        let (planned, errors) = plan_outputs(files, Some(Path::new("out")), Format::Pdf);
+        let (planned, errors) =
+            plan_outputs_with(files, |_| Some(PathBuf::from("out")), Format::Pdf);
 
         assert_eq!(planned.len(), 1);
         assert_eq!(planned[0].output, PathBuf::from("out/A.pdf"));
         assert_eq!(errors.len(), 1);
         assert!(errors[0].message.contains("already used"));
+    }
+
+    #[test]
+    fn each_input_can_resolve_its_own_output_directory() {
+        let files = vec![
+            InputFile::new(PathBuf::from("one/A.md"), PathBuf::from("one")),
+            InputFile::new(PathBuf::from("two/B.md"), PathBuf::from("two")),
+        ];
+
+        let (planned, errors) = plan_outputs_with(
+            files,
+            |input| {
+                if input.root() == Path::new("one") {
+                    Some(PathBuf::from("out-one"))
+                } else {
+                    None
+                }
+            },
+            Format::Pdf,
+        );
+
+        assert!(errors.is_empty());
+        assert_eq!(planned[0].output, PathBuf::from("out-one/A.pdf"));
+        assert_eq!(planned[1].output, PathBuf::from("two/B.pdf"));
     }
 
     #[test]

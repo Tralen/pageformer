@@ -17,6 +17,7 @@ Pageformer is at 1.0.1. The engine, the command line, the six output formats and
 | 9. EPUB | The EPUB 3 package built on the HTML conversion | 0.36.0 |
 | 10. Release 1.0.0 | Stability review, full verification and a signed tag | Done in 1.0.0 |
 | 11. Packaging | Debian binary package, English examples and the application icon | Done in 1.0.1 |
+| 12. Output defaults | User-level default output and per-INI output directories | Pending 1.1.0 |
 
 ```mermaid
 flowchart TD
@@ -30,6 +31,7 @@ flowchart TD
     HTML --> EPUB[9. EPUB]
     EPUB --> Release[10. Release 1.0.0]
     Release --> Packaging[11. Packaging]
+    Packaging --> OutputDefaults[12. Output defaults]
 ```
 
 ## Why this order
@@ -59,6 +61,10 @@ The compatibility promise after 1.0.0 is intentionally simple: an additive optio
 ## The 1.0.1 release
 
 1.0.1 ships the Debian binary package, the English examples and the application icon. It changes no template key and no output format; the ODT examples were regenerated only because `meta:generator` carries the version. The source archive, the `.deb` and `SHA256SUMS` are attached to the signed `v1.0.1` tag.
+
+## The 1.1.0 release
+
+1.1.0 adds the user-level output defaults: `default_output` in the public `config.yaml` and optional `outputs` per INI in `confidential.yaml`, with the precedence `--output`, per-INI output, default output and the source folder. It keeps the template unaware of output paths. The feature is prepared and tested; publish it with the normal tag workflow.
 
 ## Binary packages
 

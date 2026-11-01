@@ -197,7 +197,7 @@ Drop a Markdown file or click the drop box, choose a format, export and open the
 
 ## Confidential configuration
 
-`tests/cli.rs` builds a temporary `XDG_CONFIG_HOME` with a public `config.yaml`, a `700` confidential directory, a `600` `confidential.yaml` and a mapped INI, then renders a document without `--confidential-file` and checks the resolved text. Another test proves that an explicit `--confidential-file` wins over the mapping. The unit tests in `src/confidential/config.rs` cover the longest folder prefix, duplicate folders, invalid INI names, relative paths, unsupported versions, unknown keys, missing INIs and private permissions.
+`tests/cli.rs` builds a temporary `XDG_CONFIG_HOME` with a public `config.yaml`, a `700` confidential directory, a `600` `confidential.yaml` and a mapped INI, then renders a document without `--confidential-file` and checks the resolved text. Another test proves that an explicit `--confidential-file` wins over the mapping. The same suite covers the output precedence: `--output` over the per-INI output, the per-INI output over `default_output`, `default_output` over the source folder, and an explicit confidential file that still uses `default_output`. It also proves that a per-INI output inside its source and a default output inside the source of a confidential document are rejected. The unit tests in `src/confidential/config.rs` cover the longest folder prefix, duplicate folders, invalid INI names, relative paths, unsupported versions, unknown keys, missing INIs, private permissions, the optional default output, unknown and duplicate output keys, and output paths inside their source.
 
 The full configuration and failure rules are in [`confidential.md`](confidential.md).
 

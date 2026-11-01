@@ -4,6 +4,10 @@
 
 *Major updates and feature releases.*
 
+### Unreleased
+
+- Automates the Debian package on release: `.github/workflows/deb.yml` checks out the tag, verifies the version and `lintian`, builds the `.deb`, rewrites `SHA256SUMS` with the source archive and the package, and attaches both to the release.
+
 ### 1.0.1
 
 - Ships a Debian binary package built by `packaging/build-deb.sh`, with both binaries, the desktop entry, the manual pages, the documentation and a reproducible archive.

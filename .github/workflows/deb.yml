@@ -1,0 +1,100 @@
+name: Debian package
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: deb-${{ github.event.release.tag_name }}
+  cancel-in-progress: false
+
+jobs:
+  deb:
+    name: Build and attach the .deb
+    if: startsWith(github.event.release.tag_name, 'v')
+    # The package declares libc6 >= 2.35, so build on the matching runner.
+    runs-on: ubuntu-22.04
+    timeout-minutes: 45
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: ${{ github.event.release.tag_name }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.release.tag_name }}
+          fetch-depth: 0
+
+      - uses: dtolnay/rust-toolchain@stable # The ref name selects the toolchain.
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+
+      - name: Install packaging tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y lintian shellcheck
+
+      - name: Read the workspace version
+        run: |
+          set -euo pipefail
+          version=$(awk -F'"' '
+              /^\[workspace\.package\]/ { in_section = 1; next }
+              /^\[/ { in_section = 0 }
+              in_section && /^version[[:space:]]*=/ { print $2; exit }
+          ' Cargo.toml)
+          test -n "$version"
+          test "v$version" = "$TAG"
+          printf 'PACKAGE_VERSION=%s\n' "$version" >> "$GITHUB_ENV"
+
+      - name: Check the packaging script
+        run: shellcheck packaging/build-deb.sh
+
+      - name: Build the package
+        run: packaging/build-deb.sh
+
+      - name: Verify the package
+        run: |
+          set -euo pipefail
+          test "$(./target/release/pageformer --version)" = "pageformer $PACKAGE_VERSION"
+          lintian "dist/pageformer_${PACKAGE_VERSION}_amd64.deb"
+          rm -rf /tmp/pageformer-deb
+          dpkg-deb -x "dist/pageformer_${PACKAGE_VERSION}_amd64.deb" /tmp/pageformer-deb
+          test "$(/tmp/pageformer-deb/usr/bin/pageformer --version)" = "pageformer $PACKAGE_VERSION"
+          test -f /tmp/pageformer-deb/usr/share/icons/hicolor/scalable/apps/pageformer.svg
+          test -f /tmp/pageformer-deb/usr/share/icons/hicolor/256x256/apps/pageformer.png
+
+      - name: Fetch the release source archive
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3 4 5 6 7 8 9 10; do
+            if gh release download "$TAG" --pattern "pageformer-*.tar.gz" --dir dist --clobber; then
+              break
+            fi
+            sleep 6
+          done
+          test -f "dist/pageformer-${PACKAGE_VERSION}.tar.gz"
+
+      - name: Refresh the checksum file
+        run: |
+          set -euo pipefail
+          cd dist
+          sha256sum "pageformer-${PACKAGE_VERSION}.tar.gz" \
+            "pageformer_${PACKAGE_VERSION}_amd64.deb" > SHA256SUMS
+          sha256sum -c SHA256SUMS
+
+      - name: Attach the package and the checksum
+        run: |
+          set -euo pipefail
+          gh release upload "$TAG" \
+            "dist/pageformer_${PACKAGE_VERSION}_amd64.deb" \
+            dist/SHA256SUMS --clobber
+
+      - name: Verify the published assets
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/pageformer-release
+          mkdir -p /tmp/pageformer-release
+          gh release download "$TAG" --dir /tmp/pageformer-release --clobber
+          cd /tmp/pageformer-release
+          sha256sum -c SHA256SUMS

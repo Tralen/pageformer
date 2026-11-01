@@ -87,6 +87,8 @@ dpkg-deb -x dist/pageformer_<version>_amd64.deb /tmp/pageformer-deb
 
 The script derives `SOURCE_DATE_EPOCH` from the last commit and remaps the Rust build paths, so two runs from the same checkout produce the same SHA-256. `lintian` reports no errors; the four `embedded-library` errors are overridden with an explanation, because the libraries are pure Rust ports compiled into the binary and not system dependencies. The two `no-manual-page` warnings and the `no-changelog` error are fixed by the installed manual pages and the compressed change log.
 
+The same build and checks run in `.github/workflows/deb.yml` when a release is published. The workflow also rewrites `SHA256SUMS` with the source archive and the package, attaches both with `--clobber`, and verifies the downloaded assets.
+
 ## Markdown lint
 
 Use the repository configuration:

@@ -144,6 +144,12 @@ dpkg-deb -x dist/pageformer_<version>_<architecture>.deb /tmp/pageformer-deb
 
 `lintian` must report no errors. The four `embedded-library` errors are overridden with a comment in `/usr/share/lintian/overrides/pageformer`, because `unsafe-libyaml` is a pure Rust port compiled into the binary and the FreeType strings come from the font stack; neither is a system dependency.
 
+### Automation
+
+`.github/workflows/deb.yml` runs when a release is published. It checks out the tag, verifies that `v<version>` matches both `Cargo.toml` and the built `pageformer --version`, builds the package, runs `lintian`, downloads the release source archive, rewrites `SHA256SUMS` with the archive and the package, uploads both with `--clobber`, and downloads the release again to verify the checksum. The workflow has `contents: write` only for the release, and the test workflows stay read-only.
+
+The manual commands above remain for a local rebuild; the upload below is the fallback when the workflow cannot run.
+
 Create the checksum file with the source archive and the package together, and verify it before publishing:
 
 ```sh
@@ -153,13 +159,14 @@ sha256sum -c SHA256SUMS
 cd ..
 ```
 
-Attach the package in the authorized publish step, after the tag and the source archive exist:
+The workflow attaches the package automatically after the release exists. The fallback, after the tag and the source archive exist, is:
 
 ```sh
-gh release upload v<version> dist/pageformer_<version>_<architecture>.deb
+gh release upload v<version> dist/pageformer_<version>_<architecture>.deb --clobber
+gh release upload v<version> dist/SHA256SUMS --clobber
 ```
 
-CI stays test-only. It may build the package to prove the script works, but it must not upload it without a separate decision.
+The test workflows stay read-only; only `deb.yml` has `contents: write`, and only for the release it serves.
 
 ## Publish
 
@@ -169,12 +176,12 @@ Publishing needs explicit authorization even after the candidate exists. Push th
 git push origin main
 git push origin v<version>
 gh release create v<version> --verify-tag --generate-notes \
-  dist/pageformer-<version>.tar.gz dist/pageformer_<version>_<architecture>.deb dist/SHA256SUMS
+  dist/pageformer-<version>.tar.gz
 ```
 
-The release carries the source archive, the Debian binary package and a checksum file. There are no provenance attestations to attach.
+The `deb.yml` workflow attaches the Debian package and the refreshed checksum immediately after the release is published, so the source archive is the only asset created by hand. The release then carries the source archive, the Debian binary package and a checksum file. There are no provenance attestations to attach.
 
-Finally, download the assets from the release into a temporary directory and verify the checksum again:
+Wait for the `Debian package` workflow to finish, then download the assets from the release into a temporary directory and verify the checksum again:
 
 ```sh
 gh release download v<version> --dir /tmp/pageformer-release

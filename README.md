@@ -16,7 +16,7 @@ The development profile keeps line tables for this crate and no debug informatio
 
 The workspace also builds `pageformer-publisher`, the minimal egui converter. Its eframe dependencies follow the same profile. To build only the engine and the command line, use `cargo build -p pageformer`.
 
-To build a Debian or Ubuntu package from a checkout, run `packaging/build-deb.sh`; it installs both binaries, the desktop entry, the icon and the manual pages. The packaging checks and the release attachment are in [`docs/releasing.md`](docs/releasing.md).
+To build a Debian or Ubuntu package from a checkout, run `packaging/build-deb.sh`; it installs both binaries, the desktop entry, the icons and the manual pages. `.github/workflows/deb.yml` builds the package from the release tag, verifies it and attaches it to the GitHub release. The packaging checks and the manual fallback are in [`docs/releasing.md`](docs/releasing.md).
 
 ## Versioning
 

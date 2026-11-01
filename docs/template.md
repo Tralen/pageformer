@@ -4,21 +4,61 @@ One YAML template drives every output format. The schema is versioned, and a tem
 
 ## Resolution
 
-The nearest `.pageformer.yaml`, starting in the Markdown file's directory and walking upwards, wins entirely. There is no merge across directories. If the winning template is invalid, generation fails with a diagnostic that names the file and the position.
+A document uses exactly one template. Pageformer looks in three places, in this order, and the first one that exists wins entirely:
 
-Without a local template, the global template in the user configuration directory is used:
+1. The nearest `.pageformer.yaml`, starting in the Markdown file's directory and walking upwards. This is the project template.
+2. The user template, `pageformer.yaml`, also called the global template, in the user configuration directory. It applies to every project on the machine.
+3. The template embedded in the binary. It is the last resort and makes Pageformer work with no configuration at all.
 
-- `$XDG_CONFIG_HOME/pageformer/pageformer.yaml`, when `XDG_CONFIG_HOME` is an absolute path;
-- `$HOME/.config/pageformer/pageformer.yaml` otherwise;
-- `%APPDATA%\pageformer\pageformer.yaml` on Windows.
+There is no merge between the levels. If the winning file is invalid, generation fails with a diagnostic that names the file and the position; it does not fall back to another template.
 
-Without either, the fallback embedded in the binary is used. It is the same file as `assets/default.pageformer.yaml`.
+```mermaid
+flowchart TD
+    Local[Nearest .pageformer.yaml] -->|exists| Use[Use that template]
+    Local -->|missing| User[User pageformer.yaml]
+    User -->|exists| Use
+    User -->|missing| Embedded[Embedded default]
+    Embedded --> Use
+```
 
-To create the global template from the embedded copy, run `pageformer --write-default-template`. It creates the configuration directory, writes the exact embedded YAML and refuses to overwrite an existing template. The Debian package also installs the reference at `/usr/share/doc/pageformer/default.pageformer.yaml`.
+### The user template path
+
+The user configuration directory is:
+
+- `${XDG_CONFIG_HOME:-$HOME/.config}/pageformer` on Linux and macOS. `XDG_CONFIG_HOME` must be an absolute path; a relative value is ignored, as the XDG specification requires.
+- `%APPDATA%\pageformer` on Windows.
+
+The user template is always `pageformer.yaml` inside that directory. The XDG form is not two different files: when `XDG_CONFIG_HOME` is set to an absolute path, that base is used; otherwise `$HOME/.config` is used. On a default setup both resolve to `/home/<user>/.config/pageformer/pageformer.yaml`.
+
+`config.yaml` in the same directory is a separate file: it holds user settings such as `default_output` and `confidential_directories`, not template styles. The two files are read independently; see [`confidential.md`](confidential.md).
+
+### pageformer.yaml and default.pageformer.yaml
+
+`pageformer.yaml` is the editable user template. It only exists after you create it; while it is absent, the embedded template is used.
+
+`default.pageformer.yaml` is the reference/master file, not a second template in the search path:
+
+- `assets/default.pageformer.yaml` in the source is the file compiled into the binary;
+- `/usr/share/doc/pageformer/default.pageformer.yaml` is a copy installed by the Debian package for reading and copying;
+- neither location is read automatically as a user template.
+
+To create the user template from the embedded copy:
+
+```sh
+pageformer --write-default-template
+```
+
+The command creates the configuration directory, writes the exact embedded YAML to `pageformer.yaml` and refuses to overwrite an existing file. After that, the publisher shows the template path with the Edit and Folder buttons.
 
 Paths written in the template, such as the letterhead image, resolve relative to the template file, never to the working directory.
 
 To use the same settings in another project, copy the template to the document directory as `.pageformer.yaml`, pass it with `--template`, or choose it under Advanced in `pageformer-publisher`.
+
+| File | Location | Created by | Read automatically | Role |
+|---|---|---|---|---|
+| `.pageformer.yaml` | nearest above the Markdown file | you | yes, first | project template |
+| `pageformer.yaml` | user configuration directory | `--write-default-template` or a manual copy | yes, second | user template |
+| `default.pageformer.yaml` | `assets/` and `/usr/share/doc/pageformer/` | the project and the package | no | reference/master template |
 
 ## A small example
 

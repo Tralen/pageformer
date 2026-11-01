@@ -8,9 +8,10 @@ The template is deliberately unaware of the INI file. The selection lives in two
 
 The public configuration in the user configuration directory holds the default output and lists the confidential directories:
 
-- `$XDG_CONFIG_HOME/pageformer/config.yaml`, when `XDG_CONFIG_HOME` is absolute;
-- `$HOME/.config/pageformer/config.yaml` otherwise;
+- `${XDG_CONFIG_HOME:-$HOME/.config}/pageformer/config.yaml` on Linux and macOS. `XDG_CONFIG_HOME` must be absolute; a relative value falls back to `$HOME/.config`;
 - `%APPDATA%\pageformer\config.yaml` on Windows.
+
+This is `config.yaml`, not the template. The user template is a separate `pageformer.yaml` in the same directory; see [`template.md`](template.md).
 
 ```yaml
 version: 1

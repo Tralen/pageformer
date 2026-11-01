@@ -10,7 +10,7 @@ Pageweaver is the separate WYSIWYG editor for Pageformer documents. It edits the
 
 ## Status
 
-Pageformer is at 1.0.1, and Pageweaver work may start. The engine API described below is public, tested and released; the editor is planned but not started.
+Pageformer is at 1.1.0, and Pageweaver work may start. The engine API described below is public, tested and released; the editor is planned but not started.
 
 ## Readiness
 
@@ -21,7 +21,7 @@ The library side is ready for the editor:
 - `html::stylesheet` exposes the CSS generated from the template, and `html::render` returns the full self-contained document with embedded CSS and data-URI images. That full document is the preview unit; there is no separate fragment API.
 - `Format::ALL`, `Format::name` and `Format::extension` enumerate the six formats, so the editor builds its format menu from the library instead of a hard-coded list.
 - `ConfidentialStore` and the loader keep values opaque; the editor and every diagnostic see names only.
-- The crate is `publish = false`, so Pageweaver depends on the Git tag `v1.0.1` of `Tralen/pageformer`, not on crates.io. A local `[patch]` may point at a sibling checkout during development.
+- The crate is `publish = false`, so Pageweaver depends on the Git tag `v1.1.0` of `Tralen/pageformer`, not on crates.io. A local `[patch]` may point at a sibling checkout during development.
 
 Four decisions belong to Pageweaver and do not need a Pageformer change:
 

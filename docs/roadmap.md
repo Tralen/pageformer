@@ -1,6 +1,6 @@
 # Roadmap
 
-Pageformer is at 1.0.1. The engine, the command line, the six output formats and the minimal converter window are implemented, tested on Linux, macOS and Windows, and released. This page records what each phase delivered, why the work happened in that order, and the compatibility promise that starts with the release.
+Pageformer is at 1.1.0. The engine, the command line, the six output formats and the minimal converter window are implemented, tested on Linux, macOS and Windows, and released. This page records what each phase delivered, why the work happened in that order, and the compatibility promise that starts with the release.
 
 ## Status at a glance
 
@@ -17,7 +17,7 @@ Pageformer is at 1.0.1. The engine, the command line, the six output formats and
 | 9. EPUB | The EPUB 3 package built on the HTML conversion | 0.36.0 |
 | 10. Release 1.0.0 | Stability review, full verification and a signed tag | Done in 1.0.0 |
 | 11. Packaging | Debian binary package, English examples and the application icon | Done in 1.0.1 |
-| 12. Output defaults | User-level default output and per-INI output directories | Pending 1.1.0 |
+| 12. Output defaults | User-level default output and per-INI output directories | Done in 1.1.0 |
 
 ```mermaid
 flowchart TD
@@ -64,7 +64,7 @@ The compatibility promise after 1.0.0 is intentionally simple: an additive optio
 
 ## The 1.1.0 release
 
-1.1.0 adds the user-level output defaults: `default_output` in the public `config.yaml` and optional `outputs` per INI in `confidential.yaml`, with the precedence `--output`, per-INI output, default output and the source folder. The publisher resolves and displays the same output as a placeholder in the empty Configuration field, treats a value as an override and offers Use default; its title follows the active light or dark theme. It keeps the template unaware of output paths. The feature is prepared and tested; publish it with the normal tag workflow.
+1.1.0 adds the user-level output defaults: `default_output` in the public `config.yaml` and optional `outputs` per INI in `confidential.yaml`, with the precedence `--output`, per-INI output, default output and the source folder. The publisher resolves and displays the same output as a placeholder in the empty Configuration field, treats a value as an override and offers Use default; its title follows the active light or dark theme. It keeps the template unaware of output paths. The release is published as `v1.1.0`; the `release: published` workflow attaches the `.deb` and `SHA256SUMS`.
 
 ## Binary packages
 

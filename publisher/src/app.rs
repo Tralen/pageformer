@@ -699,13 +699,15 @@ impl Publisher {
 
             let template_row = path_row(
                 ui,
-                "Template:",
-                "The template in use when this field is empty: the nearest local file, then the global file, then the embedded fallback.",
                 &mut self.session.template_file,
-                template_hint.as_deref(),
-                "Explicit YAML template. Leave it empty to use the resolved template shown as the hint.",
-                label_width,
-                field_width,
+                &PathRowSpec {
+                    label: "Template:",
+                    label_tooltip: "The template in use when this field is empty: the nearest local file, then the global file, then the embedded fallback.",
+                    hint: template_hint.as_deref(),
+                    field_tooltip: "Explicit YAML template. Leave it empty to use the resolved template shown as the hint.",
+                    label_width,
+                    field_width,
+                },
                 &template_buttons,
             );
             match template_row.clicked {
@@ -740,13 +742,15 @@ impl Publisher {
 
             let output_row = path_row(
                 ui,
-                "Output:",
-                "Leave it empty to use the confidential mapping, the user default, or the source folder. A value is a manual override. Documents with confidential fields need a folder outside the source tree.",
                 &mut self.session.output_override,
-                output_hint.as_deref(),
-                "Leave it empty for the automatic directory; type or choose a folder to override it. Documents with confidential fields need a folder outside the source tree.",
-                label_width,
-                field_width,
+                &PathRowSpec {
+                    label: "Output:",
+                    label_tooltip: "Leave it empty to use the confidential mapping, the user default, or the source folder. A value is a manual override. Documents with confidential fields need a folder outside the source tree.",
+                    hint: output_hint.as_deref(),
+                    field_tooltip: "Leave it empty for the automatic directory; type or choose a folder to override it. Documents with confidential fields need a folder outside the source tree.",
+                    label_width,
+                    field_width,
+                },
                 &output_buttons,
             );
             match output_row.clicked {
@@ -772,13 +776,15 @@ impl Publisher {
 
             let confidential_row = path_row(
                 ui,
-                "Confidential:",
-                "INI file with the confidential {NAME} values. Leave it empty to use the user-level folder mapping. Keep it outside the source tree, with mode 600.",
                 &mut self.session.confidential_file,
-                None,
-                "INI file with the confidential {NAME} values. Leave it empty to use the user-level folder mapping. Keep it outside the source tree, with mode 600.",
-                label_width,
-                field_width,
+                &PathRowSpec {
+                    label: "Confidential:",
+                    label_tooltip: "INI file with the confidential {NAME} values. Leave it empty to use the user-level folder mapping. Keep it outside the source tree, with mode 600.",
+                    hint: None,
+                    field_tooltip: "INI file with the confidential {NAME} values. Leave it empty to use the user-level folder mapping. Keep it outside the source tree, with mode 600.",
+                    label_width,
+                    field_width,
+                },
                 &confidential_buttons,
             );
             match confidential_row.clicked {
@@ -1007,6 +1013,16 @@ struct RowButton<'a> {
     enabled: bool,
 }
 
+/// The fixed presentation of one path row.
+struct PathRowSpec<'a> {
+    label: &'a str,
+    label_tooltip: &'a str,
+    hint: Option<&'a str>,
+    field_tooltip: &'a str,
+    label_width: f32,
+    field_width: f32,
+}
+
 /// The horizontal padding on each side of a Configuration button.
 const BUTTON_SIDE_PADDING: f32 = 10.0;
 /// The extra space after the widest Configuration label.
@@ -1016,34 +1032,29 @@ const LABEL_GAP: f32 = 4.0;
 /// passes a common label and field width, so every row aligns.
 fn path_row(
     ui: &mut egui::Ui,
-    label: &str,
-    label_tooltip: &str,
     value: &mut String,
-    hint: Option<&str>,
-    field_tooltip: &str,
-    label_width: f32,
-    field_width: f32,
+    spec: &PathRowSpec<'_>,
     buttons: &[RowButton<'_>],
 ) -> PathRow {
     let height = ui.spacing().interact_size.y;
     let mut report = PathRow::default();
     ui.horizontal(|ui| {
         let _ = ui.allocate_ui_with_layout(
-            egui::vec2(label_width, height),
+            egui::vec2(spec.label_width, height),
             egui::Layout::left_to_right(egui::Align::Center),
             |ui| {
-                ui.set_width(label_width);
-                with_tooltip(ui.label(label), label_tooltip);
+                ui.set_width(spec.label_width);
+                with_tooltip(ui.label(spec.label), spec.label_tooltip);
             },
         );
-        let mut field = egui::TextEdit::singleline(value).desired_width(field_width);
-        if let Some(hint) = hint {
-            let hint = elide_left(ui, hint, (field_width - 20.0).max(0.0));
+        let mut field = egui::TextEdit::singleline(value).desired_width(spec.field_width);
+        if let Some(hint) = spec.hint {
+            let hint = elide_left(ui, hint, (spec.field_width - 20.0).max(0.0));
             field = field.hint_text(hint.as_str());
         }
         let field = ui.add(field);
         report.lost_focus = field.lost_focus();
-        with_tooltip(field, field_tooltip);
+        with_tooltip(field, spec.field_tooltip);
         for (index, button) in buttons.iter().enumerate() {
             let response = ui.add_enabled(
                 button.enabled,

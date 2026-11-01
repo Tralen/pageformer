@@ -127,7 +127,7 @@ Build the package from the same signed tag as the source archive, so the package
 
 The optional argument selects the architecture, which defaults to `dpkg --print-architecture`. The script needs `cargo` and `dpkg-deb`, runs the release build for both workspace binaries and writes `dist/pageformer_<version>_<architecture>.deb`. It installs `pageformer`, `pageformer-publisher`, the desktop entry, the SVG icon and its 256 PNG fallback, the two manual pages, the README, the change log and the license.
 
-The script remaps the Rust build paths, so the binary never carries the builder's home directory, and it derives `SOURCE_DATE_EPOCH` from the last commit. Two runs from the same checkout produce a byte-identical package.
+The script remaps the Rust build paths, so the binary never carries the builder's home directory, and it derives `SOURCE_DATE_EPOCH` from the last commit. Two runs from the same checkout and toolchain produce a byte-identical package.
 
 The package declares `libc6 (>= 2.35)` and `libgcc-s1`; it is built against the oldest glibc available in the target matrix, so build it on the oldest supported distribution instead of a newer one. There is no Debian repository: the artifact is a release asset, and the user installs it with `sudo apt install ./pageformer_<version>_<architecture>.deb`. Build each architecture on a machine of that architecture; there is no cross-compilation step.
 

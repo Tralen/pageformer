@@ -21,3 +21,4 @@ SKETCH.md
 *.p12
 *.pfx
 secrets/
+.owner

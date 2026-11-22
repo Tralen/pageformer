@@ -178,6 +178,34 @@ fn an_empty_line_is_an_empty_paragraph_without_its_own_spacing() {
 }
 
 #[test]
+fn an_empty_line_and_a_rule_inside_a_list_and_a_quote_keep_the_container_style() {
+    let source = "- Item um\n\n  -empty-\n\n  -horizontal-\n\n- Item dois\n\n> Citação um.\n>\n> -empty-\n>\n> -horizontal-\n>\n> Citação dois.\n";
+    let document = markdown::parse(source).expect("the document must parse");
+    let bytes = render(&document);
+    let mut archive = ZipArchive::new(Cursor::new(bytes)).expect("the package must be a ZIP");
+    let content = entry(&mut archive, "word/document.xml");
+
+    assert!(
+        content.contains(
+            "<w:pStyle w:val=\"ListParagraph\"/><w:spacing w:after=\"0\"/><w:ind w:left=\"567\" w:hanging=\"0\"/>"
+        ),
+        "{content}"
+    );
+    assert!(
+        content.contains("<w:pStyle w:val=\"Quote\"/><w:spacing w:after=\"0\"/>"),
+        "{content}"
+    );
+    assert!(
+        content.contains("<w:pStyle w:val=\"ListParagraph\"/><w:pBdr>"),
+        "{content}"
+    );
+    assert!(
+        content.contains("<w:pStyle w:val=\"Quote\"/><w:pBdr>"),
+        "{content}"
+    );
+}
+
+#[test]
 fn the_embargos_metadata_never_carries_a_value() {
     let document = markdown::parse(EMBARGOS).expect("the embargos fixture must parse");
     let resolution = confidential::resolve(&document, &example_store())

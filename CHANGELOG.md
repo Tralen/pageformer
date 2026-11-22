@@ -8,6 +8,7 @@
 
 - Adds the `-empty-` marker: a standalone paragraph that becomes one deliberate blank line of body text.
 - The empty line occupies one body line advance, adds no paragraph spacing of its own and leaves the page background visible; PDF emits `#v()`, ODT and DOCX use an `EmptyLine` paragraph style, HTML and EPUB use `div.empty-line`, and TXT adds one blank line.
+- The empty line and the horizontal rule follow the container's indent and border inside lists and quotes.
 - Adds `-empty-` to the technical report and the brief and regenerates their six outputs.
 - Regenerates the HTML and EPUB examples for the new `.empty-line` rule.
 - Regenerates the ODT examples for `meta:generator` 1.2.0.

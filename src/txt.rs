@@ -359,6 +359,16 @@ mod tests {
     }
 
     #[test]
+    fn an_empty_line_and_a_rule_inside_a_list_and_a_quote_keep_the_container() {
+        assert_eq!(
+            rendered(
+                "- Item um\n\n  -empty-\n\n  -horizontal-\n\n- Item dois\n\n> Citação um.\n>\n> -empty-\n>\n> -horizontal-\n>\n> Citação dois.\n"
+            ),
+            "- Item um\n\n\n  ---\n\n- Item dois\n\n> Citação um.\n>\n>\n> ---\n>\n> Citação dois.\n"
+        );
+    }
+
+    #[test]
     fn a_thematic_break_is_three_dashes() {
         assert_eq!(
             rendered("Antes.\n\n---\n\nDepois.\n"),

@@ -125,6 +125,32 @@ fn an_empty_line_is_a_div_with_the_body_line_height() {
 }
 
 #[test]
+fn an_empty_line_and_a_rule_inside_a_list_and_a_quote_stay_inside_the_container() {
+    let template = pageformer::template::Template::embedded().expect("the embedded template");
+    let document = markdown::parse(
+        "- Item um\n\n  -empty-\n\n  -horizontal-\n\n- Item dois\n\n> Citação um.\n>\n> -empty-\n>\n> -horizontal-\n>\n> Citação dois.\n",
+    )
+    .expect("the document must parse");
+    let rendered = epub::render(&document, &template, &pageformer::assets::Assets::default())
+        .expect("the package must be produced");
+    let mut archive = archive(rendered.into_bytes());
+    let chapter = entry(&mut archive, "OEBPS/chapter-1.xhtml");
+
+    assert!(
+        chapter.contains(
+            "<li><p class=\"list-paragraph\">Item um</p>\n<div class=\"empty-line\" aria-hidden=\"true\"></div>\n<hr class=\"horizontal-rule\" /></li>"
+        ),
+        "{chapter}"
+    );
+    assert!(
+        chapter.contains(
+            "<blockquote class=\"quote\">\n<p>Citação um.</p>\n<div class=\"empty-line\" aria-hidden=\"true\"></div>\n<hr class=\"horizontal-rule\" />\n<p>Citação dois.</p>\n</blockquote>"
+        ),
+        "{chapter}"
+    );
+}
+
+#[test]
 fn the_package_starts_with_a_stored_mimetype() {
     let (bytes, warnings) = render_example("escritorio", CONTRACT);
     assert!(warnings.is_empty(), "{warnings:?}");

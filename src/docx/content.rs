@@ -140,6 +140,16 @@ struct Builder<'a> {
     template: &'a Template,
     assets: &'a Assets,
     media: &'a [Media],
+    container: Container,
+    list_depth: usize,
+}
+
+/// The block container that owns the current paragraph.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Container {
+    Body,
+    ListItem,
+    Quote,
 }
 
 impl<'a> Builder<'a> {
@@ -164,6 +174,8 @@ impl<'a> Builder<'a> {
             template,
             assets,
             media,
+            container: Container::Body,
+            list_depth: 0,
         }
     }
 
@@ -217,14 +229,42 @@ impl<'a> Builder<'a> {
             Block::Quote(quote) => self.quote(quote),
             Block::CodeBlock(code) => self.code(code),
             Block::ThematicBreak => {
-                let line = self.paragraph(None, &self.thematic_break_properties(), "");
-                self.document.push_str(&line);
+                let after_zero = !matches!(self.container, Container::Body);
+                let extra = self.thematic_break_properties(after_zero);
+                let paragraph = match self.container {
+                    Container::Body => self.paragraph(None, &extra, ""),
+                    Container::ListItem => {
+                        let indent = self.list_indent();
+                        self.paragraph(
+                            Some("ListParagraph"),
+                            &format!("{extra}<w:ind w:left=\"{indent}\" w:hanging=\"0\"/>"),
+                            "",
+                        )
+                    }
+                    Container::Quote => self.paragraph(Some("Quote"), &extra, ""),
+                };
+                self.document.push_str(&paragraph);
             }
             Block::PageBreak => self
                 .document
                 .push_str("<w:p><w:r><w:br w:type=\"page\"/></w:r></w:p>\n"),
             Block::EmptyLine => {
-                let paragraph = self.paragraph(Some("EmptyLine"), "", "");
+                let paragraph = match self.container {
+                    Container::Body => self.paragraph(Some("EmptyLine"), "", ""),
+                    Container::ListItem => {
+                        let indent = self.list_indent();
+                        self.paragraph(
+                            Some("ListParagraph"),
+                            &format!(
+                                "<w:spacing w:after=\"0\"/><w:ind w:left=\"{indent}\" w:hanging=\"0\"/>"
+                            ),
+                            "",
+                        )
+                    }
+                    Container::Quote => {
+                        self.paragraph(Some("Quote"), "<w:spacing w:after=\"0\"/>", "")
+                    }
+                };
                 self.document.push_str(&paragraph);
             }
             Block::FootnoteDefinition(_) => {}
@@ -232,7 +272,7 @@ impl<'a> Builder<'a> {
     }
 
     /// The bottom border that draws the rule, plus the spacing the template declares.
-    fn thematic_break_properties(&self) -> String {
+    fn thematic_break_properties(&self, after_zero: bool) -> String {
         let rule = self.template.formatting().horizontal_rule();
         let mut output = format!(
             "<w:pBdr><w:bottom w:val=\"single\" w:sz=\"{}\" w:space=\"1\" w:color=\"{}\"/></w:pBdr>",
@@ -242,13 +282,25 @@ impl<'a> Builder<'a> {
         let before = rule.spacing_before().map_or_else(String::new, |length| {
             format!(" w:before=\"{}\"", metrics::twips(length.points()))
         });
-        let after = rule.spacing_after().map_or_else(String::new, |length| {
-            format!(" w:after=\"{}\"", metrics::twips(length.points()))
-        });
+        let after = if after_zero {
+            " w:after=\"0\"".to_owned()
+        } else {
+            rule.spacing_after().map_or_else(String::new, |length| {
+                format!(" w:after=\"{}\"", metrics::twips(length.points()))
+            })
+        };
         if !before.is_empty() || !after.is_empty() {
             output.push_str(&format!("<w:spacing{before}{after}/>"));
         }
         output
+    }
+
+    /// The left indent of the current list item, matching its numbering level.
+    fn list_indent(&self) -> String {
+        let list = self.template.formatting().list();
+        let step = u32::try_from(self.list_depth.saturating_add(1)).unwrap_or(1);
+        let indent = list.indent().points() * f64::from(step);
+        metrics::twips(indent + list.marker_gap().points())
     }
 
     /// Body paragraphs take the fill through their own style, so quotes and lists
@@ -562,6 +614,8 @@ impl<'a> Builder<'a> {
             ItemSpacing::Loose => marker.to_owned(),
         };
         let task = self.task_marker(item.task());
+        let previous_container = std::mem::replace(&mut self.container, Container::ListItem);
+        let previous_depth = std::mem::replace(&mut self.list_depth, depth);
         match item.blocks().first() {
             Some(Block::Paragraph(inlines)) => {
                 let mut runs = task;
@@ -580,6 +634,8 @@ impl<'a> Builder<'a> {
                 self.blocks(item.blocks(), depth.saturating_add(1));
             }
         }
+        self.container = previous_container;
+        self.list_depth = previous_depth;
     }
 
     fn task_marker(&self, task: Option<TaskState>) -> String {
@@ -705,6 +761,7 @@ impl<'a> Builder<'a> {
     }
 
     fn quote(&mut self, quote: &Quote) {
+        let previous = std::mem::replace(&mut self.container, Container::Quote);
         if let QuoteKind::Alert(alert) = quote.kind() {
             let runs = self.run(&format!("[{}]", alert.label()), "");
             let paragraph = self.paragraph(Some("Quote"), "", &runs);
@@ -725,6 +782,7 @@ impl<'a> Builder<'a> {
                 _ => self.block(block, 0),
             }
         }
+        self.container = previous;
     }
 
     fn code(&mut self, code: &CodeBlock) {

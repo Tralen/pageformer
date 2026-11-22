@@ -66,6 +66,16 @@ struct Builder<'a> {
     table_count: usize,
     text_width: f64,
     pending_break: bool,
+    container: Container,
+}
+
+/// The block container that owns the current paragraph.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Container {
+    Body,
+    ListItem,
+    Quote,
+    Footnote,
 }
 
 impl<'a> Builder<'a> {
@@ -88,6 +98,7 @@ impl<'a> Builder<'a> {
             table_count: 0,
             text_width,
             pending_break: false,
+            container: Container::Body,
         }
     }
 
@@ -145,15 +156,28 @@ impl<'a> Builder<'a> {
             Block::CodeBlock(code) => self.code(code),
             Block::ThematicBreak => {
                 self.flush_break_as_paragraph();
-                xml::push(
+                let style = match self.container {
+                    Container::Body | Container::Footnote => "HorizontalLine",
+                    Container::ListItem => "ListHorizontalLine",
+                    Container::Quote => "QuoteHorizontalLine",
+                };
+                xml::push_fmt(
                     &mut self.body,
-                    "<text:p text:style-name=\"HorizontalLine\"/>\n",
+                    format_args!("<text:p text:style-name=\"{style}\"/>\n"),
                 );
             }
             Block::PageBreak => self.pending_break = true,
             Block::EmptyLine => {
                 self.flush_break_as_paragraph();
-                xml::push(&mut self.body, "<text:p text:style-name=\"EmptyLine\"/>\n");
+                let style = match self.container {
+                    Container::Body | Container::Footnote => "EmptyLine",
+                    Container::ListItem => "ListEmptyLine",
+                    Container::Quote => "QuoteEmptyLine",
+                };
+                xml::push_fmt(
+                    &mut self.body,
+                    format_args!("<text:p text:style-name=\"{style}\"/>\n"),
+                );
             }
             Block::FootnoteDefinition(_) => {}
         }
@@ -261,6 +285,7 @@ impl<'a> Builder<'a> {
             ItemSpacing::Tight => "ListItem",
             ItemSpacing::Loose => "ListLooseItem",
         };
+        let previous = std::mem::replace(&mut self.container, Container::ListItem);
         match item.blocks().first() {
             Some(Block::Paragraph(inlines)) => {
                 let style = self.style_with_break(base);
@@ -282,6 +307,7 @@ impl<'a> Builder<'a> {
                 self.blocks(item.blocks());
             }
         }
+        self.container = previous;
     }
 
     fn task_marker(&mut self, task: Option<TaskState>) {
@@ -386,6 +412,7 @@ impl<'a> Builder<'a> {
 
     fn quote(&mut self, quote: &Quote) {
         self.flush_break_as_paragraph();
+        let previous = std::mem::replace(&mut self.container, Container::Quote);
         if let QuoteKind::Alert(alert) = quote.kind() {
             self.paragraph_with(
                 "QuoteParagraph",
@@ -401,6 +428,7 @@ impl<'a> Builder<'a> {
                 _ => self.block(block),
             }
         }
+        self.container = previous;
     }
 
     fn code(&mut self, code: &CodeBlock) {
@@ -614,7 +642,9 @@ impl<'a> Builder<'a> {
             ),
         );
         self.active.push(key.to_owned());
+        let previous = std::mem::replace(&mut self.container, Container::Footnote);
         self.blocks(definition.blocks());
+        self.container = previous;
         self.active.pop();
         xml::push(&mut self.body, "</text:note-body></text:note>");
     }
@@ -660,7 +690,7 @@ fn list_item_styles(output: &mut String, template: &Template) {
     xml::push_fmt(
         output,
         format_args!(
-            "<style:style style:name=\"ListItem\" style:family=\"paragraph\" style:parent-style-name=\"Standard\"><style:paragraph-properties fo:text-align=\"{align}\" fo:margin-bottom=\"0cm\"{background}/>{text}</style:style>\n<style:style style:name=\"ListLooseItem\" style:family=\"paragraph\" style:parent-style-name=\"Standard\"><style:paragraph-properties fo:text-align=\"{align}\"{loose_margin}{background}/>{text}</style:style>\n<style:style style:name=\"ListItemBreak\" style:family=\"paragraph\" style:parent-style-name=\"ListItem\"><style:paragraph-properties fo:break-before=\"page\"/></style:style>\n<style:style style:name=\"ListLooseItemBreak\" style:family=\"paragraph\" style:parent-style-name=\"ListLooseItem\"><style:paragraph-properties fo:break-before=\"page\"/></style:style>\n"
+            "<style:style style:name=\"ListItem\" style:family=\"paragraph\" style:parent-style-name=\"Standard\"><style:paragraph-properties fo:text-align=\"{align}\" fo:margin-bottom=\"0cm\"{background}/>{text}</style:style>\n<style:style style:name=\"ListLooseItem\" style:family=\"paragraph\" style:parent-style-name=\"Standard\"><style:paragraph-properties fo:text-align=\"{align}\"{loose_margin}{background}/>{text}</style:style>\n<style:style style:name=\"ListItemBreak\" style:family=\"paragraph\" style:parent-style-name=\"ListItem\"><style:paragraph-properties fo:break-before=\"page\"/></style:style>\n<style:style style:name=\"ListLooseItemBreak\" style:family=\"paragraph\" style:parent-style-name=\"ListLooseItem\"><style:paragraph-properties fo:break-before=\"page\"/></style:style>\n<style:style style:name=\"ListEmptyLine\" style:family=\"paragraph\" style:parent-style-name=\"ListItem\"><style:paragraph-properties fo:margin-bottom=\"0cm\"/></style:style>\n"
         ),
     );
 }
@@ -699,7 +729,7 @@ fn block_styles(output: &mut String, template: &Template) {
     xml::push_fmt(
         output,
         format_args!(
-            "<style:style style:name=\"QuoteParagraph\" style:family=\"paragraph\" style:parent-style-name=\"Standard\"><style:paragraph-properties fo:text-align=\"{align}\" fo:margin-left=\"1cm\" fo:margin-right=\"1cm\"{border}{quote_background}/>{text}</style:style>\n",
+            "<style:style style:name=\"QuoteParagraph\" style:family=\"paragraph\" style:parent-style-name=\"Standard\"><style:paragraph-properties fo:text-align=\"{align}\" fo:margin-left=\"1cm\" fo:margin-right=\"1cm\"{border}{quote_background}/>{text}</style:style>\n<style:style style:name=\"QuoteEmptyLine\" style:family=\"paragraph\" style:parent-style-name=\"QuoteParagraph\"><style:paragraph-properties fo:margin-bottom=\"0cm\"/></style:style>\n",
             align = alignment(quote_style.alignment()),
             border = border_attributes(quote_style.border())
         ),
@@ -772,16 +802,20 @@ fn horizontal_line_style(output: &mut String, template: &Template) {
     let after = rule.spacing_after().map_or_else(String::new, |length| {
         format!("fo:margin-bottom=\"{}\" ", xml::points(length))
     });
-    xml::push_fmt(
-        output,
-        format_args!(
-            "<style:style style:name=\"HorizontalLine\" style:family=\"paragraph\" style:parent-style-name=\"Standard\"><style:paragraph-properties {before}{after}fo:border-bottom=\"{thickness} solid {color}\" fo:padding-bottom=\"0.1cm\"/></style:style>\n",
-            before = before,
-            after = after,
-            thickness = xml::points(rule.thickness()),
-            color = rule.color().hex(),
-        ),
-    );
+    for (name, parent) in [
+        ("HorizontalLine", "Standard"),
+        ("ListHorizontalLine", "ListItem"),
+        ("QuoteHorizontalLine", "QuoteParagraph"),
+    ] {
+        xml::push_fmt(
+            output,
+            format_args!(
+                "<style:style style:name=\"{name}\" style:family=\"paragraph\" style:parent-style-name=\"{parent}\"><style:paragraph-properties {before}{after}fo:border-bottom=\"{thickness} solid {color}\" fo:padding-bottom=\"0.1cm\"/></style:style>\n",
+                thickness = xml::points(rule.thickness()),
+                color = rule.color().hex(),
+            ),
+        );
+    }
 }
 
 fn plain_text(inlines: &[Inline]) -> String {

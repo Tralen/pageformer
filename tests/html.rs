@@ -266,6 +266,54 @@ fn an_empty_line_is_a_div_with_the_body_line_height() {
 }
 
 #[test]
+fn an_empty_line_and_a_rule_inside_a_list_and_a_quote_stay_inside_the_container() {
+    let template = Template::embedded().expect("the embedded template must be valid");
+    let document = markdown::parse(
+        "- Item um\n\n  -empty-\n\n  -horizontal-\n\n- Item dois\n\n> Citação um.\n>\n> -empty-\n>\n> -horizontal-\n>\n> Citação dois.\n",
+    )
+    .expect("the document must parse");
+    let rendered = html::render(&document, &template, &pageformer::assets::Assets::default());
+    let html = String::from_utf8(rendered.into_bytes()).expect("the HTML must be UTF-8");
+    let document = parser(&html);
+
+    let empty_lines = document
+        .descendants()
+        .filter(|node| node.has_tag_name("div") && node.attribute("class") == Some("empty-line"))
+        .collect::<Vec<_>>();
+    assert_eq!(empty_lines.len(), 2, "{html}");
+    assert!(
+        empty_lines
+            .iter()
+            .any(|node| node.ancestors().any(|ancestor| ancestor.has_tag_name("li"))),
+        "{html}"
+    );
+    assert!(
+        empty_lines.iter().any(|node| node
+            .ancestors()
+            .any(|ancestor| ancestor.has_tag_name("blockquote"))),
+        "{html}"
+    );
+
+    let rules = document
+        .descendants()
+        .filter(|node| node.has_tag_name("hr"))
+        .collect::<Vec<_>>();
+    assert_eq!(rules.len(), 2, "{html}");
+    assert!(
+        rules
+            .iter()
+            .any(|node| node.ancestors().any(|ancestor| ancestor.has_tag_name("li"))),
+        "{html}"
+    );
+    assert!(
+        rules.iter().any(|node| node
+            .ancestors()
+            .any(|ancestor| ancestor.has_tag_name("blockquote"))),
+        "{html}"
+    );
+}
+
+#[test]
 fn the_embargos_values_reach_the_body_but_not_the_head() {
     let (html, warnings) = render_embargos();
     assert!(warnings.is_empty(), "{warnings:?}");

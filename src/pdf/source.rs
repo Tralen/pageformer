@@ -1268,6 +1268,7 @@ mod tests {
         Alert, CodeBlock, CodeLanguage, Destination, FootnoteDefinition, FootnoteId, Heading,
         HeadingLevel, ListItem, Metadata, NumberedParagraph, Quote, QuoteKind, TableCell,
     };
+    use crate::markdown;
     use crate::template::Template;
 
     fn template() -> Template {
@@ -1434,6 +1435,19 @@ mod tests {
         );
         let source = source(&document, &AssetMap::new());
         assert!(source.contains("#v(15.684pt)"), "{source}");
+    }
+
+    #[test]
+    fn an_empty_line_and_a_rule_inside_a_list_and_a_quote_are_rendered() {
+        let document = markdown::parse(
+            "- Item um\n\n  -empty-\n\n  -horizontal-\n\n- Item dois\n\n> Citação um.\n>\n> -empty-\n>\n> -horizontal-\n>\n> Citação dois.\n",
+        )
+        .expect("the document must parse");
+        let source = source(&document, &AssetMap::new());
+        assert!(source.contains("#v(15.684pt)"), "{source}");
+        assert!(source.contains("#line(length: 100%"), "{source}");
+        assert!(source.contains("#list("), "{source}");
+        assert!(source.contains("#quote(block: true)["), "{source}");
     }
 
     #[test]

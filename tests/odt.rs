@@ -271,6 +271,48 @@ fn an_empty_line_is_an_empty_paragraph_without_its_own_spacing() {
 }
 
 #[test]
+fn an_empty_line_and_a_rule_inside_a_list_and_a_quote_keep_the_container_style() {
+    let source = "- Item um\n\n  -empty-\n\n  -horizontal-\n\n- Item dois\n\n> Citação um.\n>\n> -empty-\n>\n> -horizontal-\n>\n> Citação dois.\n";
+    let document = markdown::parse(source).expect("the document must parse");
+    let bytes = render(&document);
+    let mut archive = ZipArchive::new(Cursor::new(bytes)).expect("the package must be a ZIP");
+    let content = entry(&mut archive, "content.xml");
+
+    assert!(
+        content.contains("<text:p text:style-name=\"ListEmptyLine\"/>"),
+        "{content}"
+    );
+    assert!(
+        content.contains("<text:p text:style-name=\"ListHorizontalLine\"/>"),
+        "{content}"
+    );
+    assert!(
+        content.contains("<text:p text:style-name=\"QuoteEmptyLine\"/>"),
+        "{content}"
+    );
+    assert!(
+        content.contains("<text:p text:style-name=\"QuoteHorizontalLine\"/>"),
+        "{content}"
+    );
+    assert!(
+        content.contains("style:name=\"ListEmptyLine\""),
+        "{content}"
+    );
+    assert!(
+        content.contains("style:name=\"QuoteEmptyLine\""),
+        "{content}"
+    );
+    assert!(
+        content.contains("style:name=\"ListHorizontalLine\""),
+        "{content}"
+    );
+    assert!(
+        content.contains("style:name=\"QuoteHorizontalLine\""),
+        "{content}"
+    );
+}
+
+#[test]
 fn a_rule_and_a_heading_background_follow_the_template() {
     let document =
         markdown::parse("# Título\n\nTexto.\n\n---\n\nDepois.\n").expect("the document must parse");

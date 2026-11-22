@@ -270,7 +270,7 @@ The marker is inline at the start of the item, so a wrapped line aligns with the
 
 ## `formatting.horizontal_rule`
 
-The thematic break, written as `---`, `***`, `___` or `-horizontal-` in the Markdown body, is drawn as a horizontal rule across the text width. The same keys declare the rule under a heading level, in `formatting.heading.h1` to `h6`, and every format reads them the same way:
+The thematic break, written as `---`, `***`, `___` or `-horizontal-` in the Markdown body, is drawn as a horizontal rule across the text width. Inside a list item, a quote or a footnote, the rule follows the container's width and indent. The same keys declare the rule under a heading level, in `formatting.heading.h1` to `h6`, and every format reads them the same way:
 
 - `thickness`: the line thickness, as a length greater than zero. The default is `0.5pt`.
 - `color`: the line color, as a [color](#colors). The default is `#000000`.
@@ -290,6 +290,8 @@ The `formatting.table` section styles every table in the document:
 ## Page breaks
 
 A paragraph that contains only `-pagebreak-` starts a new page; `-!-` is the shorthand with the same effect. The marker becomes a page break in the document model, so every paged backend reads the same block. Dashes and the exclamation mark are ordinary text to CommonMark, so the Zed preview shows the marker and no raw HTML is involved.
+
+The marker is only recognized in the body. Inside a list item, a quote or a footnote it stays literal text, because the PDF engine cannot place a page break inside a container.
 
 A marker inside a sentence stays literal text. The old brace form `{pagebreak}` and the backslash form `\pagebreak` are ordinary text too.
 

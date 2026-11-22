@@ -103,8 +103,8 @@ ODT and DOCX carry the template's page layout, fonts, headings, tables, letterhe
 
 A few standalone paragraphs extend ordinary CommonMark:
 
-- `-pagebreak-` or `-!-` starts a new page.
-- `-horizontal-` draws a horizontal rule, as `---`, `***` and `___` already do.
+- `-pagebreak-` or `-!-` starts a new page. It is a body-level marker; inside a list, quote or footnote it stays literal text.
+- `-horizontal-` draws a horizontal rule, as `---`, `***` and `___` already do; inside a list, quote or footnote, it follows the container's style.
 - `-empty-` leaves one deliberate blank line of body text; inside a list, quote or footnote, it follows the container's style.
 - A paragraph that contains only an image becomes a block image. The standalone lines directly below it may set `-width:...-`, `-height:...-` or `-align:left|center|right-`. One dimension is enough, because the other follows the image ratio.
 

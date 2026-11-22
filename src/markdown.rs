@@ -81,6 +81,16 @@ struct DocumentParser<'source> {
     events: Vec<Event<'source>>,
     index: usize,
     metadata: Option<Metadata>,
+    context: Context,
+}
+
+/// The block container that owns the paragraph being parsed.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Context {
+    Body,
+    ListItem,
+    Quote,
+    Footnote,
 }
 
 struct ParsedList {
@@ -99,6 +109,7 @@ impl<'source> DocumentParser<'source> {
             events,
             index: 0,
             metadata: None,
+            context: Context::Body,
         }
     }
 
@@ -155,7 +166,7 @@ impl<'source> DocumentParser<'source> {
         match tag {
             Tag::Paragraph => {
                 let content = self.parse_inlines(TagEnd::Paragraph, depth)?;
-                Ok(paragraph_blocks(content))
+                Ok(paragraph_blocks(content, self.context))
             }
             Tag::Heading { level: source, .. } => {
                 let end = TagEnd::Heading(source);
@@ -166,7 +177,9 @@ impl<'source> DocumentParser<'source> {
             Tag::BlockQuote(kind) => {
                 let end = TagEnd::BlockQuote(kind);
                 let quote_kind = quote_kind(kind);
+                let previous = std::mem::replace(&mut self.context, Context::Quote);
                 let blocks = normalize_blocks(self.parse_blocks(end, depth + 1)?)?;
+                self.context = previous;
                 Ok(vec![Block::Quote(Quote::new(quote_kind, blocks))])
             }
             Tag::List(start) => {
@@ -201,8 +214,10 @@ impl<'source> DocumentParser<'source> {
             Tag::FootnoteDefinition(name) => {
                 let id = FootnoteId::parse(&name)
                     .ok_or_else(|| malformed("a footnote definition has an empty label"))?;
+                let previous = std::mem::replace(&mut self.context, Context::Footnote);
                 let blocks =
                     normalize_blocks(self.parse_blocks(TagEnd::FootnoteDefinition, depth + 1)?)?;
+                self.context = previous;
                 Ok(vec![Block::FootnoteDefinition(FootnoteDefinition::new(
                     id, blocks,
                 ))])
@@ -270,6 +285,7 @@ impl<'source> DocumentParser<'source> {
     }
 
     fn parse_item(&mut self, depth: usize) -> Result<ParsedItem, MarkdownError> {
+        let previous = std::mem::replace(&mut self.context, Context::ListItem);
         let mut blocks = Vec::new();
         let mut task = None;
         let mut tight = true;
@@ -277,6 +293,7 @@ impl<'source> DocumentParser<'source> {
             match self.peek().cloned() {
                 Some(Event::End(TagEnd::Item)) => {
                     self.index += 1;
+                    self.context = previous;
                     return Ok(ParsedItem {
                         item: ListItem::new(task, normalize_blocks(blocks)?),
                         tight,
@@ -297,7 +314,7 @@ impl<'source> DocumentParser<'source> {
                         task = self.take_task_marker();
                     }
                     let content = self.parse_inlines(TagEnd::Paragraph, depth)?;
-                    blocks.extend(paragraph_blocks(content));
+                    blocks.extend(paragraph_blocks(content, self.context));
                 }
                 Some(event) if is_inline_event(&event) => {
                     let content = self.parse_inline_run(None, depth)?;
@@ -751,8 +768,10 @@ fn image_block(image: ImageParts, options: Vec<ImageOption>) -> Result<ImageBloc
 /// A standalone marker paragraph is a page break, a horizontal rule or an
 /// empty line. The markers are ordinary text to CommonMark and to the Zed
 /// preview, so they survive the parser without raw HTML or a backslash escape.
-fn paragraph_blocks(content: Vec<Inline>) -> Vec<Block> {
-    match paragraph_marker(&content) {
+/// A page break is only recognized in the body, because the PDF engine cannot
+/// place one inside a list, quote or footnote.
+fn paragraph_blocks(content: Vec<Inline>, context: Context) -> Vec<Block> {
+    match paragraph_marker(&content, context) {
         Some(ParagraphMarker::PageBreak) => vec![Block::PageBreak],
         Some(ParagraphMarker::HorizontalRule) => vec![Block::ThematicBreak],
         Some(ParagraphMarker::EmptyLine) => vec![Block::EmptyLine],
@@ -767,12 +786,12 @@ enum ParagraphMarker {
     EmptyLine,
 }
 
-fn paragraph_marker(content: &[Inline]) -> Option<ParagraphMarker> {
+fn paragraph_marker(content: &[Inline], context: Context) -> Option<ParagraphMarker> {
     let [Inline::Text(text)] = content else {
         return None;
     };
     match text.trim() {
-        "-pagebreak-" | "-!-" => Some(ParagraphMarker::PageBreak),
+        "-pagebreak-" | "-!-" if context == Context::Body => Some(ParagraphMarker::PageBreak),
         "-horizontal-" => Some(ParagraphMarker::HorizontalRule),
         "-empty-" => Some(ParagraphMarker::EmptyLine),
         _ => None,
@@ -1091,6 +1110,127 @@ mod tests {
         assert!(
             matches!(document.blocks().get(1), Some(Block::Paragraph(_))),
             "the old marker must not become a page break"
+        );
+    }
+
+    fn is_text_paragraph(block: &Block, expected: &str) -> bool {
+        matches!(
+            block,
+            Block::Paragraph(inlines)
+                if inlines.len() == 1
+                    && matches!(inlines.first(), Some(Inline::Text(text)) if text == expected)
+        )
+    }
+
+    #[test]
+    fn a_pagebreak_marker_inside_a_list_item_stays_text() {
+        let document = parse("- Item um\n\n  -pagebreak-\n\n  Item dois\n").expect("a list");
+        let Block::List(list) = first_block(&document) else {
+            panic!("expected a list");
+        };
+        let item = list.items().first().expect("an item");
+        assert!(
+            item.blocks()
+                .iter()
+                .any(|block| is_text_paragraph(block, "-pagebreak-")),
+            "{:?}",
+            item.blocks()
+        );
+        assert!(
+            !item
+                .blocks()
+                .iter()
+                .any(|block| matches!(block, Block::PageBreak)),
+            "{:?}",
+            item.blocks()
+        );
+    }
+
+    #[test]
+    fn a_pagebreak_marker_inside_a_quote_stays_text() {
+        let document =
+            parse("> Citação um.\n>\n> -pagebreak-\n>\n> Citação dois.\n").expect("a quote");
+        let Block::Quote(quote) = first_block(&document) else {
+            panic!("expected a quote");
+        };
+        assert!(
+            quote
+                .blocks()
+                .iter()
+                .any(|block| is_text_paragraph(block, "-pagebreak-")),
+            "{:?}",
+            quote.blocks()
+        );
+        assert!(
+            !quote
+                .blocks()
+                .iter()
+                .any(|block| matches!(block, Block::PageBreak)),
+            "{:?}",
+            quote.blocks()
+        );
+    }
+
+    #[test]
+    fn a_pagebreak_marker_inside_a_footnote_stays_text() {
+        let document = parse("Texto[^1].\n\n[^1]: Nota um.\n\n    -pagebreak-\n\n    Nota dois.\n")
+            .expect("a footnote");
+        let definition = document
+            .blocks()
+            .iter()
+            .find_map(|block| match block {
+                Block::FootnoteDefinition(definition) => Some(definition),
+                _ => None,
+            })
+            .expect("a footnote definition");
+        assert!(
+            definition
+                .blocks()
+                .iter()
+                .any(|block| is_text_paragraph(block, "-pagebreak-")),
+            "{:?}",
+            definition.blocks()
+        );
+        assert!(
+            !definition
+                .blocks()
+                .iter()
+                .any(|block| matches!(block, Block::PageBreak)),
+            "{:?}",
+            definition.blocks()
+        );
+    }
+
+    #[test]
+    fn an_empty_marker_inside_a_list_item_is_an_empty_line() {
+        let document = parse("- Item um\n\n  -empty-\n\n  Item dois\n").expect("a list");
+        let Block::List(list) = first_block(&document) else {
+            panic!("expected a list");
+        };
+        let item = list.items().first().expect("an item");
+        assert!(
+            item.blocks()
+                .iter()
+                .any(|block| matches!(block, Block::EmptyLine)),
+            "{:?}",
+            item.blocks()
+        );
+    }
+
+    #[test]
+    fn a_horizontal_marker_inside_a_quote_is_a_thematic_break() {
+        let document =
+            parse("> Citação um.\n>\n> -horizontal-\n>\n> Citação dois.\n").expect("a quote");
+        let Block::Quote(quote) = first_block(&document) else {
+            panic!("expected a quote");
+        };
+        assert!(
+            quote
+                .blocks()
+                .iter()
+                .any(|block| matches!(block, Block::ThematicBreak)),
+            "{:?}",
+            quote.blocks()
         );
     }
 

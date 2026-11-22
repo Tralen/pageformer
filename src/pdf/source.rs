@@ -1462,6 +1462,17 @@ mod tests {
     }
 
     #[test]
+    fn a_pagebreak_marker_inside_a_container_stays_text() {
+        let document = markdown::parse(
+            "- Item um\n\n  -pagebreak-\n\n  Item dois\n\n> Citação um.\n>\n> -pagebreak-\n>\n> Citação dois.\n",
+        )
+        .expect("the document must parse");
+        let source = source(&document, &AssetMap::new());
+        assert!(!source.contains("#pagebreak()"), "{source}");
+        assert!(source.contains("pagebreak"), "{source}");
+    }
+
+    #[test]
     fn the_table_style_is_emitted_from_the_template() {
         let table = Table::new(
             vec![ColumnAlignment::Left],

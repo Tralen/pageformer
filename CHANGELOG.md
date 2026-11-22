@@ -10,6 +10,7 @@
 - The empty line occupies one body line advance, adds no paragraph spacing of its own and leaves the page background visible; PDF emits `#v()`, ODT and DOCX use an `EmptyLine` paragraph style, HTML and EPUB use `div.empty-line`, and TXT adds one blank line.
 - The empty line and the horizontal rule follow the container's indent and border inside lists and quotes.
 - The empty line and the horizontal rule are also rendered inside footnotes in ODT and DOCX.
+- `-pagebreak-` is a body-level marker; inside a list, quote or footnote it stays literal text, because the PDF engine cannot place a page break inside a container.
 - Adds `-empty-` to the technical report and the brief and regenerates their six outputs.
 - Regenerates the HTML and EPUB examples for the new `.empty-line` rule.
 - Regenerates the ODT examples for `meta:generator` 1.2.0.

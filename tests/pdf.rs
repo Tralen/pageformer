@@ -67,6 +67,16 @@ fn document_with_image(destination: &str) -> Document {
 }
 
 #[test]
+fn a_pagebreak_marker_inside_a_container_does_not_fail_the_pdf() {
+    let source = "- Item um\n\n  -pagebreak-\n\n  Item dois\n\n> Citação um.\n>\n> -pagebreak-\n>\n> Citação dois.\n";
+    let document = markdown::parse(source).expect("the document must parse");
+    let rendered =
+        pdf::render(&document, &embedded(), &Assets::default()).expect("the PDF must render");
+
+    assert!(rendered.bytes().starts_with(b"%PDF-"));
+}
+
+#[test]
 fn the_contract_is_rendered_as_pdf_a_and_stays_deterministic() {
     let document = markdown::parse(CONTRACT).expect("the contract fixture must parse");
     let template = embedded();

@@ -369,6 +369,16 @@ mod tests {
     }
 
     #[test]
+    fn an_empty_line_and_a_rule_inside_a_footnote_are_rendered() {
+        assert_eq!(
+            rendered(
+                "Texto[^1].\n\n[^1]: Nota um.\n\n    -empty-\n\n    -horizontal-\n\n    Nota dois.\n"
+            ),
+            "Texto[^1].\n\n[^1] Nota um.\n\n\n     ---\n\n     Nota dois.\n"
+        );
+    }
+
+    #[test]
     fn a_thematic_break_is_three_dashes() {
         assert_eq!(
             rendered("Antes.\n\n---\n\nDepois.\n"),

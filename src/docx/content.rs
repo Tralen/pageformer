@@ -552,27 +552,48 @@ impl<'a> Builder<'a> {
         self.active.push(key.to_owned());
         let mut body = String::new();
         for (index, block) in definition.blocks().iter().enumerate() {
-            let runs = match block {
-                Block::Paragraph(inlines) => self.runs(inlines, ""),
-                Block::NumberedParagraph(paragraph) => {
-                    let mut runs = self.run(&format!("{}. ", paragraph.number()), "");
-                    runs.push_str(&self.runs(paragraph.content(), ""));
-                    runs
-                }
-                Block::CodeBlock(code) => self.run(code.text().trim_end_matches('\n'), ""),
-                _ => String::new(),
-            };
             let mark = if index == 0 {
                 "<w:r><w:rPr><w:rStyle w:val=\"FootnoteReference\"/></w:rPr><w:footnoteRef/></w:r>"
             } else {
                 ""
             };
-            xml::push_fmt(
-                &mut body,
-                format_args!(
-                    "<w:p><w:pPr><w:pStyle w:val=\"FootnoteText\"/></w:pPr>{mark}{runs}</w:p>"
-                ),
-            );
+            match block {
+                Block::EmptyLine => {
+                    xml::push_fmt(
+                        &mut body,
+                        format_args!(
+                            "<w:p><w:pPr><w:pStyle w:val=\"FootnoteText\"/><w:spacing w:after=\"0\"/></w:pPr>{mark}</w:p>"
+                        ),
+                    );
+                }
+                Block::ThematicBreak => {
+                    let extra = self.thematic_break_properties(false);
+                    xml::push_fmt(
+                        &mut body,
+                        format_args!(
+                            "<w:p><w:pPr><w:pStyle w:val=\"FootnoteText\"/>{extra}</w:pPr>{mark}</w:p>"
+                        ),
+                    );
+                }
+                _ => {
+                    let runs = match block {
+                        Block::Paragraph(inlines) => self.runs(inlines, ""),
+                        Block::NumberedParagraph(paragraph) => {
+                            let mut runs = self.run(&format!("{}. ", paragraph.number()), "");
+                            runs.push_str(&self.runs(paragraph.content(), ""));
+                            runs
+                        }
+                        Block::CodeBlock(code) => self.run(code.text().trim_end_matches('\n'), ""),
+                        _ => String::new(),
+                    };
+                    xml::push_fmt(
+                        &mut body,
+                        format_args!(
+                            "<w:p><w:pPr><w:pStyle w:val=\"FootnoteText\"/></w:pPr>{mark}{runs}</w:p>"
+                        ),
+                    );
+                }
+            }
         }
         self.active.pop();
         self.footnotes

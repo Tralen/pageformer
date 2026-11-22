@@ -313,6 +313,26 @@ fn an_empty_line_and_a_rule_inside_a_list_and_a_quote_keep_the_container_style()
 }
 
 #[test]
+fn an_empty_line_and_a_rule_inside_a_footnote_are_rendered() {
+    let source =
+        "Texto[^1].\n\n[^1]: Nota um.\n\n    -empty-\n\n    -horizontal-\n\n    Nota dois.\n";
+    let document = markdown::parse(source).expect("the document must parse");
+    let bytes = render(&document);
+    let mut archive = ZipArchive::new(Cursor::new(bytes)).expect("the package must be a ZIP");
+    let content = entry(&mut archive, "content.xml");
+
+    assert!(content.contains("<text:note-body>"), "{content}");
+    assert!(
+        content.contains("<text:p text:style-name=\"EmptyLine\"/>"),
+        "{content}"
+    );
+    assert!(
+        content.contains("<text:p text:style-name=\"HorizontalLine\"/>"),
+        "{content}"
+    );
+}
+
+#[test]
 fn a_rule_and_a_heading_background_follow_the_template() {
     let document =
         markdown::parse("# Título\n\nTexto.\n\n---\n\nDepois.\n").expect("the document must parse");

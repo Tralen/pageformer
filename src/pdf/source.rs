@@ -1451,6 +1451,17 @@ mod tests {
     }
 
     #[test]
+    fn an_empty_line_and_a_rule_inside_a_footnote_are_rendered() {
+        let document = markdown::parse(
+            "Texto[^1].\n\n[^1]: Nota um.\n\n    -empty-\n\n    -horizontal-\n\n    Nota dois.\n",
+        )
+        .expect("the document must parse");
+        let source = source(&document, &AssetMap::new());
+        assert!(source.contains("#v(15.684pt)"), "{source}");
+        assert!(source.contains("#line(length: 100%"), "{source}");
+    }
+
+    #[test]
     fn the_table_style_is_emitted_from_the_template() {
         let table = Table::new(
             vec![ColumnAlignment::Left],

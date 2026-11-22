@@ -206,6 +206,25 @@ fn an_empty_line_and_a_rule_inside_a_list_and_a_quote_keep_the_container_style()
 }
 
 #[test]
+fn an_empty_line_and_a_rule_inside_a_footnote_are_rendered() {
+    let source =
+        "Texto[^1].\n\n[^1]: Nota um.\n\n    -empty-\n\n    -horizontal-\n\n    Nota dois.\n";
+    let document = markdown::parse(source).expect("the document must parse");
+    let bytes = render(&document);
+    let mut archive = ZipArchive::new(Cursor::new(bytes)).expect("the package must be a ZIP");
+    let footnotes = entry(&mut archive, "word/footnotes.xml");
+
+    assert!(
+        footnotes.contains("<w:pStyle w:val=\"FootnoteText\"/><w:spacing w:after=\"0\"/>"),
+        "{footnotes}"
+    );
+    assert!(
+        footnotes.contains("<w:pStyle w:val=\"FootnoteText\"/><w:pBdr>"),
+        "{footnotes}"
+    );
+}
+
+#[test]
 fn the_embargos_metadata_never_carries_a_value() {
     let document = markdown::parse(EMBARGOS).expect("the embargos fixture must parse");
     let resolution = confidential::resolve(&document, &example_store())

@@ -151,6 +151,28 @@ fn an_empty_line_and_a_rule_inside_a_list_and_a_quote_stay_inside_the_container(
 }
 
 #[test]
+fn an_empty_line_and_a_rule_inside_a_footnote_are_rendered() {
+    let template = pageformer::template::Template::embedded().expect("the embedded template");
+    let document = markdown::parse(
+        "Texto[^1].\n\n[^1]: Nota um.\n\n    -empty-\n\n    -horizontal-\n\n    Nota dois.\n",
+    )
+    .expect("the document must parse");
+    let rendered = epub::render(&document, &template, &pageformer::assets::Assets::default())
+        .expect("the package must be produced");
+    let mut archive = archive(rendered.into_bytes());
+    let chapter = entry(&mut archive, "OEBPS/chapter-1.xhtml");
+
+    assert!(
+        chapter.contains("<div class=\"empty-line\" aria-hidden=\"true\"></div>"),
+        "{chapter}"
+    );
+    assert!(
+        chapter.contains("<hr class=\"horizontal-rule\" />"),
+        "{chapter}"
+    );
+}
+
+#[test]
 fn the_package_starts_with_a_stored_mimetype() {
     let (bytes, warnings) = render_example("escritorio", CONTRACT);
     assert!(warnings.is_empty(), "{warnings:?}");

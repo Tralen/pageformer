@@ -49,8 +49,13 @@ pub fn text(document: &Document) -> String {
 }
 
 fn blocks(blocks: &[Block], separator: &str, footnotes: &mut Vec<String>) -> String {
-    let mut rendered = Vec::new();
+    let mut output = String::new();
+    let mut has_text = false;
     for block in blocks {
+        if matches!(block, Block::EmptyLine) {
+            output.push('\n');
+            continue;
+        }
         let text = match block {
             Block::FootnoteDefinition(definition) => {
                 let definition = footnote(definition, footnotes);
@@ -59,11 +64,16 @@ fn blocks(blocks: &[Block], separator: &str, footnotes: &mut Vec<String>) -> Str
             }
             _ => block_text(block, footnotes),
         };
-        if !text.is_empty() {
-            rendered.push(text);
+        if text.is_empty() {
+            continue;
         }
+        if has_text {
+            output.push_str(separator);
+        }
+        output.push_str(&text);
+        has_text = true;
     }
-    rendered.join(separator)
+    output
 }
 
 fn block_text(block: &Block, footnotes: &mut Vec<String>) -> String {
@@ -78,6 +88,7 @@ fn block_text(block: &Block, footnotes: &mut Vec<String>) -> String {
         Block::CodeBlock(code) => code.text().trim_end_matches('\n').to_owned(),
         Block::ThematicBreak => "---".to_owned(),
         Block::PageBreak => PAGE_BREAK.to_owned(),
+        Block::EmptyLine => String::new(),
         Block::FootnoteDefinition(_) => String::new(),
     }
 }
@@ -327,6 +338,24 @@ mod tests {
             rendered("Antes.\n\n-pagebreak-\n\nDepois.\n"),
             "Antes.\n\n\u{c}\n\nDepois.\n"
         );
+    }
+
+    #[test]
+    fn an_empty_line_marker_adds_a_blank_line() {
+        assert_eq!(
+            rendered("Antes.\n\n-empty-\n\nDepois.\n"),
+            "Antes.\n\n\nDepois.\n"
+        );
+    }
+
+    #[test]
+    fn an_empty_line_at_the_start_is_a_leading_blank_line() {
+        assert_eq!(rendered("-empty-\n\nDepois.\n"), "\nDepois.\n");
+    }
+
+    #[test]
+    fn a_document_with_only_an_empty_line_is_a_blank_line() {
+        assert_eq!(rendered("-empty-\n"), "\n\n");
     }
 
     #[test]

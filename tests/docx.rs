@@ -159,6 +159,25 @@ fn the_same_document_produces_the_same_bytes() {
 }
 
 #[test]
+fn an_empty_line_is_an_empty_paragraph_without_its_own_spacing() {
+    let document =
+        markdown::parse("Antes.\n\n-empty-\n\nDepois.\n").expect("the document must parse");
+    let bytes = render(&document);
+    let mut archive = ZipArchive::new(Cursor::new(bytes)).expect("the package must be a ZIP");
+    let content = entry(&mut archive, "word/document.xml");
+    let styles = entry(&mut archive, "word/styles.xml");
+
+    assert!(
+        content.contains("<w:pStyle w:val=\"EmptyLine\"/>"),
+        "{content}"
+    );
+    assert!(
+        styles.contains("w:styleId=\"EmptyLine\"") && styles.contains("w:after=\"0\""),
+        "{styles}"
+    );
+}
+
+#[test]
 fn the_embargos_metadata_never_carries_a_value() {
     let document = markdown::parse(EMBARGOS).expect("the embargos fixture must parse");
     let resolution = confidential::resolve(&document, &example_store())

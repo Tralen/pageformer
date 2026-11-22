@@ -340,7 +340,9 @@ fn resolve_block(
                 blocks,
             )))
         }
-        Block::CodeBlock(_) | Block::ThematicBreak | Block::PageBreak => Ok(block.clone()),
+        Block::CodeBlock(_) | Block::ThematicBreak | Block::PageBreak | Block::EmptyLine => {
+            Ok(block.clone())
+        }
     }
 }
 

@@ -748,13 +748,14 @@ fn image_block(image: ImageParts, options: Vec<ImageOption>) -> Result<ImageBloc
     ))
 }
 
-/// A standalone marker paragraph is a page break or a horizontal rule. The
-/// markers are ordinary text to CommonMark and to the Zed preview, so they
-/// survive the parser without raw HTML or a backslash escape.
+/// A standalone marker paragraph is a page break, a horizontal rule or an
+/// empty line. The markers are ordinary text to CommonMark and to the Zed
+/// preview, so they survive the parser without raw HTML or a backslash escape.
 fn paragraph_blocks(content: Vec<Inline>) -> Vec<Block> {
     match paragraph_marker(&content) {
         Some(ParagraphMarker::PageBreak) => vec![Block::PageBreak],
         Some(ParagraphMarker::HorizontalRule) => vec![Block::ThematicBreak],
+        Some(ParagraphMarker::EmptyLine) => vec![Block::EmptyLine],
         None => vec![Block::Paragraph(content)],
     }
 }
@@ -763,6 +764,7 @@ fn paragraph_blocks(content: Vec<Inline>) -> Vec<Block> {
 enum ParagraphMarker {
     PageBreak,
     HorizontalRule,
+    EmptyLine,
 }
 
 fn paragraph_marker(content: &[Inline]) -> Option<ParagraphMarker> {
@@ -772,6 +774,7 @@ fn paragraph_marker(content: &[Inline]) -> Option<ParagraphMarker> {
     match text.trim() {
         "-pagebreak-" | "-!-" => Some(ParagraphMarker::PageBreak),
         "-horizontal-" => Some(ParagraphMarker::HorizontalRule),
+        "-empty-" => Some(ParagraphMarker::EmptyLine),
         _ => None,
     }
 }
@@ -1101,6 +1104,64 @@ mod tests {
     fn a_horizontal_marker_inside_a_paragraph_stays_text() {
         let document = parse("Texto -horizontal- aqui.\n").expect("inline text");
         assert!(matches!(first_block(&document), Block::Paragraph(_)));
+    }
+
+    #[test]
+    fn a_standalone_empty_marker_is_an_empty_line() {
+        let document = parse("Antes.\n\n-empty-\n\nDepois.\n").expect("an empty line");
+        assert_eq!(
+            document.blocks(),
+            &[
+                Block::Paragraph(vec![Inline::Text("Antes.".to_owned())]),
+                Block::EmptyLine,
+                Block::Paragraph(vec![Inline::Text("Depois.".to_owned())]),
+            ]
+        );
+    }
+
+    #[test]
+    fn consecutive_empty_markers_are_consecutive_empty_lines() {
+        let document = parse("-empty-\n\n-empty-\n").expect("two empty lines");
+        assert_eq!(document.blocks(), &[Block::EmptyLine, Block::EmptyLine]);
+    }
+
+    #[test]
+    fn an_empty_marker_inside_a_paragraph_stays_text() {
+        let document = parse("Texto -empty- aqui.\n").expect("inline text");
+        assert!(matches!(first_block(&document), Block::Paragraph(_)));
+    }
+
+    #[test]
+    fn an_empty_marker_in_a_table_cell_stays_text() {
+        let document = parse("| A |\n|---|\n| -empty- |\n").expect("a table");
+        let table = document
+            .blocks()
+            .iter()
+            .find_map(|block| match block {
+                Block::Table(table) => Some(table),
+                _ => None,
+            })
+            .expect("a table");
+        let cell = table
+            .rows()
+            .first()
+            .and_then(|row| row.first())
+            .expect("a cell");
+        assert_eq!(cell.content(), &[Inline::Text("-empty-".to_owned())]);
+    }
+
+    #[test]
+    fn an_empty_marker_in_a_code_block_stays_text() {
+        let document = parse("```\n-empty-\n```\n").expect("a code block");
+        let code = document
+            .blocks()
+            .iter()
+            .find_map(|block| match block {
+                Block::CodeBlock(code) => Some(code),
+                _ => None,
+            })
+            .expect("a code block");
+        assert_eq!(code.text().trim_end_matches('\n'), "-empty-");
     }
 
     #[test]

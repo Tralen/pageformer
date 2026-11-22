@@ -106,6 +106,25 @@ fn a_page_background_reaches_the_reflowable_body() {
 }
 
 #[test]
+fn an_empty_line_is_a_div_with_the_body_line_height() {
+    let template = pageformer::template::Template::embedded().expect("the embedded template");
+    let document =
+        markdown::parse("Antes.\n\n-empty-\n\nDepois.\n").expect("the document must parse");
+    let rendered = epub::render(&document, &template, &pageformer::assets::Assets::default())
+        .expect("the package must be produced");
+    let mut archive = archive(rendered.into_bytes());
+    let chapter = entry(&mut archive, "OEBPS/chapter-1.xhtml");
+    let css = entry(&mut archive, "OEBPS/style.css");
+
+    assert!(
+        chapter.contains("<div class=\"empty-line\" aria-hidden=\"true\"></div>"),
+        "{chapter}"
+    );
+    assert!(css.contains(".empty-line {"), "{css}");
+    assert!(css.contains("height: 1.3070em;"), "{css}");
+}
+
+#[test]
 fn the_package_starts_with_a_stored_mimetype() {
     let (bytes, warnings) = render_example("escritorio", CONTRACT);
     assert!(warnings.is_empty(), "{warnings:?}");

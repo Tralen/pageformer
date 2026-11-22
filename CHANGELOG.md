@@ -4,6 +4,14 @@
 
 *Major updates and feature releases.*
 
+### 1.2.0
+
+- Adds the `-empty-` marker: a standalone paragraph that becomes one deliberate blank line of body text.
+- The empty line occupies one body line advance, adds no paragraph spacing of its own and leaves the page background visible; PDF emits `#v()`, ODT and DOCX use an `EmptyLine` paragraph style, HTML and EPUB use `div.empty-line`, and TXT adds one blank line.
+- Adds `-empty-` to the technical report and the brief and regenerates their six outputs.
+- Regenerates the HTML and EPUB examples for the new `.empty-line` rule.
+- Regenerates the ODT examples for `meta:generator` 1.2.0.
+
 ### 1.1.0
 
 - Adds `default_output` to the public `config.yaml` and an optional `outputs` map to `confidential.yaml`.

@@ -85,6 +85,8 @@ The image below uses the width, the alignment, the border and the background def
 
 The engine computes pagination and numbering from the whole document, so the total in the header matches the final number.
 
+-empty-
+
 The same model drives the six formats: Typst for PDF, internal writers for ODT and DOCX, a semantic view for HTML and EPUB, and a plain-text view for TXT. A single template keeps the face, the colors, the spacing and the blocks consistent.
 
 The table below summarizes what each format preserves from the template.

@@ -163,7 +163,8 @@ fn collect_definitions(blocks: &[Block], definitions: &mut Vec<Block>) {
             | Block::Table(_)
             | Block::CodeBlock(_)
             | Block::ThematicBreak
-            | Block::PageBreak => {}
+            | Block::PageBreak
+            | Block::EmptyLine => {}
         }
     }
 }
@@ -206,6 +207,7 @@ fn first_heading(blocks: &[Block]) -> Option<String> {
             | Block::CodeBlock(_)
             | Block::ThematicBreak
             | Block::PageBreak
+            | Block::EmptyLine
             | Block::Heading(_) => {}
         }
     }

@@ -73,6 +73,11 @@ pub fn styles_xml(document: &Document, template: &Template, assets: &Assets) -> 
         );
     }
 
+    xml::push(
+        &mut output,
+        "<style:style style:name=\"EmptyLine\" style:family=\"paragraph\" style:parent-style-name=\"Standard\" style:next-style-name=\"Standard\"><style:paragraph-properties fo:margin-bottom=\"0pt\"/></style:style>\n",
+    );
+
     character_style(&mut output, "Emphasis", paragraph.emphasis());
     character_style(&mut output, "Strong", paragraph.strong());
     partial_character_style(

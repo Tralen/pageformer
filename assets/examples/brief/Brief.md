@@ -20,6 +20,8 @@ The document is a Pageformer example. It is independent of the legal fixtures: i
 
 The station finished the winter maintenance with three of the four instruments ready. The lidar remains in calibration and joins the campaign after the first week.
 
+-empty-
+
 | Instrument | State | Next window |
 |---|---|---|
 | Spectrometer | Ready | 12 April |

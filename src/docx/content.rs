@@ -223,6 +223,10 @@ impl<'a> Builder<'a> {
             Block::PageBreak => self
                 .document
                 .push_str("<w:p><w:r><w:br w:type=\"page\"/></w:r></w:p>\n"),
+            Block::EmptyLine => {
+                let paragraph = self.paragraph(Some("EmptyLine"), "", "");
+                self.document.push_str(&paragraph);
+            }
             Block::FootnoteDefinition(_) => {}
         }
     }

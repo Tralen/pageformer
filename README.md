@@ -105,6 +105,7 @@ A few standalone paragraphs extend ordinary CommonMark:
 
 - `-pagebreak-` or `-!-` starts a new page.
 - `-horizontal-` draws a horizontal rule, as `---`, `***` and `___` already do.
+- `-empty-` leaves one deliberate blank line of body text.
 - A paragraph that contains only an image becomes a block image. The standalone lines directly below it may set `-width:...-`, `-height:...-` or `-align:left|center|right-`. One dimension is enough, because the other follows the image ratio.
 
 The template's `formatting.image` section supplies the default alignment, the maximum width, the border, the padding and the background. A marker inside ordinary text stays ordinary text.

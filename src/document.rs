@@ -436,6 +436,7 @@ pub enum Block {
     CodeBlock(CodeBlock),
     ThematicBreak,
     PageBreak,
+    EmptyLine,
     FootnoteDefinition(FootnoteDefinition),
 }
 

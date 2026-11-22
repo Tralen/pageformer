@@ -28,7 +28,7 @@ Four decisions belong to Pageweaver and do not need a Pageformer change:
 1. An untitled document has no natural path. The editor picks a provisional path in the folder the user chose, and moves the file and its state when the user saves. The template and the relative images resolve from that folder.
 2. The preview is the HTML backend, not the PDF. It is visually close; the browser decides line breaks and page size. Use CSS Paged Media for the print-like view and accept that the PDF remains the final appearance.
 3. A preview re-render reads the images and the template from disk. Debounce the edits and run the render on the worker thread, as `pageformer-publisher` already does.
-4. The Markdown serializer is Pageweaver's responsibility. It must preserve `-pagebreak-`, `-!-`, `-horizontal-`, `-width-`, `-height-`, `-align-`, `{NAME}`, frontmatter, tables, lists, footnotes and alerts. The examples under `assets/examples/` are the round-trip regression set.
+4. The Markdown serializer is Pageweaver's responsibility. It must preserve `-pagebreak-`, `-!-`, `-horizontal-`, `-empty-`, `-width-`, `-height-`, `-align-`, `{NAME}`, frontmatter, tables, lists, footnotes and alerts. The examples under `assets/examples/` are the round-trip regression set.
 
 No blocking gap remains in the library. The only accepted limitation is the path for a never-saved buffer, which is a Pageweaver decision. The MSRV is not declared; edition 2024 requires Rust 1.85 or newer, so Pageweaver pins a toolchain at least that recent.
 
@@ -50,7 +50,7 @@ The editor previews the document with the styles resolved from the YAML template
 
 ## Round-trip risk
 
-The editor serializes Markdown back to the source. The serialization must preserve the Pageformer syntax: `-pagebreak-`, `-!-`, `-horizontal-`, `{NAME}`, frontmatter, tables, lists, footnotes and alerts. A rich-text editor can normalize markers and escaping, so the fixtures under `assets/examples/` are the regression set. Keep the Markdown as the source of truth and test the round trip on every serializer change.
+The editor serializes Markdown back to the source. The serialization must preserve the Pageformer syntax: `-pagebreak-`, `-!-`, `-horizontal-`, `-empty-`, `{NAME}`, frontmatter, tables, lists, footnotes and alerts. A rich-text editor can normalize markers and escaping, so the fixtures under `assets/examples/` are the regression set. Keep the Markdown as the source of truth and test the round trip on every serializer change.
 
 ## Dependency
 

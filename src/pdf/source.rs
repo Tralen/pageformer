@@ -72,6 +72,7 @@ struct SourceBuilder<'a> {
     warnings: Vec<String>,
     text_width: f64,
     paragraph_after: f64,
+    line_advance: f64,
     table: &'a TableStyle,
     rule: &'a RuleStyle,
     image: &'a ImageStyle,
@@ -113,6 +114,8 @@ impl<'a> SourceBuilder<'a> {
         let paragraph = template.formatting().paragraph();
         let paragraph_after =
             crate::metrics::paragraph_after(paragraph.spacing(), paragraph.leading());
+        let line_advance =
+            crate::metrics::line_advance(paragraph.face().size(), paragraph.leading());
         Self {
             output: String::new(),
             assets,
@@ -120,6 +123,7 @@ impl<'a> SourceBuilder<'a> {
             warnings: Vec::new(),
             text_width,
             paragraph_after,
+            line_advance,
             table: template.table(),
             rule: template.formatting().horizontal_rule(),
             image: template.formatting().image(),
@@ -633,6 +637,9 @@ impl<'a> SourceBuilder<'a> {
             Block::CodeBlock(code) => self.code_block(code),
             Block::ThematicBreak => self.thematic_break(),
             Block::PageBreak => self.output.push_str("#pagebreak()"),
+            Block::EmptyLine => {
+                let _ = write!(self.output, "#v({:.3}pt)", self.line_advance);
+            }
             Block::FootnoteDefinition(_) => {}
         }
         Ok(())
@@ -1057,7 +1064,8 @@ fn collect_footnotes(blocks: &[Block], footnotes: &mut BTreeMap<String, Vec<Bloc
             | Block::Table(_)
             | Block::CodeBlock(_)
             | Block::ThematicBreak
-            | Block::PageBreak => {}
+            | Block::PageBreak
+            | Block::EmptyLine => {}
         }
     }
 }
@@ -1412,6 +1420,20 @@ mod tests {
         );
         let source = source(&document, &AssetMap::new());
         assert!(source.contains("#pagebreak()"), "{source}");
+    }
+
+    #[test]
+    fn an_empty_line_is_a_vertical_space_of_one_line() {
+        let document = Document::new(
+            Metadata::default(),
+            vec![
+                Block::Paragraph(vec![Inline::Text("Antes".to_owned())]),
+                Block::EmptyLine,
+                Block::Paragraph(vec![Inline::Text("Depois".to_owned())]),
+            ],
+        );
+        let source = source(&document, &AssetMap::new());
+        assert!(source.contains("#v(15.684pt)"), "{source}");
     }
 
     #[test]

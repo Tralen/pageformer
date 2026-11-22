@@ -113,6 +113,14 @@ pub(crate) fn styles_xml(document: &Document, template: &Template) -> String {
         );
     }
 
+    xml::push_fmt(
+        &mut output,
+        format_args!(
+            "<w:style w:type=\"paragraph\" w:styleId=\"EmptyLine\"><w:name w:val=\"Empty Line\"/><w:basedOn w:val=\"Normal\"/><w:qFormat/><w:pPr><w:spacing w:after=\"0\" w:line=\"{}\" w:lineRule=\"atLeast\"/></w:pPr></w:style>\n",
+            metrics::twips(line)
+        ),
+    );
+
     let list = template.formatting().list();
     let list_line = metrics::line_advance(face.size(), paragraph.leading());
     let list_after =

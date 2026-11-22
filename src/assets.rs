@@ -194,7 +194,7 @@ fn collect_block_images<'a>(blocks: &'a [Block], destinations: &mut Vec<&'a str>
             Block::FootnoteDefinition(definition) => {
                 collect_block_images(definition.blocks(), destinations);
             }
-            Block::CodeBlock(_) | Block::ThematicBreak | Block::PageBreak => {}
+            Block::CodeBlock(_) | Block::ThematicBreak | Block::PageBreak | Block::EmptyLine => {}
         }
     }
 }

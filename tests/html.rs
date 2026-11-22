@@ -250,6 +250,22 @@ fn the_report_keeps_its_table_alert_code_and_endnotes() {
 }
 
 #[test]
+fn an_empty_line_is_a_div_with_the_body_line_height() {
+    let template = Template::embedded().expect("the embedded template must be valid");
+    let document =
+        markdown::parse("Antes.\n\n-empty-\n\nDepois.\n").expect("the document must parse");
+    let rendered = html::render(&document, &template, &pageformer::assets::Assets::default());
+    let html = String::from_utf8(rendered.into_bytes()).expect("the HTML must be UTF-8");
+
+    assert!(
+        html.contains("<div class=\"empty-line\" aria-hidden=\"true\"></div>"),
+        "{html}"
+    );
+    assert!(html.contains(".empty-line {"), "{html}");
+    assert!(html.contains("height: 1.3070em;"), "{html}");
+}
+
+#[test]
 fn the_embargos_values_reach_the_body_but_not_the_head() {
     let (html, warnings) = render_embargos();
     assert!(warnings.is_empty(), "{warnings:?}");

@@ -151,6 +151,10 @@ impl<'a> Builder<'a> {
                 );
             }
             Block::PageBreak => self.pending_break = true,
+            Block::EmptyLine => {
+                self.flush_break_as_paragraph();
+                xml::push(&mut self.body, "<text:p text:style-name=\"EmptyLine\"/>\n");
+            }
             Block::FootnoteDefinition(_) => {}
         }
     }

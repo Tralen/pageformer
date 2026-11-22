@@ -129,7 +129,8 @@ impl Builder<'_> {
                 | Block::Table(_)
                 | Block::CodeBlock(_)
                 | Block::ThematicBreak
-                | Block::PageBreak => {}
+                | Block::PageBreak
+                | Block::EmptyLine => {}
             }
         }
     }
@@ -167,6 +168,7 @@ impl Builder<'_> {
             Block::CodeBlock(code) => self.code_block(code),
             Block::ThematicBreak => "<hr class=\"horizontal-rule\" />".to_owned(),
             Block::PageBreak => "<div class=\"page-break\" aria-hidden=\"true\"></div>".to_owned(),
+            Block::EmptyLine => "<div class=\"empty-line\" aria-hidden=\"true\"></div>".to_owned(),
             Block::FootnoteDefinition(_) => String::new(),
         }
     }

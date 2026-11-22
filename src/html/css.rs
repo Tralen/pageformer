@@ -74,7 +74,7 @@ fn screen(template: &Template) -> String {
     main.push(format!("text-align: {};", alignment(paragraph.alignment())));
     output.push_str(&rule("main.pageformer", &main));
 
-    output.push_str(&content_rules(template, paragraph_after));
+    output.push_str(&content_rules(template, paragraph_after, line_height));
     output.push_str(
         "@media screen and (max-width: 720pt) { main.pageformer { width: 100%; padding: 24pt; } }\n",
     );
@@ -106,19 +106,26 @@ pub(crate) fn epub_stylesheet(template: &Template) -> String {
     }
     output.push_str(&rule("body", &body));
     output.push_str("img { max-width: 100%; height: auto; }\n");
-    output.push_str(&content_rules(template, paragraph_after));
+    output.push_str(&content_rules(template, paragraph_after, line_height));
     output.push_str("h1, h2, h3, h4, h5, h6 { break-before: auto; page-break-before: auto; }\n");
     output.push_str(".page-break { display: none; break-after: auto; page-break-after: auto; }\n");
     output
 }
 
-fn content_rules(template: &Template, paragraph_after: f64) -> String {
+fn content_rules(template: &Template, paragraph_after: f64, line_height: f64) -> String {
     let paragraph = template.formatting().paragraph();
     let mut output = String::new();
 
     output.push_str(&rule(
         "p",
         &[format!("margin: 0 0 {} 0;", points(paragraph_after))],
+    ));
+    output.push_str(&rule(
+        ".empty-line",
+        &[
+            format!("height: {line_height:.4}em;"),
+            "margin: 0;".to_owned(),
+        ],
     ));
     if let Some(background) = paragraph.background() {
         output.push_str(&rule(
